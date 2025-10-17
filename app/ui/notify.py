@@ -46,16 +46,30 @@ class NotifyPopup(QFrame):
         self._anim.setDuration(220)
         self._anim.setEasingCurve(QEasingCurve.OutCubic)
 
-    def show_centered(self, msec: int = 2200):
+    def show_centered(self, msec: int = 2200, pos: str = "bottom"):
+        """
+        pos: "bottom" (default), "middle", "top"
+        """
         if self.parent() is None:
-            return self.show()
+            # sin padre, no calculamos centro relativo
+            self.show()
+            self._timer.start(msec)
+            return
+
         pw = self.parent().width()
         ph = self.parent().height()
         self.adjustSize()
         w = self.width()
         h = self.height()
+
         x = (pw - w) // 2
-        y = ph - h - 28
+        if pos == "middle":
+            y = (ph - h) // 2
+        elif pos == "top":
+            y = 28
+        else:  # "bottom"
+            y = ph - h - 28
+
         self.setGeometry(x, y, w, h)
         self.setWindowOpacity(0.0)
         self.show()

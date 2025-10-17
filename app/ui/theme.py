@@ -231,22 +231,49 @@ QListView#ComboPopup::item:hover {{
    ========================= */
 QTableView {{
     background: {p['white']};
+    alternate-background-color: {p['bg']};
     color: {p['ink']};
     gridline-color: {p['border']};
     border: 1px solid {p['border']};
     border-radius: 8px;
     selection-background-color: rgba(31,31,46,0.10);
     selection-color: {p['ink']};
+    font-weight: 500;
 }}
-QTableView#DataTable {{  /* id específico por si querés tunear aparte */ }}
+
+QTableView::item {{
+    padding: 6px 8px;
+    border: none;
+    text-align: left; /* Alineación general a la izquierda */
+}}
+
+QTableView::item:selected {{
+    background-color: rgba(31,31,46,0.10);
+    color: {p['ink']};
+}}
 
 QHeaderView::section {{
-    background: {p['bg']};
-    color: {p['ink']};
+    background: {p['ink']};
+    color: white;
     padding: 6px 8px;
     border: 1px solid {p['border']};
     font-weight: 600;
+    text-align: left; /* Header a la izquierda por defecto */
 }}
+
+QHeaderView::section:horizontal {{
+    text-align: left;
+}}
+
+QTableView#DataTable {{
+    alternate-background-color: {p['bg']};
+}}
+
+/* Alinear la columna Precio a la derecha si el texto contiene “Precio” */
+QTableView::item[text*="Precio"] {{
+    text-align: right;
+}}
+
 
 /* =========================
    Cards / Panels
