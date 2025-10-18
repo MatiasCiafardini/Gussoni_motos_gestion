@@ -1,0 +1,35 @@
+---- Archivos temporales de Python ----
+pycache/
+*.py[cod]
+*.class
+
+---- Entorno virtual ----
+.venv/
+venv/
+env/
+
+---- Archivos de configuración locales ----
+*.log
+*.sqlite3
+*.db
+*.bak
+
+---- Archivos del sistema ----
+.DS_Store
+Thumbs.db
+
+---- Archivos de compilación / distribución ----
+build/
+dist/
+*.egg-info/
+
+---- Configuración de IDEs ----
+.vscode/
+.idea/
+*.code-workspace
+
+---- Otros ----
+*.spec
+*.exe
+*.dll
+
