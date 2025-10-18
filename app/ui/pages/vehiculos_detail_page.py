@@ -336,9 +336,7 @@ class VehiculoDetailPage(QWidget):
         try:
             payload = self._collect_payload()
             changed = self.service.update(self.vehiculo_id, payload)
-            self.btn_save.setText("Guardado ✓" if changed else "Sin cambios")
         except Exception:
-            self.btn_save.setText("Error")
             raise
         finally:
             self.edit_mode = False
