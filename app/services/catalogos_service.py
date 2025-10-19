@@ -22,7 +22,7 @@ class CatalogosService:
         with SessionLocal() as s:
             colores = s.execute(text("SELECT id, nombre FROM colores ORDER BY nombre")).mappings().all()
             estados_stock = s.execute(text("SELECT id, nombre FROM estados_stock ORDER BY nombre")).mappings().all()
-            condiciones = s.execute(text("SELECT id, nombre FROM estados_moto ORDER BY nombre")).mappings().all()
+            condiciones = s.execute(text("SELECT id, nombre FROM estados where tipo = 'vehiculos' ORDER BY nombre")).mappings().all()
             proveedores = s.execute(text("""
                 SELECT id, razon_social as nombre
                 FROM proveedores

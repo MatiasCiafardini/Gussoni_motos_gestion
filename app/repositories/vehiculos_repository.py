@@ -45,7 +45,7 @@ class VehiculosRepository:
         """
         try:
             rows = self.db.execute(
-                text("SELECT id, nombre FROM estados_moto ORDER BY nombre ASC")
+                text("SELECT id, nombre FROM estados where tipo = 'vehiculos' ORDER BY nombre ASC")
             ).mappings().all()
             if rows:
                 return [dict(r) for r in rows]
@@ -264,7 +264,7 @@ class VehiculosRepository:
             FROM vehiculos v
             LEFT JOIN colores c       ON c.id = v.color_id
             LEFT JOIN estados_stock es ON es.id = v.estado_stock_id
-            LEFT JOIN estados_moto em  ON em.id = v.estado_moto_id
+            LEFT JOIN estados em  ON em.id = v.estado_moto_id
             LEFT JOIN proveedores p    ON p.id = v.proveedor_id
             WHERE {where_sql}
         """
@@ -313,7 +313,7 @@ class VehiculosRepository:
                 FROM vehiculos v
                 LEFT JOIN colores c ON c.id = v.color_id
                 LEFT JOIN estados_stock es ON es.id = v.estado_stock_id
-                LEFT JOIN estados_moto em ON em.id = v.estado_moto_id
+                LEFT JOIN estados em ON em.id = v.estado_moto_id
                 WHERE v.id = :id
                 """
             ),
