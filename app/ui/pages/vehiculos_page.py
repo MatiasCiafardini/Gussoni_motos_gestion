@@ -322,8 +322,6 @@ class VehiculosPage(QWidget):
                     item = QTableWidgetItem(val if isinstance(val, str) else str(val))
                     if col == self.COL_PRECIO:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    else:
-                        item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                     self.table.setItem(row, col, item)
                 btn = QPushButton("🔍"); btn.setObjectName("BtnGhost")
                 btn.setToolTip("Consultar"); btn.setCursor(Qt.PointingHandCursor)

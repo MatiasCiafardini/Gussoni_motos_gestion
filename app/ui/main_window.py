@@ -395,15 +395,7 @@ class MainWindow(QMainWindow):
         /* Panel genérico (si lo usan en páginas) */
         #Panel { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; }
 
-        /* Tabla base (si la usan en páginas) */
-        QTableView#DataTable, QTableWidget#DataTable {
-          background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px;
-          gridline-color: #ECECEC; alternate-background-color: #FAFAFD;
-        }
-        QHeaderView::section {
-          background: #F1F5F9; color: #111827; border: none; padding: 8px 10px;
-          font-size: 13px; font-weight: 600;
-        }
+
 
         /* Toast */
         #Toast {
