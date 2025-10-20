@@ -161,6 +161,51 @@ QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabl
 }}
 
 /* =========================
+   Date inputs (QDateEdit)
+   ========================= */
+QDateEdit {{
+    /* hereda base de Inputs; solo afinamos detalles */
+    padding-right: 10px;       /* espacio cómodo */
+    min-height: 36px;
+}}
+
+/* Ocultar flechitas de subir/bajar */
+QDateEdit::up-button, QDateEdit::down-button {{
+    width: 0px; height: 0px;
+    border: none; margin: 0; padding: 0;
+}}
+
+/* Ocultar el triángulo del drop-down (dejamos solo click en el campo para abrir calendario) */
+QDateEdit::drop-down {{
+    width: 0px;
+    border: none;
+}}
+
+/* Calendario popup */
+QCalendarWidget QWidget {{
+    background: {PALETTE['white']};
+    color: {PALETTE['ink']};
+}}
+QCalendarWidget QToolButton {{
+    background: {PALETTE['bg']};
+    border: 1px solid {PALETTE['border']};
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-weight: 600;
+}}
+QCalendarWidget QToolButton:hover {{
+    background: #eef1f5;
+}}
+QCalendarWidget QAbstractItemView:enabled {{
+    background: {PALETTE['white']};
+    selection-background-color: {PALETTE['secondary']};
+    selection-color: {PALETTE['white']};
+    gridline-color: {PALETTE['border']};
+}}
+
+
+
+/* =========================
    Combos de Filtros (bonitos)
    ========================= */
 /* El page setea objectName="FilterCombo" y usa QListView#ComboPopup como popup */

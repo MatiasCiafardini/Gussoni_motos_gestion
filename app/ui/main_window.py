@@ -18,18 +18,12 @@ from app.ui.pages.placeholder_page import PlaceholderPage
 # Vehículos (listado principal)
 VehiculosPage = None
 try:
-    # tu versión nueva (sin args en ctor)
     from app.ui.pages.vehiculos_page import VehiculosPage as _VehiculosPage
     VehiculosPage = _VehiculosPage
 except Exception:
-    try:
-        # por si en tu repo el nombre difiere (mantengo segundo try por compat)
-        from app.ui.pages.vehiculos_page import VehiculosPage as _VehiculosPage
-        VehiculosPage = _VehiculosPage
-    except Exception:
-        VehiculosPage = None
+    VehiculosPage = None
 
-# Detalle de Vehículo (si existe)
+# Detalle de Vehículo
 VehiculoDetailPage = None
 try:
     from app.ui.pages.vehiculos_detail_page import VehiculoDetailPage as _VehiculoDetailPage
@@ -37,15 +31,16 @@ try:
 except Exception:
     VehiculoDetailPage = None
 
-# Alta de Vehículo (si existe)
+# Alta de Vehículo
+VehiculosAgregarPage = None
 try:
-    from app.ui.pages.vehiculos_agregar import VehiculosAgregarPage
+    from app.ui.pages.vehiculos_agregar import VehiculosAgregarPage as _VehiculosAgregarPage
+    VehiculosAgregarPage = _VehiculosAgregarPage
 except Exception:
-    VehiculosAgregarPage = None  # fallback si no existe
+    VehiculosAgregarPage = None
 
 # =================== CLIENTES ===================
 
-# Clientes (listado principal)
 ClientesPage = None
 try:
     from app.ui.pages.clientes_page import ClientesPage as _ClientesPage
@@ -53,7 +48,6 @@ try:
 except Exception:
     ClientesPage = None
 
-# Detalle de Cliente (si existe)
 ClientesDetailPage = None
 try:
     from app.ui.pages.clientes_detail_page import ClientesDetailPage as _ClientesDetailPage
@@ -61,13 +55,21 @@ try:
 except Exception:
     ClientesDetailPage = None
 
-# Alta de Cliente (si existe)
 ClientesAgregarPage = None
 try:
     from app.ui.pages.clientes_agregar import ClientesAgregarPage as _ClientesAgregarPage
     ClientesAgregarPage = _ClientesAgregarPage
 except Exception:
     ClientesAgregarPage = None
+
+# =================== FACTURACIÓN ===================
+
+FacturacionPage = None
+try:
+    from app.ui.pages.facturas_page import FacturasPage as _FacturacionPage
+    FacturacionPage = _FacturacionPage
+except Exception:
+    FacturacionPage = None
 
 # NotifyPopup propio
 from app.ui.notify import NotifyPopup
@@ -98,10 +100,6 @@ class _WarmupTask(QRunnable):
 class MainWindow(QMainWindow):
     """
     Ventana principal con Sidebar + QStackedWidget.
-    - Páginas fijas: Inicio, Clientes, Vehículos, Facturación, Proveedores, Reportes, Configuración
-    - Navegación apilada para detalle (navigate_to/widget) + volver (navigate_back)
-    - Toast minimal y NotifyPopup integrados
-    - Warmup de catálogos al iniciar (y lazy si todavía no cargó)
     """
     def __init__(self):
         super().__init__()
@@ -147,23 +145,21 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget(self)
         self._page_history: list[QWidget] = []
 
-        # referencias para reusar pantallas de "Agregar"
         self._vehiculos_agregar_ref: Optional[QWidget] = None
         self._clientes_agregar_ref: Optional[QWidget] = None
 
-        # Páginas fijas (usa tus reales si existen)
+        # Páginas fijas
         self.page_inicio = DashboardPage() if DashboardPage else PlaceholderPage("Inicio")
-
-        # Clientes y Vehículos: creamos con sus fabricadores y conectamos detalle
         self.page_clientes = self._make_clientes_page()
         self.page_vehiculos = self._make_vehiculos_page()
+        self.page_facturacion = self._make_facturacion_page()
 
-        self.page_facturacion = PlaceholderPage("Facturación")
         try:
             from app.ui.pages.proveedores_page import ProveedoresPage
             self.page_proveedores = ProveedoresPage()
         except Exception:
             self.page_proveedores = PlaceholderPage("Proveedores")
+
         self.page_reportes = PlaceholderPage("Reportes")
         self.page_config = PlaceholderPage("Configuración")
 
@@ -176,7 +172,7 @@ class MainWindow(QMainWindow):
         root.addWidget(sidebar)
         root.addWidget(self.stack, 1)
 
-        # Conexiones menú (resetean historial)
+        # Conexiones menú
         self.btn_inicio.clicked.connect(lambda: self.show_fixed_page(self.page_inicio))
         self.btn_clientes.clicked.connect(lambda: self.show_fixed_page(self.page_clientes))
         self.btn_vehiculos.clicked.connect(lambda: self.show_fixed_page(self.page_vehiculos))
@@ -184,7 +180,6 @@ class MainWindow(QMainWindow):
         self.btn_proveedores.clicked.connect(lambda: self.show_fixed_page(self.page_proveedores))
         self.btn_reportes.clicked.connect(lambda: self.show_fixed_page(self.page_reportes))
         self.btn_config.clicked.connect(lambda: self.show_fixed_page(self.page_config))
-
         self.btn_inicio.setChecked(True)
 
         # =============== Toast simple (overlay) ===============
@@ -197,14 +192,11 @@ class MainWindow(QMainWindow):
         self._toast_timer.setSingleShot(True)
         self._toast_timer.timeout.connect(lambda: self._toast.setVisible(False))
 
-        # Estilos mínimos
         self._apply_base_qss()
-
-        # =============== Warmup de catálogos al iniciar ===============
         self._preload_catalogos_async()
 
     # ---------------------------------------------------------------------
-    # Warmup: async al iniciar + lazy en navegación si hiciera falta
+    # Warmup de catálogos
     # ---------------------------------------------------------------------
     def _preload_catalogos_async(self):
         task = _WarmupTask()
@@ -213,7 +205,6 @@ class MainWindow(QMainWindow):
         QThreadPool.globalInstance().start(task)
 
     def _ensure_catalogs_ready(self):
-        """Carga catálogos si aún no se precalcularon."""
         if not CatalogCache.get().loaded_once():
             try:
                 CatalogosService().warmup_all()
@@ -221,247 +212,106 @@ class MainWindow(QMainWindow):
                 print(f"[Warmup Lazy] Falló: {e}")
 
     # ---------------------------------------------------------------------
-    # Integración flexible de Vehículos
+    # Integraciones de Páginas
     # ---------------------------------------------------------------------
     def _make_vehiculos_page(self) -> QWidget:
-        """
-        Intenta crear la página de Vehículos con diferentes firmas de ctor:
-        - VehiculosPage()                       (nueva)
-        - VehiculosPage(notify=..., navigate=..., navigate_back=...)  (compat)
-        Además conecta la señal open_detail(int) si existe.
-        """
         if not VehiculosPage:
             return PlaceholderPage("Vehículos")
-
-        page: Optional[QWidget] = None
-
-        # 1) Intento sin argumentos (nueva API)
         try:
             page = VehiculosPage()
-        except TypeError:
-            page = None
         except Exception:
-            page = None
-
-        # 2) Intento con callbacks (API anterior/compat)
-        if page is None:
-            try:
-                page = VehiculosPage(
-                    notify=self.notify,
-                    navigate=self.navigate_to,
-                    navigate_back=self.navigate_back
-                )
-            except Exception:
-                page = PlaceholderPage("Vehículos")
-
-        # Conectar señal open_detail si existe
+            page = PlaceholderPage("Vehículos")
         try:
             if hasattr(page, "open_detail"):
                 page.open_detail.connect(lambda vid: self.open_vehiculo_detail(int(vid)))
         except Exception:
             pass
-
         return page
 
-    def open_vehiculo_detail(self, vehiculo_id: int):
-        """
-        Abre el detalle de vehículo (si la página existe).
-        """
-        self._ensure_catalogs_ready()
-
-        if not VehiculoDetailPage:
-            self.notify("La página de detalle de vehículo no está disponible.", "error")
-            return
-
-        detail = VehiculoDetailPage(vehiculo_id)
-
-        def _back_and_refresh():
-            self.navigate_back()
-            try:
-                if getattr(self, "page_vehiculos", None):
-                    if hasattr(self.page_vehiculos, "refresh_from_parent"):
-                        self.page_vehiculos.refresh_from_parent()
-                    else:
-                        self.page_vehiculos.reload(reset_page=False)
-            except Exception:
-                pass
-
-        try:
-            if hasattr(detail, "navigate_back"):
-                detail.navigate_back.connect(_back_and_refresh)
-        except Exception:
-            pass
-
-        self.navigate_to(detail)
-
-    # ---------------------------------------------------------------------
-    # Integración flexible de Clientes
-    # ---------------------------------------------------------------------
     def _make_clientes_page(self) -> QWidget:
-        """
-        Intenta crear la página de Clientes con diferentes firmas de ctor:
-        - ClientesPage()                       (nueva)
-        - ClientesPage(notify=..., navigate=..., navigate_back=...)  (compat)
-        Además conecta la señal open_detail(int) si existe.
-        """
         if not ClientesPage:
             return PlaceholderPage("Clientes")
-
-        page: Optional[QWidget] = None
-
-        # 1) Intento sin argumentos (nueva API)
         try:
             page = ClientesPage()
-        except TypeError:
-            page = None
         except Exception:
-            page = None
-
-        # 2) Intento con callbacks (API anterior/compat)
-        if page is None:
-            try:
-                page = ClientesPage(
-                    notify=self.notify,
-                    navigate=self.navigate_to,
-                    navigate_back=self.navigate_back
-                )
-            except Exception:
-                page = PlaceholderPage("Clientes")
-
-        # Conectar señal open_detail si existe
+            page = PlaceholderPage("Clientes")
         try:
             if hasattr(page, "open_detail"):
                 page.open_detail.connect(lambda cid: self.open_cliente_detail(int(cid)))
         except Exception:
             pass
-
         return page
 
-    def open_cliente_detail(self, cliente_id: int):
-        """
-        Abre el detalle de cliente (si la página existe).
-        """
-        self._ensure_catalogs_ready()
+    def _make_facturacion_page(self) -> QWidget:
+        if not FacturacionPage:
+            return PlaceholderPage("Facturación")
+        try:
+            page = FacturacionPage()
+        except Exception:
+            page = PlaceholderPage("Facturación")
+        return page
 
+    # ---------------------------------------------------------------------
+    # Detalles
+    # ---------------------------------------------------------------------
+    def open_vehiculo_detail(self, vehiculo_id: int):
+        self._ensure_catalogs_ready()
+        if not VehiculoDetailPage:
+            self.notify("La página de detalle de vehículo no está disponible.", "error")
+            return
+        detail = VehiculoDetailPage(vehiculo_id)
+        if hasattr(detail, "navigate_back"):
+            detail.navigate_back.connect(lambda: self.navigate_back())
+        self.navigate_to(detail)
+
+    def open_cliente_detail(self, cliente_id: int):
+        self._ensure_catalogs_ready()
         if not ClientesDetailPage:
             self.notify("La página de detalle de cliente no está disponible.", "error")
             return
-
         detail = ClientesDetailPage(cliente_id)
-
-        def _back_and_refresh():
-            self.navigate_back()
-            try:
-                if getattr(self, "page_clientes", None):
-                    if hasattr(self.page_clientes, "refresh_from_parent"):
-                        self.page_clientes.refresh_from_parent()
-                    else:
-                        self.page_clientes.reload(reset_page=False)
-            except Exception:
-                pass
-
-        try:
-            if hasattr(detail, "navigate_back"):
-                detail.navigate_back.connect(_back_and_refresh)
-        except Exception:
-            pass
-
+        if hasattr(detail, "navigate_back"):
+            detail.navigate_back.connect(lambda: self.navigate_back())
         self.navigate_to(detail)
 
     # ---------------------------------------------------------------------
-    # Router simple por nombre
+    # Router
     # ---------------------------------------------------------------------
     def open_page(self, name: str, *args, **kwargs):
-        """
-        Router simple por nombre.
-        Soporta:
-          - 'vehiculos' / 'vehiculos_detalle' / 'vehiculos_agregar'
-          - 'clientes'  / 'clientes_detalle'  / 'clientes_agregar'
-        """
-        # Garantiza que haya catálogos disponibles la primera vez
         self._ensure_catalogs_ready()
 
-        # ===== Vehículos =====
         if name == "vehiculos":
             self.show_fixed_page(self.page_vehiculos)
             return
-
         if name == "vehiculos_detalle":
-            vehiculo_id = kwargs.get("vehiculo_id") or (args[0] if args else None)
-            if vehiculo_id is None:
-                self.notify("Falta vehiculo_id para abrir el detalle.", "error")
-                return
-            self.open_vehiculo_detail(int(vehiculo_id))
+            vid = kwargs.get("vehiculo_id") or (args[0] if args else None)
+            if vid: self.open_vehiculo_detail(int(vid))
+            return
+        if name == "vehiculos_agregar" and VehiculosAgregarPage:
+            page = VehiculosAgregarPage(self)
+            self.stack.setCurrentWidget(self._mount(page))
             return
 
-        if name == "vehiculos_agregar":
-            if VehiculosAgregarPage is None:
-                self.notify("La pantalla de alta de vehículos no está disponible.", "error")
-                return
-            # Reusar la pantalla si ya fue creada (más rápido)
-            if self._vehiculos_agregar_ref is None:
-                page = VehiculosAgregarPage(self)
-                # Conectar señales una vez
-                if hasattr(page, "go_back"):
-                    page.go_back.connect(lambda: self.open_page("vehiculos"))
-                if hasattr(page, "go_to_detalle"):
-                    page.go_to_detalle.connect(lambda vid: self.open_page("vehiculos_detalle", vehiculo_id=vid))
-                self._vehiculos_agregar_ref = page
-                self.stack.setCurrentWidget(self._mount(page))
-            else:
-                page = self._vehiculos_agregar_ref
-                # limpiar si el page lo implementa
-                if hasattr(page, "_limpiar_formulario"):
-                    try:
-                        page._limpiar_formulario()
-                    except Exception:
-                        pass
-                self.stack.setCurrentWidget(self._mount(page))
-            return
-
-        # ===== Clientes =====
         if name == "clientes":
             self.show_fixed_page(self.page_clientes)
             return
-
         if name == "clientes_detalle":
-            cliente_id = kwargs.get("cliente_id") or (args[0] if args else None)
-            if cliente_id is None:
-                self.notify("Falta cliente_id para abrir el detalle.", "error")
-                return
-            self.open_cliente_detail(int(cliente_id))
+            cid = kwargs.get("cliente_id") or (args[0] if args else None)
+            if cid: self.open_cliente_detail(int(cid))
+            return
+        if name == "clientes_agregar" and ClientesAgregarPage:
+            page = ClientesAgregarPage(self)
+            self.stack.setCurrentWidget(self._mount(page))
             return
 
-        if name == "clientes_agregar":
-            # Reusar la pantalla si ya fue creada
-            if self._clientes_agregar_ref is None:
-                if not ClientesAgregarPage:
-                    self.notify("La pantalla de alta de clientes no está disponible.", "error")
-                    return
-                page = ClientesAgregarPage(self)
-                # Conectar señales una vez
-                if hasattr(page, "go_back"):
-                    page.go_back.connect(lambda: self.open_page("clientes"))
-                if hasattr(page, "go_to_detalle"):
-                    page.go_to_detalle.connect(lambda cid: self.open_page("clientes_detalle", cliente_id=cid))
-                self._clientes_agregar_ref = page
-                self.stack.setCurrentWidget(self._mount(page))
-            else:
-                page = self._clientes_agregar_ref
-                # limpiar si el page lo implementa
-                if hasattr(page, "_limpiar_formulario"):
-                    try:
-                        page._limpiar_formulario()
-                    except Exception:
-                        pass
-                self.stack.setCurrentWidget(self._mount(page))
+        if name == "facturacion":
+            self.show_fixed_page(self.page_facturacion)
             return
 
-        # Ruta desconocida
         self.notify(f"Ruta no reconocida: {name}", "error")
 
     # ---------------------------------------------------------------------
-    # Navegación apilada (detalle -> volver)
+    # Navegación y helpers
     # ---------------------------------------------------------------------
     def navigate_to(self, widget: QWidget):
         self._page_history.append(self.stack.currentWidget())
@@ -474,17 +324,11 @@ class MainWindow(QMainWindow):
         current = self.stack.currentWidget()
         prev = self._page_history.pop()
         self.stack.setCurrentWidget(prev)
-        # limpieza del widget apilado
         current.setParent(None)
         current.deleteLater()
 
-    # ---------------------------------------------------------------------
-    # Navegación a páginas fijas (limpia historial)
-    # ---------------------------------------------------------------------
     def show_fixed_page(self, page: QWidget):
-        # Asegura catálogos antes de mostrar páginas que podrían usarlos
         self._ensure_catalogs_ready()
-
         while self._page_history:
             current = self.stack.currentWidget()
             prev = self._page_history.pop()
@@ -494,12 +338,11 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(page)
 
     # ---------------------------------------------------------------------
-    # Toast overlay
+    # Toast & notify
     # ---------------------------------------------------------------------
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
-        w = 320
-        h = 36
+        w, h = 320, 36
         x = (self.width() - w) // 2
         y = self.height() - h - 20
         self._toast.setGeometry(x, y, w, h)
@@ -530,8 +373,6 @@ class MainWindow(QMainWindow):
     def _apply_base_qss(self):
         self.setStyleSheet("""
         QMainWindow#MainWindow { background: #F5F7FB; }
-
-        /* Sidebar */
         #Sidebar { background: #1E2330; }
         #SideTitle { color: #E8EAED; font-weight: 700; margin: 6px 0 8px 0; }
         #SideButton {
@@ -540,11 +381,7 @@ class MainWindow(QMainWindow):
         }
         #SideButton:hover { background: #343B4D; }
         #SideButton:checked { background: #6C5CE7; border-color: #6C5CE7; color: white; }
-
-        /* Panel genérico (si lo usan en páginas) */
         #Panel { background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; }
-
-        /* Toast */
         #Toast {
           background: rgba(15, 23, 42, 0.92); color: white;
           padding: 8px 12px; border-radius: 8px; font-weight: 600;
@@ -552,10 +389,6 @@ class MainWindow(QMainWindow):
         """)
 
     def _mount(self, widget: QWidget) -> QWidget:
-        """
-        Asegura que el widget esté en el stack y devuelve el widget mostrado.
-        Evita duplicados y conserva la referencia para que no lo recolecte el GC.
-        """
         idx = self.stack.indexOf(widget)
         if idx == -1:
             self.stack.addWidget(widget)
