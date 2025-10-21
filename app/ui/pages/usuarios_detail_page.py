@@ -9,13 +9,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy, QMessageBox
 )
 
-from app.services.clientes_service import ClientesService
+from app.services.usuarios_service import UsuariosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 
 
-class ClientesDetailPage(QWidget):
+class UsuariosDetailPage(QWidget):
     """
-    Detalle de un cliente:
+    Detalle de un Usuario:
     - Campos de lectura/edición con el mismo estilo de filtros.
     - Al entrar: todo deshabilitado (modo lectura).
     - Botonera: Editar / Guardar / Cancelar / Volver (centrada).
@@ -23,12 +23,12 @@ class ClientesDetailPage(QWidget):
     """
     navigate_back = Signal()
 
-    def __init__(self, cliente_id: int, parent: Optional[Widget] = None):
+    def __init__(self, Usuario_id: int, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setObjectName("ClientesDetailPage")
+        self.setObjectName("UsuariosDetailPage")
 
-        self.service = ClientesService()
-        self.cliente_id = cliente_id
+        self.service = UsuariosService()
+        self.Usuario_id = Usuario_id
         self.data: Dict[str, Any] = {}
         self.edit_mode = False
 
@@ -97,7 +97,7 @@ class ClientesDetailPage(QWidget):
         grid.addWidget(self.in_observ, row, 1, 1, 5)
 
         root = QVBoxLayout(self)
-        title = QLabel(f"Cliente #{self.cliente_id}")
+        title = QLabel(f"Usuario #{self.Usuario_id}")
         title.setObjectName("KpiValue")
         root.addWidget(title)
         root.addLayout(grid)
@@ -188,7 +188,7 @@ class ClientesDetailPage(QWidget):
         # Estados (1 Activo / 0 Inactivo)
         self.in_estado.clear()
         try:
-            estados = self.service.get_estados_clientes()
+            estados = self.service.get_estados_Usuarios()
         except Exception:
             estados = None
         if not estados:
@@ -197,9 +197,9 @@ class ClientesDetailPage(QWidget):
             self.in_estado.addItem(e.get("nombre", f"ID {e.get('id')}"), e.get("id"))
 
     def _load_data(self):
-        data = self.service.get(self.cliente_id)
+        data = self.service.get(self.Usuario_id)
         if not data:
-            QMessageBox.warning(self, "Clientes", "No se encontró el cliente.")
+            QMessageBox.warning(self, "Usuarios", "No se encontró el Usuario.")
             self.navigate_back.emit()
             return
         self.data = data
@@ -298,13 +298,13 @@ class ClientesDetailPage(QWidget):
         errs = self._validate(payload)
         if errs:
             msg = "\n".join(f"• {v}" for v in errs.values())
-            QMessageBox.warning(self, "Clientes", msg)
+            QMessageBox.warning(self, "Usuarios", msg)
             return
 
         try:
-            changed = self.service.update(self.cliente_id, payload)
+            changed = self.service.update(self.Usuario_id, payload)
         except Exception as ex:
-            QMessageBox.critical(self, "Clientes", f"Error al guardar: {ex}")
+            QMessageBox.critical(self, "Usuarios", f"Error al guardar: {ex}")
             return
         finally:
             # volver a modo lectura siempre

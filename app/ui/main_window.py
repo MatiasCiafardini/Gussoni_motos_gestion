@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Callable
+# Usamos loguru para el logging, como se usa en el resto de la aplicación [29]
+from loguru import logger 
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
@@ -49,11 +51,11 @@ except Exception:
     ClientesPage = None
 
 ClientesDetailPage = None
-try:
-    from app.ui.pages.clientes_detail_page import ClientesDetailPage as _ClientesDetailPage
-    ClientesDetailPage = _ClientesDetailPage
-except Exception:
-    ClientesDetailPage = None
+#try:
+    #from app.ui.pages.clientes_detail import ClientesDetailPage as _ClientesDetailPage
+    #ClientesDetailPage = _ClientesDetailPage
+#except Exception:
+    #ClientesDetailPage = None
 
 ClientesAgregarPage = None
 try:
@@ -70,6 +72,43 @@ try:
     FacturacionPage = _FacturacionPage
 except Exception:
     FacturacionPage = None
+
+# =================== CONFIGURACION ===================
+
+ConfiguracionPage = None
+try:
+    from app.ui.pages.configuracion_page import ConfiguracionPage as _ConfiguracionPage
+    ConfiguracionPage = _ConfiguracionPage
+except Exception:
+    ConfiguracionPage = None
+
+    # =================== USUARIOS ===================
+
+# Vehículos (listado principal)
+UsuariosPage = None
+try:
+    from app.ui.pages.usuarios_page import UsuariosPage as UsuariosPage
+    UsuariosPage = UsuariosPage
+except Exception:
+    UsuariosPage = None
+
+# Detalle de Vehículo
+UsuariosDetailPage = None
+try:
+    from app.ui.pages.usuarios_detail_page import UsuariosDetailPage as _UsuariosDetailPage
+    UsuariosDetailPage = _UsuariosDetailPage
+except Exception:
+    UsuariosDetailPage = None
+
+# Alta de Vehículo
+UsuariosAgregarPage = None
+try:
+    from app.ui.pages.usuarios_agregar import UsuariosAgregarPage as _UsuariosAgregarPage
+    UsuariosAgregarPage = _UsuariosAgregarPage
+except Exception:
+    UsuariosAgregarPage = None
+
+
 
 # NotifyPopup propio
 from app.ui.notify import NotifyPopup
@@ -133,6 +172,7 @@ class MainWindow(QMainWindow):
         self.btn_proveedores  = self._mk_btn("Proveedores")
         self.btn_reportes     = self._mk_btn("Reportes")
         self.btn_config       = self._mk_btn("Configuración")
+        
 
         for b in (
             self.btn_inicio, self.btn_clientes, self.btn_vehiculos, self.btn_facturacion,
@@ -143,16 +183,19 @@ class MainWindow(QMainWindow):
 
         # =============== Stack + historial ===============
         self.stack = QStackedWidget(self)
-        self._page_history: list[QWidget] = []
+        self._history: list[QWidget] = []
 
         self._vehiculos_agregar_ref: Optional[QWidget] = None
+        self._usuarios_agregar_ref: Optional[QWidget] = None
         self._clientes_agregar_ref: Optional[QWidget] = None
 
         # Páginas fijas
         self.page_inicio = DashboardPage() if DashboardPage else PlaceholderPage("Inicio")
-        self.page_clientes = self._make_clientes_page()
-        self.page_vehiculos = self._make_vehiculos_page()
-        self.page_facturacion = self._make_facturacion_page()
+        self.page_clientes = self._make_clientes()
+        self.page_vehiculos = self._make_vehiculos()
+        self.page_facturacion = self._make_facturacion()
+        self.page_configuracion = self._make_configuracion()
+        self.page_usuarios = self._make_usuarios()
 
         try:
             from app.ui.pages.proveedores_page import ProveedoresPage
@@ -161,11 +204,10 @@ class MainWindow(QMainWindow):
             self.page_proveedores = PlaceholderPage("Proveedores")
 
         self.page_reportes = PlaceholderPage("Reportes")
-        self.page_config = PlaceholderPage("Configuración")
 
         for p in (
             self.page_inicio, self.page_clientes, self.page_vehiculos, self.page_facturacion,
-            self.page_proveedores, self.page_reportes, self.page_config
+            self.page_proveedores, self.page_reportes, self.page_configuracion
         ):
             self.stack.addWidget(p)
 
@@ -173,13 +215,13 @@ class MainWindow(QMainWindow):
         root.addWidget(self.stack, 1)
 
         # Conexiones menú
-        self.btn_inicio.clicked.connect(lambda: self.show_fixed_page(self.page_inicio))
-        self.btn_clientes.clicked.connect(lambda: self.show_fixed_page(self.page_clientes))
-        self.btn_vehiculos.clicked.connect(lambda: self.show_fixed_page(self.page_vehiculos))
-        self.btn_facturacion.clicked.connect(lambda: self.show_fixed_page(self.page_facturacion))
-        self.btn_proveedores.clicked.connect(lambda: self.show_fixed_page(self.page_proveedores))
-        self.btn_reportes.clicked.connect(lambda: self.show_fixed_page(self.page_reportes))
-        self.btn_config.clicked.connect(lambda: self.show_fixed_page(self.page_config))
+        self.btn_inicio.clicked.connect(lambda: self.show_fixed(self.page_inicio))
+        self.btn_clientes.clicked.connect(lambda: self.show_fixed(self.page_clientes))
+        self.btn_vehiculos.clicked.connect(lambda: self.show_fixed(self.page_vehiculos))
+        self.btn_facturacion.clicked.connect(lambda: self.show_fixed(self.page_facturacion))
+        self.btn_proveedores.clicked.connect(lambda: self.show_fixed(self.page_proveedores))
+        self.btn_reportes.clicked.connect(lambda: self.show_fixed(self.page_reportes))
+        self.btn_config.clicked.connect(lambda: self.show_fixed(self.page_configuracion))
         self.btn_inicio.setChecked(True)
 
         # =============== Toast simple (overlay) ===============
@@ -214,7 +256,7 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------
     # Integraciones de Páginas
     # ---------------------------------------------------------------------
-    def _make_vehiculos_page(self) -> QWidget:
+    def _make_vehiculos(self) -> QWidget:
         if not VehiculosPage:
             return PlaceholderPage("Vehículos")
         try:
@@ -228,7 +270,7 @@ class MainWindow(QMainWindow):
             pass
         return page
 
-    def _make_clientes_page(self) -> QWidget:
+    def _make_clientes(self) -> QWidget:
         if not ClientesPage:
             return PlaceholderPage("Clientes")
         try:
@@ -242,7 +284,7 @@ class MainWindow(QMainWindow):
             pass
         return page
 
-    def _make_facturacion_page(self) -> QWidget:
+    def _make_facturacion(self) -> QWidget:
         if not FacturacionPage:
             return PlaceholderPage("Facturación")
         try:
@@ -251,6 +293,28 @@ class MainWindow(QMainWindow):
             page = PlaceholderPage("Facturación")
         return page
 
+    def _make_configuracion(self) -> QWidget:
+        if not ConfiguracionPage:
+            return PlaceholderPage("Configuracion")
+        try:
+            page = ConfiguracionPage()
+        except Exception:
+            page = PlaceholderPage("Configuracion")      
+        return page
+    
+    def _make_usuarios(self) -> QWidget:
+        if not UsuariosPage:
+            return PlaceholderPage("Usuarios")
+        try:
+            page = UsuariosPage()
+        except Exception:
+            page = PlaceholderPage("Usuarios")
+        try:
+            if hasattr(page, "open_detail"):
+                page.open_detail.connect(lambda vid: self.open_usuario_detail(int(vid)))
+        except Exception:
+            pass
+        return page   
     # ---------------------------------------------------------------------
     # Detalles
     # ---------------------------------------------------------------------
@@ -274,14 +338,22 @@ class MainWindow(QMainWindow):
             detail.navigate_back.connect(lambda: self.navigate_back())
         self.navigate_to(detail)
 
+    def open_usuario_detail(self, usuario_id: int):
+        self._ensure_catalogs_ready()
+        if not UsuariosDetailPage:
+            self.notify("La página de detalle de usuario no está disponible.", "error")
+            return
+        detail = UsuariosDetailPage(usuario_id)
+        if hasattr(detail, "navigate_back"):
+            detail.navigate_back.connect(lambda: self.navigate_back())
+        self.navigate_to(detail)
     # ---------------------------------------------------------------------
     # Router
     # ---------------------------------------------------------------------
-    def open_page(self, name: str, *args, **kwargs):
+    def open(self, name: str, *args, **kwargs):
         self._ensure_catalogs_ready()
-
         if name == "vehiculos":
-            self.show_fixed_page(self.page_vehiculos)
+            self.show_fixed(self.page_vehiculos)
             return
         if name == "vehiculos_detalle":
             vid = kwargs.get("vehiculo_id") or (args[0] if args else None)
@@ -293,7 +365,7 @@ class MainWindow(QMainWindow):
             return
 
         if name == "clientes":
-            self.show_fixed_page(self.page_clientes)
+            self.show_fixed(self.page_clientes)
             return
         if name == "clientes_detalle":
             cid = kwargs.get("cliente_id") or (args[0] if args else None)
@@ -303,9 +375,24 @@ class MainWindow(QMainWindow):
             page = ClientesAgregarPage(self)
             self.stack.setCurrentWidget(self._mount(page))
             return
+        
+        if name == "usuarios":
+            self.show_fixed(self.page_usuarios)
+            return
+        if name == "usuarios_detalle":
+            vid = kwargs.get("usuarios_id") or (args[0] if args else None)
+            if vid: self.open_usuario_detail(int(vid))
+            return
+        if name == "usuarios_agregar" and UsuariosAgregarPage:
+            page = UsuariosAgregarPage(self)
+            self.stack.setCurrentWidget(self._mount(page))
+            return
 
         if name == "facturacion":
-            self.show_fixed_page(self.page_facturacion)
+            self.show_fixed(self.page_facturacion)
+            return
+        if name == "configuracion":
+            self.show_fixed(self.page_configuracion)
             return
 
         self.notify(f"Ruta no reconocida: {name}", "error")
@@ -314,24 +401,24 @@ class MainWindow(QMainWindow):
     # Navegación y helpers
     # ---------------------------------------------------------------------
     def navigate_to(self, widget: QWidget):
-        self._page_history.append(self.stack.currentWidget())
+        self._history.append(self.stack.currentWidget())
         self.stack.addWidget(widget)
         self.stack.setCurrentWidget(widget)
 
     def navigate_back(self):
-        if not self._page_history:
+        if not self._history:
             return
         current = self.stack.currentWidget()
-        prev = self._page_history.pop()
+        prev = self._history.pop()
         self.stack.setCurrentWidget(prev)
         current.setParent(None)
         current.deleteLater()
 
-    def show_fixed_page(self, page: QWidget):
+    def show_fixed(self, page: QWidget):
         self._ensure_catalogs_ready()
-        while self._page_history:
+        while self._history:
             current = self.stack.currentWidget()
-            prev = self._page_history.pop()
+            prev = self._history.pop()
             self.stack.setCurrentWidget(prev)
             current.setParent(None)
             current.deleteLater()
