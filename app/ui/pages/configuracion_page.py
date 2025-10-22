@@ -74,17 +74,20 @@ class ConfiguracionPage(QWidget):
 
 
     def navigate_to_usuarios(self):
-        """
-        Maneja la navegación a UsuariosPage usando el método open_page de la MainWindow.
-        """
-        logger.error("Hola")
+        """Abre la pantalla de alta de usuarios."""
         mw = getattr(self, "main_window", None) or self.window()
-        if not isinstance(mw, QMainWindow):
-            return
-        logger.error(mw)
+        logger.error("Intentando navegar hacia la página de Usuarios...")
+    # Subir en la jerarquía de widgets hasta encontrar un QMainWindow
+        while mw and not isinstance(mw, QMainWindow):
+            mw = mw.parent()
+
+    # Validar que se encontró la MainWindow
+        if not mw or not hasattr(mw, "open_page"):
+            logger.error("No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.")
+
         try:
-            if hasattr(mw, "open_page"):
-                mw.open_page("usuarios")
+            logger.debug("MainWindow detectada. Abriendo página de usuarios...")
+            mw.open("usuarios")
+            logger.info("Navegación a UsuariosPage completada correctamente.")
         except Exception as e:
-            logger.error(f"Fallo al instanciar UsuariosPage: {e}")
-            pass
+            logger.error(f"Fallo al instanciar o abrir UsuariosPage: {e}")

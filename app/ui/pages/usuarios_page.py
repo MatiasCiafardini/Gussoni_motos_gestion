@@ -42,13 +42,12 @@ class UsuariosPage(QWidget):
         super().__init__(parent)
         self.setObjectName("UsuariosPage")
         self.main_window: Optional[QMainWindow] = main_window
-        self._usuarios_agregar_ref: Optional[QWidget] = None
+        self._usuarios_agregar_ref: Optional[UsuariosAgregarPage] = None
+
         self.service = UsuariosService()
         self.settings = QSettings("Gussoni", "SistemaFacturacion") # Nombre de la organización [4]
-
-        # ---- Filtros ----
         
-        # Filtros de texto
+        # ---- Filtros ----
         self.in_nombre = QLineEdit(); self.in_nombre.setPlaceholderText("Nombre")
         self.in_usuario = QLineEdit(); self.in_usuario.setPlaceholderText("Usuario")
         self.in_email = QLineEdit(); self.in_email.setPlaceholderText("Email")
@@ -255,7 +254,7 @@ class UsuariosPage(QWidget):
 
         filtros = self.gather_filters()
         
-        rows, total = self.service.search(filtros, page=self.page, page_size=self.page_size) [21]
+        rows, total = self.service.search(filtros, page=self.page, page_size=self.page_size) 
         
         self.total = total
         self.populate_table(rows)
@@ -267,7 +266,7 @@ class UsuariosPage(QWidget):
         self.btn_next.setEnabled(self.page < pages)
 
     def populate_table(self, rows: List[Dict[str, Any]]):
-        """Llena la tabla con los datos de usuarios.""" [22, 36]
+        """Llena la tabla con los datos de usuarios."""
         was_sorting = self.table.isSortingEnabled()
         if was_sorting:
             self.table.setSortingEnabled(False)
@@ -335,7 +334,6 @@ class UsuariosPage(QWidget):
     def _abrir_pantalla_agregar(self):
         """Abre la pantalla de alta de usuarios."""
         mw = getattr(self, "main_window", None) or self.window()
-
         if not isinstance(mw, QMainWindow):
             QMessageBox.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
             return
@@ -345,15 +343,13 @@ class UsuariosPage(QWidget):
             return
 
         if self._usuarios_agregar_ref is None:
-            page = UsuariosAgregarPage(mw)
-            
+            page = UsuariosAgregarPage(mw)           
             # Conexión de señales (asumiendo que existen)
             if hasattr(page, "go_back") and hasattr(mw, "open_page"):
                 page.go_back.connect(lambda: mw.open_page("usuarios"))
             if hasattr(page, "go_to_detalle") and hasattr(mw, "open_page"):
                 page.go_to_detalle.connect(lambda uid: mw.open_page("usuarios_detalle", user_id=uid))
-            self._usuarios_agregar_ref = page
-            
+            self._usuarios_agregar_ref = page            
             # Montaje en el stack de la ventana principal
             if hasattr(mw, "_mount") and callable(mw._mount):
                 mw.stack.setCurrentWidget(mw._mount(page))
@@ -361,13 +357,11 @@ class UsuariosPage(QWidget):
                 if mw.stack.indexOf(page) == -1: mw.stack.addWidget(page)
                 mw.stack.setCurrentWidget(page)
         else:
-            page = self._usuarios_agregar_ref
-            
+            page = self._usuarios_agregar_ref        
             # Limpiar formulario si el método existe [27, 38]
             if hasattr(page, "_limpiar_formulario"):
                 try: page._limpiar_formulario()
                 except Exception: pass
-
             if hasattr(mw, "_mount") and callable(mw._mount):
                 mw.stack.setCurrentWidget(mw._mount(page))
             else:

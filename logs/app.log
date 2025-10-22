@@ -13,3 +13,282 @@
 2025-10-20 21:55:47.094 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x2097cc7b060, name="MainWindow") at 0x000002097E21C2C0>
 2025-10-20 21:57:23.129 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
 2025-10-20 21:57:23.130 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x23907e8ee10, name="MainWindow") at 0x0000023921268E00>
+2025-10-21 19:36:18.851 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:36:18.853 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x20edc166580, name="MainWindow") at 0x0000020EF72F9440>
+2025-10-21 19:36:20.546 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:36:20.546 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x20edc166580, name="MainWindow") at 0x0000020EF72F9440>
+2025-10-21 19:37:45.167 | ERROR    | app.ui.pages.usuarios_page:__init__:43 - Es
+2025-10-21 19:37:49.217 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:37:49.218 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x19d03f21700, name="MainWindow") at 0x0000019D1F77E980>
+2025-10-21 19:43:09.269 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:43:09.270 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x1f163ce9b50, name="MainWindow") at 0x000001F10248CC80>
+2025-10-21 19:43:40.432 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:43:40.433 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x185e2f17200, name="MainWindow") at 0x00000185E44A4580>
+2025-10-21 19:43:43.291 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:43:43.291 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - <app.ui.main_window.MainWindow(0x185e2f17200, name="MainWindow") at 0x00000185E44A4580>
+2025-10-21 19:44:29.098 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:80 - Hola
+2025-10-21 19:44:29.099 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:84 - False
+2025-10-21 19:56:22.884 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 19:56:22.885 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 19:56:22.886 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:93 - Fallo al instanciar o abrir UsuariosPage: 'MainWindow' object has no attribute 'open_page'
+2025-10-21 20:01:37.255 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:01:37.256 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:01:37.256 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:02:07.387 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:02:07.387 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:02:07.388 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:06.076 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:06.077 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:06.080 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:12.961 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:12.961 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:12.962 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:19.193 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:19.193 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:19.194 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:51.997 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:51.997 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:51.998 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:54.092 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:54.092 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:54.093 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:55.597 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:55.598 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:55.599 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:09:57.939 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:09:57.939 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:09:57.940 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:10:15.179 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:10:15.179 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:10:15.180 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:10:24.179 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:10:24.179 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:10:24.180 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:11:56.686 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:11:56.687 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:11:56.688 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:12:25.492 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:12:25.492 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:12:25.493 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:18:23.189 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:18:23.190 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:18:23.192 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:20:38.357 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:20:38.358 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:20:38.359 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:22:48.209 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:22:48.210 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:22:48.212 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:23:05.545 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:23:05.545 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:23:05.546 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:23:20.517 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:23:20.518 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:23:20.518 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:28:18.336 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:28:18.337 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:28:18.339 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:28:37.906 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:28:37.907 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:28:37.908 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:30:31.206 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:30:31.207 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:30:31.208 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:31:25.882 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:31:25.883 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:31:25.885 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:32:00.776 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:32:00.777 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:32:00.778 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:32:22.441 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:32:22.442 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:32:22.444 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:33:11.609 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:33:11.610 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:33:11.611 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:33:56.505 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:33:56.506 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:33:56.507 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:34:10.404 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:34:10.405 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:34:10.407 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:35:26.184 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:35:26.185 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:35:26.187 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:35:47.104 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:35:47.105 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:35:47.107 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:36:10.346 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:36:10.347 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:36:10.349 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:36:58.894 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:36:58.895 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:36:58.897 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:38:10.244 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:38:10.245 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:38:10.247 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:38:45.826 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:38:45.827 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:38:45.829 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:39:09.422 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:39:09.423 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:39:09.424 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:39:50.486 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:39:50.487 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:39:50.489 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:40:59.089 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:40:59.090 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:40:59.091 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:45:05.105 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:45:05.106 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:45:05.108 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:47:24.706 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:47:24.707 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:47:24.708 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:48:02.791 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:48:02.792 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:48:02.794 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:48:07.949 | ERROR    | app.ui.pages.usuarios_agregar:_on_guardar:231 - Guardar
+2025-10-21 20:48:46.947 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:48:46.948 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:48:46.950 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:48:53.386 | ERROR    | app.ui.pages.usuarios_agregar:_on_guardar:231 - Guardar
+2025-10-21 20:48:53.387 | ERROR    | app.ui.pages.usuarios_agregar:_on_guardar:233 - Guardar2
+2025-10-21 20:48:53.387 | ERROR    | app.ui.pages.usuarios_agregar:_on_guardar:239 - Guardar23
+2025-10-21 20:48:53.434 | ERROR    | app.ui.pages.usuarios_agregar:_on_guardar:247 - Guardar24
+2025-10-21 20:49:53.971 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:49:53.972 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:49:53.973 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:50:24.049 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:50:24.050 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:50:24.052 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:50:32.842 | ERROR    | app.services.usuarios_service:create_user:24 - Create1
+2025-10-21 20:51:17.721 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:51:17.722 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:51:17.724 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:51:21.945 | ERROR    | app.services.usuarios_service:create_user:24 - Create1
+2025-10-21 20:52:30.080 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:52:30.081 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:52:30.083 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:52:35.083 | ERROR    | app.services.usuarios_service:create_user:24 - Create1
+2025-10-21 20:52:35.083 | ERROR    | app.services.usuarios_service:create_user:26 - Create222
+2025-10-21 20:52:35.084 | ERROR    | app.services.usuarios_service:create_user:29 - Create2
+2025-10-21 20:52:35.084 | ERROR    | app.services.usuarios_service:create_user:34 - Create2222
+2025-10-21 20:52:35.084 | ERROR    | app.services.usuarios_service:create_user:38 - Create13
+2025-10-21 20:52:35.084 | ERROR    | app.services.usuarios_service:create_user:42 - Create
+2025-10-21 20:53:49.004 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:53:49.005 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:53:49.007 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:53:53.524 | ERROR    | app.services.usuarios_service:create_user:24 - Create1
+2025-10-21 20:53:53.524 | ERROR    | app.services.usuarios_service:create_user:26 - Create222
+2025-10-21 20:53:53.524 | ERROR    | app.services.usuarios_service:create_user:29 - Create2
+2025-10-21 20:55:12.558 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:55:12.559 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:55:12.561 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:55:17.243 | ERROR    | app.services.usuarios_service:create_user:34 - CreateUsar
+2025-10-21 20:58:20.379 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:58:20.380 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:58:20.382 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:58:25.470 | ERROR    | app.services.usuarios_service:create_user:34 - CreateUsar
+2025-10-21 20:59:37.808 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 20:59:37.809 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 20:59:37.811 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 20:59:43.669 | ERROR    | app.services.usuarios_service:create_user:34 - CreateUsar
+2025-10-21 20:59:43.670 | ERROR    | app.repositories.usuarios_repository:create_user:22 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': '10ce1206b7896e84f5d7640976e8402a$b35d01f78e0621bfc6434852e8200292801d396126b1935277d20b2c45729060'}
+2025-10-21 20:59:43.670 | ERROR    | app.repositories.usuarios_repository:create_user:24 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': '10ce1206b7896e84f5d7640976e8402a$b35d01f78e0621bfc6434852e8200292801d396126b1935277d20b2c45729060'}
+2025-10-21 21:00:52.150 | ERROR    | app.services.usuarios_service:create_user:34 - CreateUsar
+2025-10-21 21:00:52.151 | ERROR    | app.repositories.usuarios_repository:create_user:22 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': '34533b9b809096c0ae4cc65469ba30ce$77d157b3f13c25792b441fc5021c08a4779734915a6a559ebb765e8d32ac752c'}
+2025-10-21 21:00:52.151 | ERROR    | app.repositories.usuarios_repository:create_user:24 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': '34533b9b809096c0ae4cc65469ba30ce$77d157b3f13c25792b441fc5021c08a4779734915a6a559ebb765e8d32ac752c'}
+2025-10-21 21:00:55.988 | ERROR    | app.services.usuarios_service:create_user:34 - CreateUsar
+2025-10-21 21:00:55.989 | ERROR    | app.repositories.usuarios_repository:create_user:22 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': 'ace7e9d093b07cff15068308c6ed30e2$d159aca24cb7d29a7533de732d4d9661f2382244d79899cc4c338e95a493df11'}
+2025-10-21 21:00:55.989 | ERROR    | app.repositories.usuarios_repository:create_user:24 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': 'ace7e9d093b07cff15068308c6ed30e2$d159aca24cb7d29a7533de732d4d9661f2382244d79899cc4c338e95a493df11'}
+2025-10-21 21:07:38.767 | ERROR    | app.services.usuarios_service:create_user:34 - CreateUsar
+2025-10-21 21:07:38.767 | ERROR    | app.repositories.usuarios_repository:create_user:22 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': '63e19a4138e27cc591cd1c14953e3fc1$54cd37a7e9a304f3eb2c620a65c941241a7333047a35b6636945c4c89b378c4a'}
+2025-10-21 21:07:38.768 | ERROR    | app.repositories.usuarios_repository:create_user:24 - {'nombre': 'asdasdas', 'usuario': 'asdadsadsads', 'rol': 'admin', 'email': 'none', 'activo': 1, 'contraseña_hash': '63e19a4138e27cc591cd1c14953e3fc1$54cd37a7e9a304f3eb2c620a65c941241a7333047a35b6636945c4c89b378c4a'}
+2025-10-21 21:07:38.918 | ERROR    | app.ui.pages.usuarios_agregar:_on_guardar:252 - Guardar25
+2025-10-21 21:08:38.583 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:08:38.584 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:08:38.585 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 21:09:46.312 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:09:46.313 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:09:46.315 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 21:12:50.256 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:12:50.257 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:12:50.259 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 21:13:01.249 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:13:01.249 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:13:01.250 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 21:13:02.519 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:13:02.520 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:13:55.049 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:13:55.050 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:13:55.052 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 21:13:56.721 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:13:56.722 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:14:36.085 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:14:36.086 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:14:36.088 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-21 21:14:36.828 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:14:36.829 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:14:50.098 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:14:50.099 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:15:03.116 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1) AND u.rol = :rol
+        
+2025-10-21 21:15:03.116 | ERROR    | app.repositories.usuarios_repository:search:144 - {'rol': 'vendedor'}
+2025-10-21 21:15:04.843 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1) AND u.rol = :rol
+        
+2025-10-21 21:15:04.844 | ERROR    | app.repositories.usuarios_repository:search:144 - {'rol': 'admin'}
+2025-10-21 21:15:09.210 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1) AND u.rol = :rol AND u.activo = :activo
+        
+2025-10-21 21:15:09.211 | ERROR    | app.repositories.usuarios_repository:search:144 - {'rol': 'admin', 'activo': 1}
+2025-10-21 21:15:10.505 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1) AND u.rol = :rol AND u.activo = :activo
+        
+2025-10-21 21:15:10.505 | ERROR    | app.repositories.usuarios_repository:search:144 - {'rol': 'admin', 'activo': 0}
+2025-10-21 21:15:11.711 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1) AND u.rol = :rol AND u.activo = :activo
+        
+2025-10-21 21:15:11.712 | ERROR    | app.repositories.usuarios_repository:search:144 - {'rol': 'admin', 'activo': 1}
+2025-10-21 21:15:12.787 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1) AND u.rol = :rol
+        
+2025-10-21 21:15:12.788 | ERROR    | app.repositories.usuarios_repository:search:144 - {'rol': 'admin'}
+2025-10-21 21:15:14.324 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:15:14.324 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:15:15.055 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:15:15.056 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:15:43.920 | ERROR    | app.repositories.usuarios_repository:search:143 - 
+        FROM usuarios u
+        WHERE (1=1)
+        
+2025-10-21 21:15:43.921 | ERROR    | app.repositories.usuarios_repository:search:144 - {}
+2025-10-21 21:22:38.937 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
+2025-10-21 21:22:38.938 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
+2025-10-21 21:22:38.940 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.

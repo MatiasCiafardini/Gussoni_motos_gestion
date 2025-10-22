@@ -1,25 +1,27 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 import re
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QTextEdit, QComboBox, QPushButton,
-    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy, QMessageBox
+    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy, QMessageBox, QFrame, QSpacerItem
 )
 
+# Nota: Asumo que estos servicios manejan la DB
 from app.services.usuarios_service import UsuariosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
+# Nota: La Notificación la dejo comentada, se usa en la de Agregar.
+# from app.ui.notify import NotifyPopup 
 
 
 class UsuariosDetailPage(QWidget):
     """
     Detalle de un Usuario:
-    - Campos de lectura/edición con el mismo estilo de filtros.
-    - Al entrar: todo deshabilitado (modo lectura).
-    - Botonera: Editar / Guardar / Cancelar / Volver (centrada).
-    - Volver confirma si hay edición pendiente.
+    - Campos de lectura/edición acordes a la tabla 'usuarios' (id, nombre, usuario, rol, email, activo).
+    - Incluye campos de solo lectura (ID, fecha_creacion, contraseña_hash)
+    - Botonera: Editar / Guardar / Cancelar / Volver.
     """
     navigate_back = Signal()
 
@@ -32,76 +34,76 @@ class UsuariosDetailPage(QWidget):
         self.data: Dict[str, Any] = {}
         self.edit_mode = False
 
-        # ---------- Controles ----------
+        # -------------------- Controles (Adaptados a la tabla 'usuarios') --------------------
         # Línea 0
-        self.in_nombre = QLineEdit();     self.in_nombre.setPlaceholderText("Nombre")
-        self.in_apellido = QLineEdit();   self.in_apellido.setPlaceholderText("Apellido")
+        self.in_nombre = QLineEdit();     self.in_nombre.setPlaceholderText("Nombre completo")
+        self.in_usuario = QLineEdit();    self.in_usuario.setPlaceholderText("Nombre de usuario (Login)")
+        self.in_rol = QComboBox();        self._setup_combo(self.in_rol)
 
         # Línea 1
-        self.in_tipo_doc = QComboBox();   self._setup_combo(self.in_tipo_doc)
-        self.in_nro_doc = QLineEdit();    self.in_nro_doc.setPlaceholderText("N° Documento")
-        self.in_nro_doc.setValidator(QIntValidator(0, 99999999, self))
-
-        # Línea 2
         self.in_email = QLineEdit();      self.in_email.setPlaceholderText("Email")
-        self.in_telefono = QLineEdit();   self.in_telefono.setPlaceholderText("Teléfono")
+        self.in_activo = QComboBox();     self._setup_combo(self.in_activo) # Campo 'activo' (1/0)
+        self.btn_password = QPushButton("Cambiar Contraseña..."); self.btn_password.setObjectName("BtnFlat")
+        self.btn_password.setMaximumWidth(200)
 
-        # Línea 3
-        self.in_direccion = QLineEdit();  self.in_direccion.setPlaceholderText("Dirección")
-        self.in_estado = QComboBox();     self._setup_combo(self.in_estado)
+        # Línea 2 (Solo lectura)
+        self.lbl_id = QLabel() 
+        self.lbl_creacion = QLabel() 
+        self.lbl_hash = QLabel("...") # Contraseña hash (opcional para debug/info)
 
-        # Observaciones
-        self.in_observ = QTextEdit()
-        self.in_observ.setPlaceholderText("Observaciones")
-        self.in_observ.setMinimumHeight(80)
+        # -------------------- Layout (Basado en UsuariosAgregarPage) --------------------
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 12, 20, 16)
+        root.setSpacing(10)
 
-        # ---------- Botonera del pie (centrada) ----------
+        title = QLabel(f"Detalle de Usuario #{self.Usuario_id}")
+        title.setObjectName("KpiValue")
+        root.addWidget(title)
+
+        form_panel = QFrame(self)
+        form_panel.setObjectName("Panel")
+        form_panel.setStyleSheet("#Panel { background: transparent; border: none; }")
+        form_wrap = QVBoxLayout(form_panel)
+        form_wrap.setContentsMargins(0, 0, 0, 0)
+        form_wrap.setSpacing(6)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(8)
+        grid.setColumnStretch(0, 1); grid.setColumnStretch(1, 3)
+        grid.setColumnStretch(2, 1); grid.setColumnStretch(3, 3)
+        grid.setColumnStretch(4, 1); grid.setColumnStretch(5, 3)
+        
+        # Estilos para campos de entrada
+        for w in (self.in_nombre, self.in_usuario, self.in_rol, self.in_email, self.in_activo):
+            w.setMinimumHeight(36)
+
+        # Fila 0: Nombre, Usuario, Rol
+        grid.addWidget(QLabel("Nombre *"), 0, 0);       grid.addWidget(self.in_nombre, 0, 1)
+        grid.addWidget(QLabel("Usuario *"), 0, 2);      grid.addWidget(self.in_usuario, 0, 3)
+        grid.addWidget(QLabel("Rol *"), 0, 4);          grid.addWidget(self.in_rol, 0, 5)
+
+        # Fila 1: Email, Activo, Contraseña
+        grid.addWidget(QLabel("Email"), 1, 0);          grid.addWidget(self.in_email, 1, 1)
+        grid.addWidget(QLabel("Estado *"), 1, 2);       grid.addWidget(self.in_activo, 1, 3)
+        grid.addWidget(QLabel("Contraseña"), 1, 4);     grid.addWidget(self.btn_password, 1, 5)
+        
+        # Fila 2: Info solo lectura
+        grid.addWidget(QLabel("ID"), 2, 0);             grid.addWidget(self.lbl_id, 2, 1)
+        grid.addWidget(QLabel("Creado"), 2, 2);         grid.addWidget(self.lbl_creacion, 2, 3)
+        # grid.addWidget(QLabel("Hash"), 2, 4);           grid.addWidget(self.lbl_hash, 2, 5) # Opcional: mostrar hash
+
+        form_wrap.addLayout(grid)
+        root.addWidget(form_panel)
+        root.addStretch(1)
+
+        # -------------------- Botonera del pie (centrada) --------------------
         self.btn_edit = QPushButton("Editar");      self.btn_edit.setObjectName("BtnPrimary")
         self.btn_save = QPushButton("Guardar");     self.btn_save.setObjectName("BtnPrimary")
         self.btn_cancel = QPushButton("Cancelar");  self.btn_cancel.setObjectName("BtnFlat")
         self.btn_back = QPushButton("Volver");      self.btn_back.setObjectName("BtnGhost")
         for b in (self.btn_edit, self.btn_save, self.btn_cancel, self.btn_back):
             b.setMinimumWidth(140)
-
-        # ---------- Layout ----------
-        for w in (
-            self.in_nombre, self.in_apellido, self.in_tipo_doc, self.in_nro_doc,
-            self.in_email, self.in_telefono, self.in_direccion, self.in_estado
-        ):
-            w.setMinimumHeight(36)
-
-        grid = QGridLayout()
-        grid.setColumnStretch(0, 1); grid.setColumnStretch(1, 3)
-        grid.setColumnStretch(2, 1); grid.setColumnStretch(3, 3)
-        grid.setColumnStretch(4, 1); grid.setColumnStretch(5, 3)
-        grid.setHorizontalSpacing(12); grid.setVerticalSpacing(8)
-
-        row = 0
-        grid.addWidget(QLabel("Nombre"), row, 0);       grid.addWidget(self.in_nombre, row, 1)
-        grid.addWidget(QLabel("Apellido"), row, 2);     grid.addWidget(self.in_apellido, row, 3)
-
-        row += 1
-        grid.addWidget(QLabel("Tipo doc"), row, 0);     grid.addWidget(self.in_tipo_doc, row, 1)
-        grid.addWidget(QLabel("N° Documento"), row, 2); grid.addWidget(self.in_nro_doc, row, 3)
-
-        row += 1
-        grid.addWidget(QLabel("Email"), row, 0);        grid.addWidget(self.in_email, row, 1)
-        grid.addWidget(QLabel("Teléfono"), row, 2);     grid.addWidget(self.in_telefono, row, 3)
-
-        row += 1
-        grid.addWidget(QLabel("Dirección"), row, 0);    grid.addWidget(self.in_direccion, row, 1)
-        grid.addWidget(QLabel("Estado"), row, 2);       grid.addWidget(self.in_estado, row, 3)
-
-        row += 1
-        grid.addWidget(QLabel("Observaciones"), row, 0, Qt.AlignTop)
-        grid.addWidget(self.in_observ, row, 1, 1, 5)
-
-        root = QVBoxLayout(self)
-        title = QLabel(f"Usuario #{self.Usuario_id}")
-        title.setObjectName("KpiValue")
-        root.addWidget(title)
-        root.addLayout(grid)
-        root.addStretch(1)
 
         self._footer = QHBoxLayout()
         self._footer.addStretch(1)
@@ -115,7 +117,9 @@ class UsuariosDetailPage(QWidget):
         self._footer.addStretch(1)
         root.addLayout(self._footer)
 
-        # Estados iniciales
+        # -------------------- Inicialización --------------------
+        self._load_lookups()
+        self._load_data()
         self._set_editable(False)
         self._update_buttons()
 
@@ -124,10 +128,7 @@ class UsuariosDetailPage(QWidget):
         self.btn_cancel.clicked.connect(self._cancel_edit)
         self.btn_save.clicked.connect(self._save)
         self.btn_back.clicked.connect(self._on_back_clicked)
-
-        # Carga inicial
-        self._load_lookups()
-        self._load_data()
+        # self.btn_password.clicked.connect(self._open_password_dialog) # Implementar
 
     # ---------------------- Helpers UI ----------------------
     def _setup_combo(self, cb: QComboBox):
@@ -142,19 +143,27 @@ class UsuariosDetailPage(QWidget):
 
     def _set_editable(self, enabled: bool):
         for w in (
-            self.in_nombre, self.in_apellido, self.in_tipo_doc, self.in_nro_doc,
-            self.in_email, self.in_telefono, self.in_direccion, self.in_estado, self.in_observ
+            self.in_nombre, self.in_usuario, self.in_rol, self.in_email, self.in_activo
         ):
             w.setEnabled(enabled)
+        
+        # El botón de contraseña siempre debería estar habilitado, pero fuera de modo edición es menos relevante
+        self.btn_password.setEnabled(not enabled) # Deshabilitar si está editando otros campos
+        
+        # Labels de solo lectura
+        self.lbl_id.setEnabled(True)
+        self.lbl_creacion.setEnabled(True)
 
     def _update_buttons(self):
         if self.edit_mode:
             self.btn_edit.hide()
+            self.btn_password.hide() # Ocultar botón de password al editar otros campos
             self.btn_cancel.show()
             self.btn_save.show()
             self.btn_back.show()
         else:
             self.btn_edit.show()
+            self.btn_password.show()
             self.btn_cancel.hide()
             self.btn_save.hide()
             self.btn_back.show()
@@ -163,6 +172,8 @@ class UsuariosDetailPage(QWidget):
         self.edit_mode = True
         self._set_editable(True)
         self._update_buttons()
+        # El campo 'usuario' (login) podría ser NO editable para evitar conflictos de integridad.
+        # self.in_usuario.setEnabled(False)
 
     def _cancel_edit(self):
         self.edit_mode = False
@@ -170,33 +181,30 @@ class UsuariosDetailPage(QWidget):
         self._fill_fields(self.data)  # restauro valores
         self._update_buttons()
 
-    # ---------------------- Data ----------------------
+    # ---------------------- Data & Lookups ----------------------
     def _load_lookups(self):
-        # Tipos de documento
-        self.in_tipo_doc.clear()
-        try:
-            tipos = self.service.get_tipos_documento()
-        except Exception:
-            tipos = None
-        if not tipos:
-            tipos = [{"codigo": "DNI", "nombre": "DNI"}, {"codigo": "CUIT", "nombre": "CUIT"}, {"codigo": "CUIL", "nombre": "CUIL"}]
-        for t in tipos:
-            codigo = t.get("codigo") or t.get("nombre") or ""
-            nombre = t.get("nombre") or t.get("codigo") or codigo
-            self.in_tipo_doc.addItem(nombre, codigo)
+        # Roles (hardcodeado como ejemplo, usa tu CatalogosService para real)
+        self.in_rol.clear()
+        roles = [
+            {"codigo": "admin", "nombre": "Administrador"},
+            {"codigo": "vendedor", "nombre": "Vendedor"},
+            {"codigo": "operador", "nombre": "Operador"}
+        ]
+        # Nota: En Detalle, NO necesitamos "Seleccione...".
+        for r in roles:
+            self.in_rol.addItem(r.get("nombre", r.get("codigo")), r.get("codigo"))
 
-        # Estados (1 Activo / 0 Inactivo)
-        self.in_estado.clear()
-        try:
-            estados = self.service.get_estados_Usuarios()
-        except Exception:
-            estados = None
-        if not estados:
-            estados = [{"id": 10, "nombre": "Activo"}, {"id": 11, "nombre": "Inactivo"}]
+        # Activo (tinyint(1) -> 1/0)
+        self.in_activo.clear()
+        estados = [
+            {"id": 1, "nombre": "Activo"},
+            {"id": 0, "nombre": "Inactivo"}
+        ]
         for e in estados:
-            self.in_estado.addItem(e.get("nombre", f"ID {e.get('id')}"), e.get("id"))
+            self.in_activo.addItem(e.get("nombre", f"ID {e.get('id')}"), e.get("id"))
 
     def _load_data(self):
+        # Asumo que self.service.get(id) devuelve un dict con las keys de la tabla
         data = self.service.get(self.Usuario_id)
         if not data:
             QMessageBox.warning(self, "Usuarios", "No se encontró el Usuario.")
@@ -206,38 +214,41 @@ class UsuariosDetailPage(QWidget):
         self._fill_fields(data)
 
     def _fill_fields(self, d: Dict[str, Any]):
+        # Campos de edición
         self.in_nombre.setText(str(d.get("nombre", "") or ""))
-        self.in_apellido.setText(str(d.get("apellido", "") or ""))
-        self._set_combo_by_value(self.in_tipo_doc, d.get("tipo_doc") or d.get("tipo_documento"))
-        self.in_nro_doc.setText(str(d.get("nro_doc", "") or ""))
-
+        self.in_usuario.setText(str(d.get("usuario", "") or ""))
         self.in_email.setText(str(d.get("email", "") or ""))
-        self.in_telefono.setText(str(d.get("telefono", "") or ""))
-        self.in_direccion.setText(str(d.get("direccion", "") or ""))
+        
+        self._set_combo_by_value(self.in_rol, d.get("rol"))
+        self._set_combo_by_value(self.in_activo, d.get("activo"))
 
-        # estado_id (1/0) o nombre
-        estado_val = d.get("estado_id")
-        if estado_val is None and d.get("estado") in ("Activo", "Inactivo"):
-            estado_val = 10 if d.get("estado") == "Activo" else 11
-        self._set_combo_by_value(self.in_estado, estado_val)
-
-        self.in_observ.setPlainText(str(d.get("observaciones", "") or ""))
+        # Campos de solo lectura
+        self.lbl_id.setText(str(d.get("id", "N/A")))
+        
+        fecha = d.get("fecha_creacion")
+        if fecha:
+            # Formato de fecha
+            fecha_str = fecha.strftime("%d/%m/%Y %H:%M") if hasattr(fecha, 'strftime') else str(fecha)
+        else:
+            fecha_str = "N/A"
+        self.lbl_creacion.setText(fecha_str)
+        # self.lbl_hash.setText(str(d.get("contraseña_hash", "N/A")))
 
     def _set_combo_by_value(self, cb: QComboBox, value: Any):
         if value is None:
-            cb.setCurrentIndex(0 if cb.count() else -1)
+            cb.setCurrentIndex(-1)
             return
         for i in range(cb.count()):
             if cb.itemData(i) == value:
                 cb.setCurrentIndex(i)
                 return
-        # si mandaron el texto en vez del data
+        # Intentar por texto si el valor es un string y no se encontró por data
         if isinstance(value, str):
             idx = cb.findText(value, Qt.MatchFixedString | Qt.MatchCaseSensitive)
             if idx >= 0:
                 cb.setCurrentIndex(idx)
                 return
-        cb.setCurrentIndex(0 if cb.count() else -1)
+        cb.setCurrentIndex(-1)
 
     # ---------------------- Back con confirmación ----------------------
     def _on_back_clicked(self):
@@ -251,64 +262,53 @@ class UsuariosDetailPage(QWidget):
     def _collect_payload(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "nombre": self.in_nombre.text().strip() or None,
-            "apellido": self.in_apellido.text().strip() or None,
-            "tipo_doc": self.in_tipo_doc.currentData(),
-            "nro_doc": self._only_digits(self.in_nro_doc.text()),
+            "usuario": self.in_usuario.text().strip() or None,
+            "rol": self.in_rol.currentData(),
             "email": self.in_email.text().strip() or None,
-            "telefono": self.in_telefono.text().strip() or None,
-            "direccion": self.in_direccion.text().strip() or None,
-            "estado_id": self.in_estado.currentData(),
-            "observaciones": self.in_observ.toPlainText().strip() or None,
+            "activo": self.in_activo.currentData(),
         }
-        # limpio None para no sobreescribir con NULL si tu update ignora faltantes
+        # Solo enviar los campos que tienen valor
         return {k: v for k, v in payload.items() if v is not None}
 
     def _validate(self, d: Dict[str, Any]) -> Dict[str, str]:
         errs: Dict[str, str] = {}
         if not d.get("nombre"):
             errs["nombre"] = "El nombre es obligatorio."
-        if not d.get("tipo_doc"):
-            errs["tipo_doc"] = "Seleccioná el tipo de documento."
-        nro = d.get("nro_doc")
-        if not nro:
-            errs["nro_doc"] = "Ingresá el número de documento."
-        elif not str(nro).isdigit():
-            errs["nro_doc"] = "El N° de documento debe contener sólo números."
+        if not d.get("usuario"):
+            errs["usuario"] = "El nombre de usuario es obligatorio."
+        if not d.get("rol"):
+            errs["rol"] = "Seleccioná el rol."
+        
         email = d.get("email")
-        if email and not self._is_valid_email(email):
+        if email and ("@" not in email or "." not in email.split("@")[-1]):
             errs["email"] = "Email inválido."
-        if d.get("estado_id") is None:
-            errs["estado_id"] = "Seleccioná el estado."
+            
+        if d.get("activo") is None:
+            errs["activo"] = "Seleccioná el estado."
+        
         return errs
-
-    def _is_valid_email(self, s: str) -> bool:
-        s = (s or "").strip()
-        if not s:
-            return True
-        # validación simple
-        return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", s))
-
-    def _only_digits(self, s: str) -> Optional[str]:
-        s = (s or "").strip()
-        digits = "".join(ch for ch in s if ch.isdigit())
-        return digits or None
 
     def _save(self):
         payload = self._collect_payload()
         errs = self._validate(payload)
+        
         if errs:
             msg = "\n".join(f"• {v}" for v in errs.values())
             QMessageBox.warning(self, "Usuarios", msg)
             return
 
         try:
+            # Nota: El campo 'contraseña_hash' NO se toca aquí. Se actualiza con el diálogo de contraseña.
             changed = self.service.update(self.Usuario_id, payload)
         except Exception as ex:
+            # Aquí puedes añadir lógica para manejar errores específicos de UNIQUE (ej. usuario ya existe)
             QMessageBox.critical(self, "Usuarios", f"Error al guardar: {ex}")
             return
-        finally:
-            # volver a modo lectura siempre
-            self.edit_mode = False
-            self._set_editable(False)
-            self._load_data()
-            self._update_buttons()
+        
+        QMessageBox.information(self, "Usuarios", "Usuario actualizado exitosamente.")
+        
+        # Volver a modo lectura y recargar la data
+        self.edit_mode = False
+        self._set_editable(False)
+        self._load_data()
+        self._update_buttons()

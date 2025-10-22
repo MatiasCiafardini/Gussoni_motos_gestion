@@ -207,7 +207,7 @@ class MainWindow(QMainWindow):
 
         for p in (
             self.page_inicio, self.page_clientes, self.page_vehiculos, self.page_facturacion,
-            self.page_proveedores, self.page_reportes, self.page_configuracion
+            self.page_proveedores, self.page_reportes, self.page_configuracion, self.page_usuarios
         ):
             self.stack.addWidget(p)
 

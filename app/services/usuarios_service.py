@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 # Asumiendo que SessionLocal está disponible
 from app.data.database import SessionLocal 
 from app.repositories.usuarios_repository import UsuariosRepository
+from loguru import logger 
 #from app.utils.security import hash_password, verify_password # << Hashing externo Stefano
 
 class UsuariosService:
@@ -12,7 +13,7 @@ class UsuariosService:
 
     def _repo(self, db: Optional[Session] = None) -> UsuariosRepository:
         """Devuelve una instancia del repositorio de usuarios."""
-        return UsuariosRepository(db or SessionLocal()) [9]
+        return UsuariosRepository(db or SessionLocal()) 
 
     # -------------------- Creación de Usuario --------------------
     def create_user(self, data: Dict[str, Any]) -> int:
@@ -21,31 +22,21 @@ class UsuariosService:
         """
         db = SessionLocal()
         try:
-            payload = dict(data)
-            
-            # 1. Aplicar Hashing
-            password_plana = payload.pop("contraseña", None)
-            if not password_plana:
-                raise ValueError("La contraseña es obligatoria.")
-                
-            payload["contraseña_hash"] = ""#hash_password(password_plana) # Lógica de Hashing (Paso 1)
+            payload = dict(data)   
+            payload["contraseña_hash"] = data["contraseña_hash"]#Viene hash # Lógica de Hashing (Paso 1)
 
             # 2. Normalizaciones y valores por defecto
             payload["email"] = str(payload.get("email", "")).strip().lower() or None
-            
+
             # Asegurar que 'activo' sea un booleano/entero
             if payload.get("activo") is None:
-                payload["activo"] = 1 # Por defecto activo
-                
-            # Asignar fecha de creación (si la DB no lo hace automáticamente)
-            # Aunque MySQL lo suele hacer, podemos forzarlo en Python si es necesario.
-            # Aquí lo omitimos, esperando que la base de datos lo maneje o se agregue al payload.
-            
+                payload["activo"] = 1 # Por defecto activo  
+            logger.error("CreateUsar") 
             new_id = self._repo(db).create_user(payload)
-            db.commit() [10]
+            db.commit() 
             return new_id
         except Exception:
-            db.rollback() [10]
+            db.rollback() 
             raise
         finally:
             db.close()
@@ -87,10 +78,10 @@ class UsuariosService:
                 payload["email"] = str(payload["email"]).strip().lower() or None
             
             rc = self._repo(db).update(user_id, payload)
-            db.commit() [10]
+            db.commit() 
             return rc
         except Exception:
-            db.rollback() [10]
+            db.rollback() 
             raise
         finally:
             db.close()
@@ -103,7 +94,7 @@ class UsuariosService:
         page_size: int,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Delega la búsqueda al repositorio."""
-        db = SessionLocal() [11]
+        db = SessionLocal() 
         try:
             repo = self._repo(db)
             rows, total = repo.search(**filtros, page=page, page_size=page_size)
@@ -114,7 +105,7 @@ class UsuariosService:
                 
             return rows, total
         finally:
-            db.close() [11]
+            db.close() 
 
     def get_estados_stock(self) -> List[Dict[str, Any]]:
-        return self._catalogos.get_estados_stock()
+        return self._repo.get()
