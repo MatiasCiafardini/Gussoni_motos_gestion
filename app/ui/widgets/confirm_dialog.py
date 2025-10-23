@@ -26,7 +26,7 @@ class ConfirmDialog(QDialog):
         confirm_text: str = "Confirmar",
         cancel_text: str = "Cancelar",
         icon: str = "⚠️",
-        parent: Optional[Widget] = None,
+        parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
 

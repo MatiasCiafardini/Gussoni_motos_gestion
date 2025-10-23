@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget(self)
         self._page_history: list[QWidget] = []
 
-        self._vehiculos_agregar_ref: Optional[Widget] = None
+        self._vehiculos_agregar_ref: Optional[QWidget] = None
         self._clientes_agregar_ref: Optional[QWidget] = None
 
         # Páginas fijas
