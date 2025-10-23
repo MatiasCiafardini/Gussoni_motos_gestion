@@ -1,63 +1,113 @@
+# app/ui/widgets/config_card.py
 from __future__ import annotations
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QCursor
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QSizePolicy, QWidget
+from typing import Optional
+from PySide6.QtCore import Qt, Signal, QSize, QEvent, QPoint, Property
+from PySide6.QtGui import QIcon, QEnterEvent, QMouseEvent, QPainter, QPaintEvent
+from PySide6.QtWidgets import (
+    QFrame, QVBoxLayout, QLabel, QWidget, QHBoxLayout, QSizePolicy
+)
 
 class ConfigCard(QFrame):
-    """
-    Tarjeta de configuración clickable basada en el estilo 'Card' de la aplicación.
-    Emite una señal 'clicked' cuando se presiona.
-    """
     clicked = Signal()
 
-    def __init__(self, title: str, icon_text: str = "⚙", parent: QWidget = None):
+    def __init__(
+        self,
+        title: str,
+        subtitle: str = "",
+        parent: Optional[QWidget] = None,
+        icon: Optional[QIcon] = None,
+        icon_size: QSize = QSize(28, 28),
+    ):
         super().__init__(parent)
-        self.setObjectName("Card")
-        self.setFrameShape(QFrame.StyledPanel)
-        
-        # Hacemos que la tarjeta se expanda para ser responsiva
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setCursor(QCursor(Qt.PointingHandCursor)) # Muestra un cursor de mano
+        self.setObjectName("ConfigCard")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self._hover = False
+        self._icon = icon
+        self._icon_size = icon_size
 
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(20, 20, 20, 20)
-        lay.setSpacing(10)
+        # Layout
+        root = QVBoxLayout(self)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(10)
 
-        # 1. Ícono (Grande y centrado)
-        self.lbl_icon = QLabel(icon_text)
-        self.lbl_icon.setAlignment(Qt.AlignCenter)
-        
-        # Usamos un estilo grande para el ícono
-        icon_font = QFont(); 
-        icon_font.setPointSize(40); # Tamaño grande
-        icon_font.setWeight(QFont.Weight.Light)
-        self.lbl_icon.setFont(icon_font)
-        
-        # 2. Título (centrado)
-        self.lbl_title = QLabel(title)
-        self.lbl_title.setAlignment(Qt.AlignCenter)
-        self.lbl_title.setStyleSheet("font-size:16px; font-weight:500; color:#212529;") # Estilo similar a KpiValue [2]
+        # Encabezado con icono opcional
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(10)
 
-        lay.addWidget(self.lbl_icon)
-        lay.addStretch(1) # Espacio entre ícono y título
-        lay.addWidget(self.lbl_title)
-        
-        # 3. Estilo Visual (basado en DashboardPage)
-        # Replicamos el estilo Card [2] pero agregamos un efecto al pasar el mouse
+        if icon:
+            self._icon_lbl = QLabel()
+            self._icon_lbl.setFixedSize(icon_size)
+            self._icon_lbl.setPixmap(icon.pixmap(icon_size))
+            self._icon_lbl.setObjectName("CardIcon")
+            header.addWidget(self._icon_lbl, 0, Qt.AlignTop)
+        else:
+            self._icon_lbl = None
+
+        text_box = QWidget(self)
+        tb = QVBoxLayout(text_box); tb.setContentsMargins(0, 0, 0, 0); tb.setSpacing(2)
+        self._title = QLabel(title); self._title.setObjectName("CardTitle")
+        self._subtitle = QLabel(subtitle); self._subtitle.setObjectName("CardSubtitle")
+        self._subtitle.setWordWrap(True)
+        tb.addWidget(self._title)
+        tb.addWidget(self._subtitle)
+        header.addWidget(text_box, 1)
+
+        root.addLayout(header)
+        root.addStretch(1)
+
+        # Estilos (QSS local, no rompe tu theme global)
         self.setStyleSheet("""
-            QFrame#Card { 
-                background:#ffffff; 
-                border:1px solid #e9ecef; 
-                border-radius:12px; 
-            }
-            QFrame#Card:hover {
-                border: 1px solid #60a5fa; /* Color azul al pasar el mouse */
-                background: #f8f9fa;
-            }
+        QFrame#ConfigCard {
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 14px;
+        }
+        QFrame#ConfigCard:hover {
+            /* el "elevate" real lo hacemos con paintEvent */
+            border-color: #D1D5DB;
+        }
+        QLabel#CardTitle {
+            color: #0F172A; font-weight: 700; font-size: 16px;
+        }
+        QLabel#CardSubtitle {
+            color: #6B7280; font-size: 13px;
+        }
         """)
 
-    def mousePressEvent(self, event):
-        """Sobrescribe el evento de clic del ratón para emitir la señal."""
-        if event.button() == Qt.LeftButton:
+        # Sombra/elevación por pintura custom
+        self.installEventFilter(self)
+
+    # -------- UX --------
+    def eventFilter(self, obj, ev):
+        if obj is self:
+            if ev.type() == QEvent.Enter:
+                self._hover = True
+                self.update()
+            elif ev.type() == QEvent.Leave:
+                self._hover = False
+                self.update()
+        return super().eventFilter(obj, ev)
+
+    def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+        if e.button() == Qt.LeftButton:
             self.clicked.emit()
-        super().mousePressEvent(event)
+        super().mouseReleaseEvent(e)
+
+    def keyPressEvent(self, e) -> None:
+        if e.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space):
+            self.clicked.emit()
+            return
+        super().keyPressEvent(e)
+
+    def paintEvent(self, ev: QPaintEvent) -> None:
+        super().paintEvent(ev)
+        # “elevate” sutil con sombra pintada
+        if self._hover:
+            p = QPainter(self)
+            p.setRenderHint(QPainter.Antialiasing, True)
+            p.setOpacity(0.08)
+            r = self.rect().adjusted(3, 6, -3, -2)
+            p.fillRect(r, Qt.black)
+            p.end()

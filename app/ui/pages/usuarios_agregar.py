@@ -1,131 +1,103 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
+import os, hashlib
 
-import os
-import binascii
-import hashlib
-
-from PySide6.QtCore import Qt, QThreadPool, QRunnable, QObject, Signal
-from PySide6.QtGui import QIntValidator
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox, QTextEdit,
-    QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem,
-    QMessageBox
+    QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem, QMessageBox
 )
-
-from app.services.usuarios_service import UsuariosService
-from app.services.catalogos_service import CatalogosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
+
+
+# Servicio real (si existe) o fallback
+try:
+    from app.services.usuarios_service import UsuariosService
+except Exception:
+    UsuariosService = None  # fallback abajo
+
 from app.ui.notify import NotifyPopup
-from loguru import logger 
 
-# ====================== Carga asíncrona de catálogos ======================
-
-class _LoaderSignals(QObject):
-    done = Signal(dict)
-    error = Signal(str)
-
-
-class _LoadCatalogosTask(QRunnable):
-    def __init__(self, svc: CatalogosService):
-        super().__init__()
-        self.svc = svc
-        self.signals = _LoaderSignals()
-
-    def run(self):
-        try:
-            data = self.svc.warmup_all()  # Si falla, el signal devolverá excepción
-            self.signals.done.emit(data or {})
-        except Exception as e:
-            self.signals.error.emit(str(e))
-
-
-# ============================== Página ===================================
 
 class UsuariosAgregarPage(QWidget):
     """
-    Alta/Edición de usuario:
-    - Campos: nombre, usuario, contraseña, rol, email, estado
-    - contraseña se guarda como contraseña_hash (PBKDF2 + salt)
-    - Señales: go_back, go_to_detalle
+    Pantalla de Alta de Usuario (estilo detalle, sin título).
+    Campos: nombre, usuario, email, rol, estado (activo/inactivo), contraseña y confirmación.
+    Botones: Volver | Guardar y seguir | Guardar y abrir detalle
     """
-    go_back = Signal()
-    go_to_detalle = Signal(int)  # emite el id del nuevo usuario
 
-    def __init__(self, parent=None, main_window: Optional[QWidget] = None):
+    go_back = Signal()
+    go_to_detalle = Signal(int)  # user_id
+
+    def __init__(self, parent=None, main_window=None):
         super().__init__(parent)
         self.setObjectName("UsuariosAgregarPage")
 
-        self.service = UsuariosService()
-        self._catalogos = CatalogosService()
-        self._dirty = False
+        self.service = UsuariosService() if UsuariosService else None
+        self._dirty = False  # para confirmar al volver si hay cambios
 
         # ===================== Layout raíz =====================
         root = QVBoxLayout(self)
-        root.setContentsMargins(20, 12, 20, 16)
-        root.setSpacing(10)
+        root.setContentsMargins(24, 12, 24, 16)
+        root.setSpacing(8)
 
-        # ---------- Contenido (form) ----------
+        # ---------- Contenido (form) pegado arriba ----------
         content = QWidget(self)
         content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         content_l = QVBoxLayout(content)
         content_l.setContentsMargins(0, 0, 0, 0)
-        content_l.setSpacing(8)
+        content_l.setSpacing(6)
 
-        # Panel con estilo
+        # ===================== Formulario =====================
         form_panel = QFrame(content)
         form_panel.setObjectName("Panel")
         form_panel.setStyleSheet("#Panel { background: transparent; border: none; }")
         form_wrap = QVBoxLayout(form_panel)
         form_wrap.setContentsMargins(0, 0, 0, 0)
-        form_wrap.setSpacing(6)
+        form_wrap.setSpacing(4)
 
         form = QGridLayout()
         form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(8)
+        form.setVerticalSpacing(6)
         form.setColumnStretch(0, 1); form.setColumnStretch(1, 3)
         form.setColumnStretch(2, 1); form.setColumnStretch(3, 3)
         form.setColumnStretch(4, 1); form.setColumnStretch(5, 3)
 
-        # --- Campos solicitados ---
-        self.in_nombre = QLineEdit(); self.in_nombre.setPlaceholderText("Ej: Juan Pérez")
-        self.in_usuario = QLineEdit(); self.in_usuario.setPlaceholderText("Ej: j.perez")
-        self.in_password = QLineEdit(); self.in_password.setPlaceholderText("Contraseña segura")
-        self.in_password.setEchoMode(QLineEdit.Password)
-        # Botón para mostrar/ocultar contraseña
-        self.btn_toggle_password = QPushButton("Mostrar")
-        self.btn_toggle_password.setCheckable(True)
-        self.btn_toggle_password.setMaximumWidth(90)
-        self.btn_toggle_password.setCursor(Qt.PointingHandCursor)
+        # --- Campos ---
+        self.in_nombre = QLineEdit();   self.in_nombre.setPlaceholderText("Nombre y apellido")
+        self.in_usuario = QLineEdit();  self.in_usuario.setPlaceholderText("Usuario")
+        self.in_email = QLineEdit();    self.in_email.setPlaceholderText("email@ejemplo.com")
 
-        self.in_email = QLineEdit(); self.in_email.setPlaceholderText("Ej: nombre@mail.com")
+        self.in_rol = QComboBox();      self._setup_combo(self.in_rol);     self.in_rol.addItem("Seleccione...", None)
+        self.in_estado = QComboBox();   self._setup_combo(self.in_estado);  self.in_estado.addItem("Activo", 1); self.in_estado.addItem("Inactivo", 0)
 
-        self.in_rol = QComboBox(); self._setup_combo(self.in_rol)
-        self.in_estado = QComboBox(); self._setup_combo(self.in_estado)
+        self.in_password = QLineEdit(); self.in_password.setEchoMode(QLineEdit.Password); self.in_password.setPlaceholderText("Contraseña")
+        self.in_password2 = QLineEdit(); self.in_password2.setEchoMode(QLineEdit.Password); self.in_password2.setPlaceholderText("Repetir contraseña")
 
-        # Añadimos campos al layout (orden sencillo, dos por fila)
-        form.addWidget(QLabel("Nombre *"), 0, 0); form.addWidget(self.in_nombre, 0, 1)
-        form.addWidget(QLabel("Usuario *"), 0, 2); form.addWidget(self.in_usuario, 0, 3)
-        form.addWidget(QLabel("Rol *"), 0, 4); form.addWidget(self.in_rol, 0, 5)
-        form.addWidget(QLabel("Contraseña *"), 1, 0)
-        # password + toggle en el mismo lugar: ponemos una sub-widget
-          # password + toggle en el mismo lugar: ponemos una sub-widget
-        pwd_wrap = QWidget(); pwd_h = QHBoxLayout(pwd_wrap); pwd_h.setContentsMargins(0, 0, 0, 0); pwd_h.setSpacing(6)
-        pwd_h.addWidget(self.in_password)
-        pwd_h.addWidget(self.btn_toggle_password)
-        form.addWidget(pwd_wrap, 1, 1, 1, 3)
-        #form.addWidget(pwd_wrap, 1, 3)
+        # (opcional) observaciones, por si más adelante querés persistir notas
+        self.in_observaciones = QTextEdit(); self.in_observaciones.setPlaceholderText("Observaciones (opcional)")
+        self.in_observaciones.setFixedHeight(70)
 
-        form.addWidget(QLabel("Estado *"), 1, 4); form.addWidget(self.in_estado, 1, 5)
-        form.addWidget(QLabel("Email"), 2, 0); form.addWidget(self.in_email, 2, 1)
-        
+        # === Filas (3 columnas) ===
+        form.addWidget(QLabel("Nombre *"), 0, 0);    form.addWidget(self.in_nombre, 0, 1)
+        form.addWidget(QLabel("Usuario *"), 0, 2);   form.addWidget(self.in_usuario, 0, 3)
+        form.addWidget(QLabel("Email"), 0, 4);       form.addWidget(self.in_email, 0, 5)
+
+        form.addWidget(QLabel("Rol *"), 1, 0);       form.addWidget(self.in_rol, 1, 1)
+        form.addWidget(QLabel("Estado *"), 1, 2);    form.addWidget(self.in_estado, 1, 3)
+
+        form.addWidget(QLabel("Contraseña *"), 2, 0);   form.addWidget(self.in_password, 2, 1)
+        form.addWidget(QLabel("Repetir contraseña *"), 2, 2); form.addWidget(self.in_password2, 2, 3)
+
+        form.addWidget(QLabel("Observaciones"), 3, 0); form.addWidget(self.in_observaciones, 3, 1, 1, 5)
 
         form_wrap.addLayout(form)
         content_l.addWidget(form_panel)
+
         content_l.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Minimum))
         root.addWidget(content)
 
-        # ===================== FOOTER (botones) =====================
+        # ===================== FOOTER =====================
         root.addStretch(1)
         footer = QWidget(self)
         footer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -142,121 +114,88 @@ class UsuariosAgregarPage(QWidget):
         f.addWidget(self.btn_guardar_seguir)
         f.addWidget(self.btn_guardar_abrir)
         f.addStretch(1)
+
         root.addWidget(footer)
 
         # ===================== Señales =====================
         self.btn_volver.clicked.connect(self._on_volver)
         self.btn_guardar_seguir.clicked.connect(lambda: self._on_guardar(abrir_detalle=False))
         self.btn_guardar_abrir.clicked.connect(lambda: self._on_guardar(abrir_detalle=True))
-        self.btn_toggle_password.toggled.connect(self._on_toggle_password)
 
-        # Cambios → marcar dirty
-        for w in (self.in_nombre, self.in_usuario, self.in_password, self.in_email):
+        for w in (self.in_nombre, self.in_usuario, self.in_email, self.in_password, self.in_password2):
             w.textChanged.connect(self._mark_dirty)
         for cb in (self.in_rol, self.in_estado):
             cb.currentIndexChanged.connect(self._mark_dirty)
+        self.in_observaciones.textChanged.connect(self._mark_dirty)
 
-        # Cargar catálogos (roles / estados) asíncrono
-        self._load_cat_catalogos_async()
+        # Cargar combos
+        self._load_roles()
 
-        # Aplicar estilos mínimos (puedes ajustar a tu qss global)
-        self._apply_local_qss()
-
-    # -------------------- Helpers UI --------------------
+    # -------------------- Setup helpers --------------------
     def _setup_combo(self, cb: QComboBox):
         cb.setObjectName("FilterCombo")
         lv = QListView(); lv.setObjectName("ComboPopup"); lv.setUniformItemSizes(True); lv.setSpacing(2)
         cb.setView(lv)
         cb.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-    def _apply_local_qss(self):
-        # Estilos básicos para botones y el panel (esto complementa tu style global)
-        self.setStyleSheet("""
-        QWidget#UsuariosAgregarPage QLabel { font-weight: 600; }
-        QPushButton#BtnGhost { background: transparent; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; }
-        QPushButton#BtnPrimary { background: #6C5CE7; color: white; border-radius: 8px; padding: 8px 14px; }
-        QLineEdit, QComboBox, QTextEdit { padding: 8px; border: 1px solid #e6e9ef; border-radius: 8px; background: white; }
-        """)
-
     def _mark_dirty(self, *_):
         self._dirty = True
 
     # -------------------- Catálogos --------------------
-    def _load_cat_catalogos_async(self):
-        # deshabilitar combos en inicio
-        for cb in (self.in_rol, self.in_estado):
-            cb.setEnabled(False); cb.clear(); cb.addItem("Cargando...", None)
-
-        task = _LoadCatalogosTask(self._catalogos)
-        task.signals.done.connect(self._fill_catalogos)
-        task.signals.error.connect(lambda msg: NotifyPopup(f"No se pudieron cargar catálogos: {msg}", "error", self).show_centered())
-        QThreadPool.globalInstance().start(task)
-
-    def _fill_catalogos(self, data: dict):
-        # roles
-        self.in_rol.clear()
-        roles = data.get("roles") or [{"codigo": "admin", "nombre": "Administrador"}, {"codigo": "vendedor", "nombre": "Vendedor"}]
-        self.in_rol.addItem("Seleccione...", None)
+    def _load_roles(self):
+        self.in_rol.clear(); self.in_rol.addItem("Seleccione...", None)
+        roles: List[Dict[str, Any]] = []
+        try:
+            if self.service:
+                roles = self.service.get_roles()
+        except Exception as e:
+            NotifyPopup(f"No se pudieron cargar roles: {e}", "error", self).show_centered()
+            roles = [{"id": 1, "nombre": "Administrador"}, {"id": 2, "nombre": "Vendedor"}]
         for r in roles:
-            code = r.get("codigo") or r.get("id") or str(r)
-            name = r.get("nombre") or str(r)
-            self.in_rol.addItem(name, code)
-
-        # estados
-        self.in_estado.clear()
-        estados = data.get("estados_usuarios") or [{"id": 1, "nombre": "Activo"}, {"id": 0, "nombre": "Inactivo"}]
-        for e in estados:
-            self.in_estado.addItem(e.get("nombre", str(e.get("id"))), e.get("id"))
-
-        # preseleccionar Activo si existe
-        idx = self.in_estado.findText("Activo", Qt.MatchContains)
-        if idx != -1:
-            self.in_estado.setCurrentIndex(idx)
-
-        # habilitar combos
-        self.in_rol.setEnabled(True)
-        self.in_estado.setEnabled(True)
-
-    # -------------------- Toggle password --------------------
-    def _on_toggle_password(self, checked: bool):
-        if checked:
-            self.in_password.setEchoMode(QLineEdit.Normal)
-            self.btn_toggle_password.setText("Ocultar")
-        else:
-            self.in_password.setEchoMode(QLineEdit.Password)
-            self.btn_toggle_password.setText("Mostrar")
+            rid = r.get("id")
+            try: rid = int(rid) if rid is not None else None
+            except Exception: rid = None
+            self.in_rol.addItem(r.get("nombre", f"ID {rid}"), rid)
 
     # -------------------- Guardar --------------------
     def _on_guardar(self, abrir_detalle: bool):
-
         data = self._collect_data()
         ok, errs = self._validate(data)
         if not ok:
             msg = "\n".join(f"• {v}" for v in errs.values())
             NotifyPopup(msg, "warning", self).show_centered()
             return
-        # Hash de contraseña (si se indicó)
-        raw_pwd = data.pop("contraseña_raw", None)
-        if raw_pwd:
-            data["contraseña_hash"] = self._hash_password(raw_pwd)
-        else:
-            # Si no se indicó contraseña, no incluyas la key (posible edición futura)
-            data["contraseña_hash"] = None
-        
+
+        # Insertar usando el service si está disponible (ideal: el service hashea)
         try:
-            # Servicio debe aceptar keys: nombre, usuario, contraseña_hash, rol, email, activo
-            new_id = self.service.create_user(data)
+            new_id: Optional[int] = None
+            if self.service and hasattr(self.service, "create_usuario"):
+                new_id = int(self.service.create_usuario(data))  # el service debería hashear y mapear campos
+            else:
+                # Fallback directo a repo + hashing local
+                from app.repositories.usuarios_repository import UsuariosRepository
+                repo = UsuariosRepository()
+                to_db = {
+                    "nombre": data["nombre"],
+                    "usuario": data["usuario"],
+                    "contrasenia_hash": self._hash_password(data["password"]),  # hash local
+                    "rol": self._map_rol_texto(data["rol_id"]),
+                    "email": data["email"],
+                    "activo": 1 if data["estado_id"] == 1 else 0,
+                }
+                new_id = int(repo.insert(to_db))
         except Exception as ex:
             NotifyPopup(f"Error al guardar: {ex}", "error", self).show_centered()
             return
-        logger.error("Guardar25")
+
+        if new_id is None:
+            NotifyPopup("No se pudo obtener el ID del usuario creado.", "warning", self).show_centered()
+            return
+
         self._dirty = False
         if abrir_detalle:
             NotifyPopup("Usuario guardado correctamente.\nAbriendo detalle…", "success", self).show_centered()
-            try:
-                self.go_to_detalle.emit(int(new_id))
-            except Exception:
-                pass
+            self.go_to_detalle.emit(int(new_id))
         else:
             NotifyPopup("Usuario guardado correctamente.", "success", self).show_centered()
             self._limpiar_formulario()
@@ -269,12 +208,14 @@ class UsuariosAgregarPage(QWidget):
                 return
         self.go_back.emit()
 
+
     def _hay_info_cargada(self) -> bool:
-        campos = [
+        campos_texto = [
             self.in_nombre.text().strip(), self.in_usuario.text().strip(),
-            self.in_password.text().strip(), self.in_email.text().strip()
+            self.in_email.text().strip(), self.in_password.text().strip(),
+            self.in_password2.text().strip(), self.in_observaciones.toPlainText().strip()
         ]
-        if any(campos):
+        if any(campos_texto):
             return True
         if any(cb.currentData() for cb in (self.in_rol, self.in_estado)):
             return True
@@ -282,57 +223,52 @@ class UsuariosAgregarPage(QWidget):
 
     # -------------------- Utils --------------------
     def _collect_data(self) -> Dict[str, Any]:
-        # Nota: retornamos también 'contraseña_raw' para hashing local antes de enviar
         return {
             "nombre": self.in_nombre.text().strip() or None,
             "usuario": self.in_usuario.text().strip() or None,
-            "contraseña_raw": self.in_password.text() or None,
-            "rol": self.in_rol.currentData(),
             "email": self.in_email.text().strip() or None,
-            "activo": int(self.in_estado.currentData()) if self.in_estado.currentData() is not None else None,
+            "rol_id": self._coerce_int(self.in_rol.currentData()),
+            "estado_id": self._coerce_int(self.in_estado.currentData()),  # 1 activo / 0 inactivo
+            "password": self.in_password.text(),
+            "password2": self.in_password2.text(),
+            "observaciones": self.in_observaciones.toPlainText().strip() or None,
         }
 
     def _validate(self, d: Dict[str, Any]) -> Tuple[bool, Dict[str, str]]:
         errs: Dict[str, str] = {}
-        if not d["nombre"]:
-            errs["nombre"] = "El nombre es obligatorio."
-        if not d["usuario"]:
-            errs["usuario"] = "El nombre de usuario es obligatorio."
-        if d.get("contraseña_raw") is None or d.get("contraseña_raw") == "":
-            errs["contraseña"] = "La contraseña es obligatoria."
-        elif len(d.get("contraseña_raw", "")) < 8:
-            errs["contraseña"] = "La contraseña debe tener al menos 8 caracteres."
-        if d.get("email"):
-            # validación simple de email
-            if "@" not in d["email"] or "." not in d["email"].split("@")[-1]:
-                errs["email"] = "Email inválido."
-        if d.get("rol") is None:
-            errs["rol"] = "Seleccioná un rol."
-        if d.get("activo") is None:
-            errs["activo"] = "Seleccioná el estado."
+        if not d["nombre"]: errs["nombre"] = "El nombre es obligatorio."
+        if not d["usuario"]: errs["usuario"] = "El usuario es obligatorio."
+        if not d["rol_id"]: errs["rol_id"] = "Seleccioná un rol."
+        if d["estado_id"] not in (0, 1): errs["estado_id"] = "Seleccioná el estado."
+        if not d["password"] or len(d["password"]) < 4: errs["password"] = "La contraseña debe tener al menos 4 caracteres."
+        if d["password"] != d["password2"]: errs["password2"] = "Las contraseñas no coinciden."
         return (len(errs) == 0, errs)
 
-    def _hash_password(self, password: str) -> str:
+    def _coerce_int(self, v: Any) -> Optional[int]:
+        if v is None: return None
+        if isinstance(v, dict): v = v.get("id")
+        try: return int(v)
+        except Exception: return None
+
+    def _map_rol_texto(self, rol_id: Optional[int]) -> Optional[str]:
+        if rol_id is None: return None
+        return "admin" if rol_id == 1 else "vendedor"
+
+    def _hash_password(self, pwd: str) -> str:
         """
-        Genera un hash seguro con PBKDF2-HMAC-SHA256 y salt.
-        Se devuelve en formato: salt$hex(hash)
+        Hash rápido con salt: salt(hex)$sha256(salt+pwd)
+        (Si tu service ya hashea, no se usa esto.)
         """
-        if password is None:
-            return None
-        salt = os.urandom(16)
-        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000)
-        return binascii.hexlify(salt).decode() + "$" + binascii.hexlify(dk).decode()
+        salt = os.urandom(16).hex()
+        h = hashlib.sha256((salt + (pwd or "")).encode("utf-8")).hexdigest()
+        return f"{salt}${h}"
 
     def _limpiar_formulario(self):
         self.in_nombre.clear()
         self.in_usuario.clear()
-        self.in_password.clear()
         self.in_email.clear()
-        if self.in_rol.count() > 0:
-            self.in_rol.setCurrentIndex(0)
-        if self.in_estado.count() > 0:
-            # preseleccionar Activo si aparece
-            idx = self.in_estado.findText("Activo", Qt.MatchContains)
-            self.in_estado.setCurrentIndex(idx if idx != -1 else 0)
-        self._dirty = False
-
+        self.in_password.clear()
+        self.in_password2.clear()
+        self.in_rol.setCurrentIndex(0)
+        self.in_estado.setCurrentIndex(0)
+        self.in_observaciones.clear()
