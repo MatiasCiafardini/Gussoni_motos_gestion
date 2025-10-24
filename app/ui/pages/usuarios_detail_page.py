@@ -25,12 +25,31 @@ class UsuariosDetailPage(QWidget):
     """
     navigate_back = Signal()
 
-    def __init__(self, Usuario_id: int, parent: Optional[QWidget] = None):
+    def __init__(self, Usuario_id: Optional[int] = None, parent: Optional[QWidget] = None, **kwargs):
+        """
+        Compatibilidad hacia atrás:
+        - Acepta alias: user_id / usuario_id / id_usuario -> mapean a Usuario_id
+        - Acepta main_window en kwargs (se guarda si viene)
+        """
+        # Resolver alias de ID si no vino por nombre original
+        if Usuario_id is None:
+            Usuario_id = (
+                kwargs.pop("user_id", None)
+                or kwargs.pop("usuario_id", None)
+                or kwargs.pop("id_usuario", None)
+            )
+        # Guardar main_window si lo pasan (opcional)
+        self.main_window = kwargs.pop("main_window", None)
+        # Ignorar cualquier otro kwarg desconocido silenciosamente
+
+        if Usuario_id is None:
+            raise ValueError("Usuario_id es obligatorio para UsuariosDetailPage")
+
         super().__init__(parent)
         self.setObjectName("UsuariosDetailPage")
 
         self.service = UsuariosService()
-        self.Usuario_id = Usuario_id
+        self.Usuario_id = int(Usuario_id)
         self.data: Dict[str, Any] = {}
         self.edit_mode = False
 

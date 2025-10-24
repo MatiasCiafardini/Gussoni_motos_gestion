@@ -292,3 +292,222 @@
 2025-10-21 21:22:38.937 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:79 - Intentando navegar hacia la página de Usuarios...
 2025-10-21 21:22:38.938 | ERROR    | app.ui.pages.configuracion_page:navigate_to_usuarios:86 - No se pudo encontrar la instancia de MainWindow o no tiene 'open_page'.
 2025-10-21 21:22:38.940 | INFO     | app.ui.pages.configuracion_page:navigate_to_usuarios:91 - Navegación a UsuariosPage completada correctamente.
+2025-10-24 00:27:49.710 | ERROR    | app.ui.pages.usuarios_page:_open_detalle:386 - Falló mw.open_page('usuarios_detalle')
+Traceback (most recent call last):
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\run.py", line 4, in <module>
+    main()
+    └ <function main at 0x00000232CCD6C860>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main.py", line 17, in main
+    sys.exit(app.exec())
+    │   │    │   └ <staticmethod(<built-in method exec of Shiboken.ObjectType object at 0x00000232A6AE06F0>)>
+    │   │    └ <PySide6.QtWidgets.QApplication(0x232c88d8660) at 0x00000232C991CE80>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+
+> File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 383, in _open_detalle
+    mw.open_page("usuarios_detalle", usuario_id=user_id)
+    │  │                                        └ 2
+    │  └ <function MainWindow.open_page at 0x00000232C99477E0>
+    └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 396, in open_page
+    self.open_usuario_detail(int(uid))
+    │    │                       └ 2
+    │    └ <function MainWindow.open_usuario_detail at 0x00000232C9947740>
+    └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 330, in open_usuario_detail
+    detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
+             │                          │               │                 └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+             │                          │               └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+             │                          └ 2
+             └ <class 'app.ui.pages.usuarios_detail_page.UsuariosDetailPage'>
+
+TypeError: UsuariosDetailPage.__init__() got an unexpected keyword argument 'user_id'
+2025-10-24 00:28:39.676 | ERROR    | app.ui.pages.usuarios_page:_open_detalle:386 - Falló mw.open_page('usuarios_detalle')
+Traceback (most recent call last):
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\run.py", line 4, in <module>
+    main()
+    └ <function main at 0x00000232CCD6C860>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main.py", line 17, in main
+    sys.exit(app.exec())
+    │   │    │   └ <staticmethod(<built-in method exec of Shiboken.ObjectType object at 0x00000232A6AE06F0>)>
+    │   │    └ <PySide6.QtWidgets.QApplication(0x232c88d8660) at 0x00000232C991CE80>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+
+> File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 383, in _open_detalle
+    mw.open_page("usuarios_detalle", usuario_id=user_id)
+    │  │                                        └ 2
+    │  └ <function MainWindow.open_page at 0x00000232C99477E0>
+    └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 396, in open_page
+    self.open_usuario_detail(int(uid))
+    │    │                       └ 2
+    │    └ <function MainWindow.open_usuario_detail at 0x00000232C9947740>
+    └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 330, in open_usuario_detail
+    detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
+             │                          │               │                 └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+             │                          │               └ <app.ui.main_window.MainWindow(0x232a6e3d740, name="MainWindow") at 0x00000232CBF5C200>
+             │                          └ 2
+             └ <class 'app.ui.pages.usuarios_detail_page.UsuariosDetailPage'>
+
+TypeError: UsuariosDetailPage.__init__() got an unexpected keyword argument 'user_id'
+2025-10-24 00:31:57.788 | ERROR    | app.ui.pages.usuarios_page:_open_detalle:386 - Falló mw.open_page('usuarios_detalle')
+Traceback (most recent call last):
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\run.py", line 4, in <module>
+    main()
+    └ <function main at 0x0000027AF65F0860>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main.py", line 17, in main
+    sys.exit(app.exec())
+    │   │    │   └ <staticmethod(<built-in method exec of Shiboken.ObjectType object at 0x0000027AD01285F0>)>
+    │   │    └ <PySide6.QtWidgets.QApplication(0x27af21395d0) at 0x0000027AF5958FC0>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+
+> File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 383, in _open_detalle
+    mw.open_page("usuarios_detalle", usuario_id=user_id)
+    │  │                                        └ 2
+    │  └ <function MainWindow.open_page at 0x0000027AF31BF7E0>
+    └ <app.ui.main_window.MainWindow(0x27ad02c1e10, name="MainWindow") at 0x0000027AF5C6CFC0>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 396, in open_page
+    self.open_usuario_detail(int(uid))
+    │    │                       └ 2
+    │    └ <function MainWindow.open_usuario_detail at 0x0000027AF31BF740>
+    └ <app.ui.main_window.MainWindow(0x27ad02c1e10, name="MainWindow") at 0x0000027AF5C6CFC0>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 330, in open_usuario_detail
+    detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
+             │                          │               │                 └ <app.ui.main_window.MainWindow(0x27ad02c1e10, name="MainWindow") at 0x0000027AF5C6CFC0>
+             │                          │               └ <app.ui.main_window.MainWindow(0x27ad02c1e10, name="MainWindow") at 0x0000027AF5C6CFC0>
+             │                          └ 2
+             └ <class 'app.ui.pages.usuarios_detail_page.UsuariosDetailPage'>
+
+TypeError: UsuariosDetailPage.__init__() got an unexpected keyword argument 'user_id'
+2025-10-24 00:42:05.966 | ERROR    | app.ui.pages.usuarios_page:_open_detalle:385 - Falló mw.open_page('usuarios_detalle')
+Traceback (most recent call last):
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\run.py", line 4, in <module>
+    main()
+    └ <function main at 0x000002A4D3EC0860>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main.py", line 17, in main
+    sys.exit(app.exec())
+    │   │    │   └ <staticmethod(<built-in method exec of Shiboken.ObjectType object at 0x000002A4ADFB2540>)>
+    │   │    └ <PySide6.QtWidgets.QApplication(0x2a4b02b0210) at 0x000002A4AD76C440>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+
+> File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 382, in _open_detalle
+    mw.open_page("usuarios_detalle", usuario_id=user_id)
+    │  │                                        └ 2
+    │  └ <function MainWindow.open_page at 0x000002A4D0A8F7E0>
+    └ <app.ui.main_window.MainWindow(0x2a4adfe0b70, name="MainWindow") at 0x000002A4D353C200>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 396, in open_page
+    self.open_usuario_detail(int(uid))
+    │    │                       └ 2
+    │    └ <function MainWindow.open_usuario_detail at 0x000002A4D0A8F740>
+    └ <app.ui.main_window.MainWindow(0x2a4adfe0b70, name="MainWindow") at 0x000002A4D353C200>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 330, in open_usuario_detail
+    detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
+             │                          │               │                 └ <app.ui.main_window.MainWindow(0x2a4adfe0b70, name="MainWindow") at 0x000002A4D353C200>
+             │                          │               └ <app.ui.main_window.MainWindow(0x2a4adfe0b70, name="MainWindow") at 0x000002A4D353C200>
+             │                          └ 2
+             └ <class 'app.ui.pages.usuarios_detail_page.UsuariosDetailPage'>
+
+TypeError: UsuariosDetailPage.__init__() got an unexpected keyword argument 'user_id'
+2025-10-24 00:57:54.046 | ERROR    | app.ui.pages.usuarios_page:_open_detalle:385 - Falló mw.open_page('usuarios_detalle')
+Traceback (most recent call last):
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\run.py", line 4, in <module>
+    main()
+    └ <function main at 0x0000019AADD6C860>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main.py", line 17, in main
+    sys.exit(app.exec())
+    │   │    │   └ <staticmethod(<built-in method exec of Shiboken.ObjectType object at 0x0000019A8794E9E0>)>
+    │   │    └ <PySide6.QtWidgets.QApplication(0x19aa987b200) at 0x0000019A89B26040>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 295, in <lambda>
+    btn.clicked.connect(lambda _=False, _uid=_uid: (self.open_detail.emit(_uid) if _uid is not None else None))
+                                             │      │    │           │    │        └ 2
+                                             │      │    │           │    └ 2
+                                             │      │    │           └ <method 'emit' of 'PySide6.QtCore.SignalInstance' objects>
+                                             │      │    └ <PySide6.QtCore.SignalInstance open_detail(int) at 0x0000019AADE539F0>
+                                             │      └ <app.ui.pages.usuarios_page.UsuariosPage(0x19aaca2f120, name="UsuariosPage") at 0x0000019AAD44E900>
+                                             └ 2
+
+> File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 382, in _open_detalle
+    mw.open_page("usuarios_detalle", usuario_id=user_id)
+    │  │                                        └ 2
+    │  └ <function MainWindow.open_page at 0x0000019AAA9377E0>
+    └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 396, in open_page
+    self.open_usuario_detail(int(uid))
+    │    │                       └ 2
+    │    └ <function MainWindow.open_usuario_detail at 0x0000019AAA937740>
+    └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 330, in open_usuario_detail
+    detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
+             │                          │               │                 └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+             │                          │               └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+             │                          └ 2
+             └ <class 'app.ui.pages.usuarios_detail_page.UsuariosDetailPage'>
+
+TypeError: UsuariosDetailPage.__init__() got an unexpected keyword argument 'user_id'
+2025-10-24 00:58:45.287 | ERROR    | app.ui.pages.usuarios_page:_open_detalle:385 - Falló mw.open_page('usuarios_detalle')
+Traceback (most recent call last):
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\run.py", line 4, in <module>
+    main()
+    └ <function main at 0x0000019AADD6C860>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main.py", line 17, in main
+    sys.exit(app.exec())
+    │   │    │   └ <staticmethod(<built-in method exec of Shiboken.ObjectType object at 0x0000019A8794E9E0>)>
+    │   │    └ <PySide6.QtWidgets.QApplication(0x19aa987b200) at 0x0000019A89B26040>
+    │   └ <built-in function exit>
+    └ <module 'sys' (built-in)>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 313, in _on_row_dblclick
+    self._open_detalle(uid)
+    │    │             └ 2
+    │    └ <function UsuariosPage._open_detalle at 0x0000019AAA9365C0>
+    └ <app.ui.pages.usuarios_page.UsuariosPage(0x19aaca2f120, name="UsuariosPage") at 0x0000019AAD44E900>
+
+> File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\pages\usuarios_page.py", line 382, in _open_detalle
+    mw.open_page("usuarios_detalle", usuario_id=user_id)
+    │  │                                        └ 2
+    │  └ <function MainWindow.open_page at 0x0000019AAA9377E0>
+    └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 396, in open_page
+    self.open_usuario_detail(int(uid))
+    │    │                       └ 2
+    │    └ <function MainWindow.open_usuario_detail at 0x0000019AAA937740>
+    └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+
+  File "C:\Users\mat_i\OneDrive\Escritorio\App_gussoni\app\ui\main_window.py", line 330, in open_usuario_detail
+    detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
+             │                          │               │                 └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+             │                          │               └ <app.ui.main_window.MainWindow(0x19aa9141830, name="MainWindow") at 0x0000019AAB9C5AC0>
+             │                          └ 2
+             └ <class 'app.ui.pages.usuarios_detail_page.UsuariosDetailPage'>
+
+TypeError: UsuariosDetailPage.__init__() got an unexpected keyword argument 'user_id'

@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
+from loguru import logger
+
 from PySide6.QtCore import Qt, Signal, QSettings
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -99,6 +101,9 @@ class UsuariosPage(QWidget):
         self.table.setColumnHidden(self.COL_ID, True)
         self.table.setColumnHidden(self.COL_OBS, True)
 
+        # Doble click abre detalle
+        self.table.cellDoubleClicked.connect(self._on_row_dblclick)
+
         # ---- Paginación ----
         self.page = 1
         self.total = 0
@@ -131,6 +136,7 @@ class UsuariosPage(QWidget):
         self._column_menu = QMenu(self)
         self._build_column_menu()
 
+        # Conexiones
         self.btn_buscar.clicked.connect(self.on_search_clicked)
         self.btn_limpiar.clicked.connect(self.on_clear_filters_clicked)
         self.btn_columnas.clicked.connect(self.on_columnas_clicked)
@@ -138,6 +144,9 @@ class UsuariosPage(QWidget):
         self.cmb_page_size.currentIndexChanged.connect(self.on_page_size_changed)
         self.btn_prev.clicked.connect(self.on_prev)
         self.btn_next.clicked.connect(self.on_next)
+
+        # Conectar señal de abrir detalle
+        self.open_detail.connect(self._open_detalle)
 
         self._load_filter_data()
         self._restore_table_state()
@@ -253,8 +262,13 @@ class UsuariosPage(QWidget):
                 row = self.table.rowCount()
                 self.table.insertRow(row)
 
-                id_val = r.get("id", "")
-                id_item = QTableWidgetItem(str(id_val))
+                id_val = r.get("id") or r.get("usuario_id") or r.get("id_usuario")
+                try:
+                    uid = int(id_val) if id_val is not None else None
+                except Exception:
+                    uid = None
+
+                id_item = QTableWidgetItem("" if uid is None else str(uid))
                 id_item.setTextAlignment(Qt.AlignCenter)
                 self.table.setItem(row, self.COL_ID, id_item)
 
@@ -271,11 +285,14 @@ class UsuariosPage(QWidget):
                     item = QTableWidgetItem(val if isinstance(val, str) else str(val))
                     self.table.setItem(row, col, item)
 
+                # --- Botón Consultar (idéntico a VehiculosPage) ---
                 btn = QPushButton("🔍"); btn.setObjectName("BtnGhost")
                 btn.setToolTip("Consultar"); btn.setCursor(Qt.PointingHandCursor)
-                try: uid = int(id_val)
-                except Exception: uid = None
-                btn.clicked.connect(lambda _=False, _uid=uid: (self.open_detail.emit(_uid) if _uid is not None else None))
+                try:
+                    _uid = int(uid) if uid is not None else None
+                except Exception:
+                    _uid = None
+                btn.clicked.connect(lambda _=False, _uid=_uid: (self.open_detail.emit(_uid) if _uid is not None else None))
                 self.table.setCellWidget(row, self.COL_ACCION, btn)
 
             self.table.resizeRowsToContents()
@@ -283,6 +300,17 @@ class UsuariosPage(QWidget):
             if was_sorting:
                 self.table.setSortingEnabled(True)
             self._save_table_state()
+
+    # --- Navegación / acciones ---
+    def _on_row_dblclick(self, row: int, _col: int):
+        item = self.table.item(row, self.COL_ID)
+        if not item:
+            return
+        try:
+            uid = int(item.text())
+        except Exception:
+            return
+        self._open_detalle(uid)
 
     def on_search_clicked(self): self.reload(reset_page=True)
 
@@ -303,9 +331,8 @@ class UsuariosPage(QWidget):
             return
         if self._usuarios_agregar_ref is None:
             page = UsuariosAgregarPage(parent=mw, main_window=mw)
-            # opcional: si tu alta emite señales de navegación
             if hasattr(page, "go_back") and hasattr(mw, "open_page"):
-                page.go_back.connect(lambda: mw.open_page("usuarios"))  # misma lógica que Vehículos
+                page.go_back.connect(lambda: mw.open_page("usuarios"))
             if hasattr(page, "go_to_detalle") and hasattr(mw, "open_page"):
                 page.go_to_detalle.connect(lambda uid: mw.open_page("usuarios_detalle", usuario_id=uid))
             self._usuarios_agregar_ref = page
@@ -340,3 +367,37 @@ class UsuariosPage(QWidget):
         if self.page < pages:
             self.page += 1
             self.reload()
+
+    # -------- Ir al detalle --------
+    def _open_detalle(self, user_id: int):
+        logger.debug(f"Abrir detalle usuario id={user_id}")
+        mw = getattr(self, "main_window", None) or self.window()
+        if not isinstance(mw, QMainWindow):
+            QMessageBox.critical(self, "Error", "No pude abrir el detalle (MainWindow no disponible).")
+            return
+
+        # Ruta preferida (si tu MainWindow tiene router)
+        if hasattr(mw, "open_page") and callable(mw.open_page):
+            try:
+                mw.open_page("usuarios_detalle", usuario_id=user_id)
+                return
+            except Exception as e:
+                logger.exception("Falló mw.open_page('usuarios_detalle')")
+                QMessageBox.critical(self, "Error", f"No pude abrir el detalle.\n\n{e}")
+                return
+
+        # Fallback: crear la página manualmente
+        try:
+            from app.ui.pages.usuarios_detail_page import UsuariosDetailPage
+            # Constructor de tu clase: UsuariosDetailPage(Usuario_id, parent)
+            page = UsuariosDetailPage(Usuario_id=user_id, parent=mw)
+            page.setObjectName("UsuariosDetailPage")
+            if hasattr(mw, "_mount") and callable(mw._mount):
+                mw.stack.setCurrentWidget(mw._mount(page))
+            else:
+                if mw.stack.indexOf(page) == -1:
+                    mw.stack.addWidget(page)
+                mw.stack.setCurrentWidget(page)
+        except Exception as e:
+            logger.exception("Creación de UsuariosDetailPage falló")
+            QMessageBox.critical(self, "Error", f"No pude crear UsuariosDetailPage.\n\n{e}")

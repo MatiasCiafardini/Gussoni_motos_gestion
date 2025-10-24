@@ -342,6 +342,44 @@ QFrame#DialogPanel {{
 #NiceDialog QLabel#DialogIcon {{
     font-size: 18px; /* tamaño del emoji/icono */
 }}
+
+/* =========================
+   Configuración – OptionCard minimal
+   ========================= */
+QPushButton#CfgOption {{
+    background: #ffffff;
+    border: 1px solid #E5E7EB;
+    border-radius: 14px;
+    padding: 14px;
+}}
+QPushButton#CfgOption:hover {{
+    border-color: #D1D5DB;              /* leve énfasis */
+    background: #dddddd;
+}}
+QPushButton#CfgOption:pressed {{
+    background: #F8FAFC;
+}}
+
+/* Contenido */
+QPushButton#CfgOption QLabel#CfgOptionIcon {{
+    font-size: 40px;                     /* si usa emoji */
+    color: #6B7280;
+}}
+QPushButton#CfgOption QLabel#CfgOptionTitle {{
+    font-size: 14px;
+    font-weight: 700;
+    color: #1F2937; /* ink-like */
+}}
+
+/* Sombra muy sutil (fake) para plataformas sin efecto nativo) */
+QPushButton#CfgOption {{
+    box-shadow: 0px 6px 16px rgba(0,0,0,0.10);   /* Qt ignora, pero sirve en algunos estilos */
+}}
+/* La elevación real visual la logramos con el contraste del borde + bg del layout; 
+   si querés más punch, podés sumar QGraphicsDropShadowEffect desde código. */
+
+
+
 """
 
 

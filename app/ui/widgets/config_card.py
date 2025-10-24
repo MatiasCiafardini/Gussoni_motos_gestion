@@ -41,6 +41,8 @@ class ConfigCard(QFrame):
             self._icon_lbl.setFixedSize(icon_size)
             self._icon_lbl.setPixmap(icon.pixmap(icon_size))
             self._icon_lbl.setObjectName("CardIcon")
+            
+
             header.addWidget(self._icon_lbl, 0, Qt.AlignTop)
         else:
             self._icon_lbl = None
