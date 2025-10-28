@@ -27,9 +27,8 @@ class UsuariosPage(QWidget):
     COL_ROL = 3
     COL_ESTADO = 4
     COL_EMAIL = 5
-    COL_TELEFONO = 6
-    COL_OBS = 7
-    COL_ACCION = 8
+    COL_OBS = 6
+    COL_ACCION = 7
 
     SETTINGS_HEADER_STATE = "UsuariosPage/header_state_v1"
     SETTINGS_HIDDEN_COLS = "UsuariosPage/hidden_columns_v1"
@@ -80,10 +79,10 @@ class UsuariosPage(QWidget):
         grid.addWidget(btns_wrap, 1, 4, 1, 2)
 
         # ---- Tabla ----
-        self.table = QTableWidget(0, 9, self)
+        self.table = QTableWidget(0, 8, self)
         self.table.setObjectName("DataTable")
         self.table.setHorizontalHeaderLabels([
-            "ID", "Nombre", "Usuario", "Rol", "Estado", "Email", "Teléfono", "Observaciones", "Acción"
+            "ID", "Nombre", "Usuario", "Rol", "Estado", "Email", "Observaciones", "Acción"
         ])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -192,7 +191,7 @@ class UsuariosPage(QWidget):
         togglables = [
             (self.COL_NOMBRE, "Nombre"), (self.COL_USERNAME, "Usuario"),
             (self.COL_ROL, "Rol"), (self.COL_ESTADO, "Estado"),
-            (self.COL_EMAIL, "Email"), (self.COL_TELEFONO, "Teléfono"),
+            (self.COL_EMAIL, "Email"),
             (self.COL_OBS, "Observaciones"),
         ]
         for col, title in togglables:
@@ -278,7 +277,6 @@ class UsuariosPage(QWidget):
                     self.COL_ROL: r.get("rol", "") or r.get("rol_nombre", ""),
                     self.COL_ESTADO: r.get("estado", "") or r.get("estado_nombre", ""),
                     self.COL_EMAIL: r.get("email", ""),
-                    self.COL_TELEFONO: r.get("telefono", "") or r.get("tel", ""),
                     self.COL_OBS: r.get("observaciones", "") or r.get("obs", ""),
                 }
                 for col, val in values.items():
