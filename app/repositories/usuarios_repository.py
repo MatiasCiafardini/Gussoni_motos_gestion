@@ -166,6 +166,24 @@ class UsuariosRepository:
         row = self.db.execute(sql, {"id": user_id}).mappings().first()
         return dict(row) if row else None
 
+    def get_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        sql = text("""
+            SELECT id,
+                   nombre,
+                   usuario AS username,
+                   rol,
+                   email,
+                   activo,
+                   contrasenia_hash,
+                   CASE WHEN LOWER(rol) = 'admin' THEN 1 ELSE 2 END AS rol_id,
+                   CASE WHEN activo = 1 THEN 1 ELSE 0 END AS estado_id
+            FROM usuarios
+            WHERE LOWER(usuario) = LOWER(:usuario)
+            LIMIT 1
+        """)
+        row = self.db.execute(sql, {"usuario": username}).mappings().first()
+        return dict(row) if row else None
+
     def insert(self, data: Dict[str, Any]) -> int:
         """
         Espera keys: nombre, usuario, contrasenia_hash, rol, email, activo

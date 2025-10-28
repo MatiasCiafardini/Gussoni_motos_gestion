@@ -53,6 +53,21 @@ QFrame#Sidebar QPushButton:pressed {{
     background: {p['ink']};
     border-color: {p['ink']};
 }}
+QPushButton#SideLogout {{
+    background: #2A3040;
+    color: {p['bg']};
+    border: 1px solid #3A4050;
+    border-radius: 10px;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 14px;
+}}
+QPushButton#SideLogout:hover {{
+    background: #343B4D;
+}}
+QPushButton#SideLogout:pressed {{
+    background: #1F2433;
+}}
 
 /* =========================
    Botones
@@ -158,6 +173,31 @@ QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdi
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QDateEdit:disabled {{
     color: {p['muted']};
     background: {p['bg']};
+}}
+
+/* =========================
+   Login
+   ========================= */
+QDialog#LoginDialog {{
+    background: {p['bg']};
+}}
+QFrame#LoginCard {{
+    background: {p['white']};
+    border: 1px solid {p['border']};
+    border-radius: 16px;
+}}
+QLabel#LoginTitle {{
+    font-size: 20px;
+    font-weight: 600;
+    color: {p['ink']};
+}}
+QLabel#LoginSubtitle {{
+    color: {p['secondary']};
+    font-size: 13px;
+}}
+QLabel#LoginError {{
+    color: #d64545;
+    font-weight: 600;
 }}
 
 /* =========================
