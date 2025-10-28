@@ -2,11 +2,13 @@
 pycache/
 *.py[cod]
 *.class
+*.pyc
 
 ---- Entorno virtual ----
 .venv/
 venv/
 env/
+.env
 
 ---- Archivos de configuración locales ----
 *.log
