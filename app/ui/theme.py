@@ -54,19 +54,20 @@ QFrame#Sidebar QPushButton:pressed {{
     border-color: {p['ink']};
 }}
 QPushButton#SideLogout {{
-    background: #2A3040;
-    color: {p['bg']};
+    color: #E8EAED; 
+    background: #2A3040; 
     border: 1px solid #3A4050;
-    border-radius: 10px;
-    padding: 10px 14px;
-    text-align: left;
+    border-radius:
+    10px; padding: 10px 14px;
+    text-align: left; 
     font-size: 14px;
+       
 }}
 QPushButton#SideLogout:hover {{
     background: #343B4D;
 }}
 QPushButton#SideLogout:pressed {{
-    background: #1F2433;
+    background: #6C5CE7;
 }}
 
 /* =========================

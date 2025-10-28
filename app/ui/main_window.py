@@ -173,7 +173,7 @@ class MainWindow(QMainWindow):
             sbl.addWidget(b)
         sbl.addStretch(1)
 
-        self.btn_logout = self._mk_btn("Cerrar sesión", checkable=False)
+        self.btn_logout = self._mk_btn("Cerrar sesión")
         self.btn_logout.setObjectName("SideLogout")
         sbl.addWidget(self.btn_logout)
 
