@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Callable
+import time
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
@@ -174,6 +175,10 @@ class MainWindow(QMainWindow):
         self._vehiculos_agregar_ref: Optional[QWidget] = None
         self._clientes_agregar_ref: Optional[QWidget] = None
 
+        # Timestamp del último intento fallido de warmup de catálogos para evitar
+        # reintentos constantes que bloqueen la UI.
+        self._catalog_warmup_fail_ts: Optional[float] = None
+
         # Páginas fijas
         self.page_inicio = DashboardPage() if DashboardPage else PlaceholderPage("Inicio")
         self.page_clientes = self._make_clientes_page()
@@ -226,16 +231,37 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------
     def _preload_catalogos_async(self):
         task = _WarmupTask()
-        task.signals.done.connect(lambda _: print("[Warmup] Catálogos precargados"))
-        task.signals.error.connect(lambda msg: print(f"[Warmup] Falló: {msg}"))
+        task.signals.done.connect(self._on_catalog_warmup_done)
+        task.signals.error.connect(self._on_catalog_warmup_error)
         QThreadPool.globalInstance().start(task)
 
-    def _ensure_catalogs_ready(self):
-        if not CatalogCache.get().loaded_once():
-            try:
-                CatalogosService().warmup_all()
-            except Exception as e:
-                print(f"[Warmup Lazy] Falló: {e}")
+    def _on_catalog_warmup_done(self, _data: dict):
+        self._catalog_warmup_fail_ts = None
+        print("[Warmup] Catálogos precargados")
+
+    def _on_catalog_warmup_error(self, msg: str):
+        self._catalog_warmup_fail_ts = time.monotonic()
+        print(f"[Warmup] Falló: {msg}")
+
+    def _ensure_catalogs_ready(self, *, force: bool = False):
+        cache = CatalogCache.get()
+        if cache.loaded_once():
+            return
+
+        # Evitamos reintentar en caliente continuamente si la última carga falló.
+        if not force and self._catalog_warmup_fail_ts is not None:
+            if time.monotonic() - self._catalog_warmup_fail_ts < 30:
+                return
+
+        try:
+            CatalogosService().warmup_all()
+            self._catalog_warmup_fail_ts = None
+        except Exception as e:
+            self._catalog_warmup_fail_ts = time.monotonic()
+            print(f"[Warmup Lazy] Falló: {e}")
+
+    def _route_requires_catalogs(self, route: str) -> bool:
+        return route.startswith("vehiculos")
 
     # ---------------------------------------------------------------------
     # Integraciones de Páginas
@@ -301,7 +327,7 @@ class MainWindow(QMainWindow):
     # Detalles
     # ---------------------------------------------------------------------
     def open_vehiculo_detail(self, vehiculo_id: int):
-        self._ensure_catalogs_ready()
+        self._ensure_catalogs_ready(force=True)
         if not VehiculoDetailPage:
             self.notify("La página de detalle de vehículo no está disponible.", "error")
             return
@@ -339,7 +365,8 @@ class MainWindow(QMainWindow):
     # Router
     # ---------------------------------------------------------------------
     def open_page(self, name: str, *args, **kwargs):
-        self._ensure_catalogs_ready()
+        if self._route_requires_catalogs(name):
+            self._ensure_catalogs_ready()
 
         # -------- Vehículos --------
         if name == "vehiculos":
@@ -455,7 +482,8 @@ class MainWindow(QMainWindow):
         current.deleteLater()
 
     def show_fixed_page(self, page: QWidget):
-        self._ensure_catalogs_ready()
+        if page is self.page_vehiculos:
+            self._ensure_catalogs_ready()
         while self._page_history:
             current = self.stack.currentWidget()
             prev = self._page_history.pop()
