@@ -6,12 +6,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QTextEdit, QComboBox, QPushButton,
-    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy, QMessageBox, QFrame, QSpacerItem
+    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy, QMessageBox, QFrame, QSpacerItem, QDialog
 )
 
 # Nota: Asumo que estos servicios manejan la DB
 from app.services.usuarios_service import UsuariosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
+from app.ui.widgets.password_dialog import ChangePasswordDialog
 # Nota: La Notificación la dejo comentada, se usa en la de Agregar.
 # from app.ui.notify import NotifyPopup 
 
@@ -147,7 +148,7 @@ class UsuariosDetailPage(QWidget):
         self.btn_cancel.clicked.connect(self._cancel_edit)
         self.btn_save.clicked.connect(self._save)
         self.btn_back.clicked.connect(self._on_back_clicked)
-        # self.btn_password.clicked.connect(self._open_password_dialog) # Implementar
+        self.btn_password.clicked.connect(self._open_password_dialog)
 
     # ---------------------- Helpers UI ----------------------
     def _setup_combo(self, cb: QComboBox):
@@ -199,6 +200,33 @@ class UsuariosDetailPage(QWidget):
         self._set_editable(False)
         self._fill_fields(self.data)  # restauro valores
         self._update_buttons()
+
+    def _open_password_dialog(self):
+        dialog = ChangePasswordDialog(self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        new_password = dialog.password
+        if not new_password:
+            return
+
+        try:
+            self.service.change_password(self.Usuario_id, new_password)
+        except Exception as ex:
+            QMessageBox.critical(
+                self,
+                "Usuarios",
+                f"No se pudo actualizar la contraseña.\n\n{ex}",
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Usuarios",
+            "La contraseña se actualizó correctamente.",
+        )
+        # Recargar la información para mantener consistencia en pantalla
+        self._load_data()
 
     # ---------------------- Data & Lookups ----------------------
     def _load_lookups(self):
