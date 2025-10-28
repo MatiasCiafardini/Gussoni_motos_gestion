@@ -9,6 +9,7 @@ pycache/
 venv/
 env/
 .env
+.env*
 
 ---- Archivos de configuración locales ----
 *.log
