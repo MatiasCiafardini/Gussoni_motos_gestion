@@ -109,8 +109,8 @@ class UsuariosDetailPage(QWidget):
         grid.addWidget(QLabel("Contraseña"), 1, 4);     grid.addWidget(self.btn_password, 1, 5)
         
         # Fila 2: Info solo lectura
-        grid.addWidget(QLabel("ID"), 2, 0);             grid.addWidget(self.lbl_id, 2, 1)
-        grid.addWidget(QLabel("Creado"), 2, 2);         grid.addWidget(self.lbl_creacion, 2, 3)
+        # grid.addWidget(QLabel("ID"), 2, 0);             grid.addWidget(self.lbl_id, 2, 1)
+        # grid.addWidget(QLabel("Creado"), 2, 2);         grid.addWidget(self.lbl_creacion, 2, 3)
         # grid.addWidget(QLabel("Hash"), 2, 4);           grid.addWidget(self.lbl_hash, 2, 5) # Opcional: mostrar hash
 
         form_wrap.addLayout(grid)
