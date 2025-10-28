@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple, List
-import os, hashlib
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -15,6 +14,8 @@ try:
     from app.services.usuarios_service import UsuariosService
 except Exception:
     UsuariosService = None  # fallback abajo
+
+from app.core.security import hash_password
 
 from app.ui.notify import NotifyPopup
 
@@ -259,9 +260,7 @@ class UsuariosAgregarPage(QWidget):
         Hash rápido con salt: salt(hex)$sha256(salt+pwd)
         (Si tu service ya hashea, no se usa esto.)
         """
-        salt = os.urandom(16).hex()
-        h = hashlib.sha256((salt + (pwd or "")).encode("utf-8")).hexdigest()
-        return f"{salt}${h}"
+        return hash_password(pwd)
 
     def _limpiar_formulario(self):
         self.in_nombre.clear()

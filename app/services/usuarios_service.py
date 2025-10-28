@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.data.database import SessionLocal
 from app.repositories.usuarios_repository import UsuariosRepository
+from app.core.security import hash_password
 
 
 def _coerce_int(v: Any) -> Optional[int]:
@@ -21,13 +22,10 @@ def _coerce_int(v: Any) -> Optional[int]:
 
 
 def _hash_password(pwd: Optional[str]) -> Optional[str]:
-    """Hash simple con salt (hex)$sha256(salt+pwd). Reemplazá si usás otro esquema."""
-    import os, hashlib
+    """Wrapper to keep backwards compatibility with existing imports."""
     if not pwd:
         return None
-    salt = os.urandom(16).hex()
-    h = hashlib.sha256((salt + pwd).encode("utf-8")).hexdigest()
-    return f"{salt}${h}"
+    return hash_password(pwd)
 
 
 def _rol_texto_from_id(rol_id: Optional[int]) -> Optional[str]:

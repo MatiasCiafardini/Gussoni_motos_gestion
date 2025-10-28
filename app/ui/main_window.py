@@ -128,11 +128,16 @@ class MainWindow(QMainWindow):
     """
     Ventana principal con Sidebar + QStackedWidget.
     """
-    def __init__(self):
+    logout_requested = Signal()
+
+    def __init__(self, *, current_user: Optional[dict] = None, on_logout: Optional[Callable[[], None]] = None):
         super().__init__()
         self.setWindowTitle("Gestión de Motos")
         self.resize(1100, 720)
         self.setObjectName("MainWindow")
+
+        self.current_user = current_user
+        self._on_logout_callback = on_logout
 
         central = QWidget(self)
         self.setCentralWidget(central)
@@ -167,6 +172,10 @@ class MainWindow(QMainWindow):
         ):
             sbl.addWidget(b)
         sbl.addStretch(1)
+
+        self.btn_logout = self._mk_btn("Cerrar sesión", checkable=False)
+        self.btn_logout.setObjectName("SideLogout")
+        sbl.addWidget(self.btn_logout)
 
         # =============== Stack + historial ===============
         self.stack = QStackedWidget(self)
@@ -212,6 +221,9 @@ class MainWindow(QMainWindow):
         self.btn_reportes.clicked.connect(lambda: self.show_fixed_page(self.page_reportes))
         self.btn_config.clicked.connect(lambda: self.show_fixed_page(self.page_config))
         self.btn_inicio.setChecked(True)
+
+        self.btn_logout.clicked.connect(self._handle_logout)
+        self.logout_requested.connect(self._emit_logout_callback)
 
         # =============== Toast simple (overlay) ===============
         self._toast = QLabel("", self)
@@ -515,15 +527,23 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------
     # Helpers
     # ---------------------------------------------------------------------
-    def _mk_btn(self, text: str) -> QPushButton:
+    def _mk_btn(self, text: str, *, checkable: bool = True) -> QPushButton:
         b = QPushButton(text)
         b.setObjectName("SideButton")
-        b.setCheckable(True)
-        b.setAutoExclusive(True)
+        b.setCheckable(checkable)
+        b.setAutoExclusive(checkable)
         b.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         b.setMinimumHeight(44)
         b.setCursor(Qt.PointingHandCursor)
         return b
+
+    def _handle_logout(self):
+        self.logout_requested.emit()
+
+    def _emit_logout_callback(self):
+        self.close()
+        if self._on_logout_callback:
+            self._on_logout_callback()
 
     def _apply_base_qss(self):
         self.setStyleSheet("""
