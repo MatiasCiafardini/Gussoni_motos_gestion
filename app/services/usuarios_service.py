@@ -111,6 +111,26 @@ class UsuariosService:
         finally:
             db.close()
 
+    def change_password(self, user_id: int, new_password: str) -> None:
+        """Actualiza la contraseña del usuario aplicando el hash configurado."""
+        if not new_password or not new_password.strip():
+            raise ValueError("La contraseña no puede estar vacía.")
+
+        hashed = _hash_password(new_password)
+        if not hashed:
+            raise ValueError("No fue posible generar el hash de la contraseña.")
+
+        db = SessionLocal()
+        try:
+            repo = self._repo(db)
+            repo.update(user_id, {"contrasenia_hash": hashed})
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     def create_usuario(self, data: Dict[str, Any]) -> int:
         """
         Crea un usuario y devuelve el ID insertado.
