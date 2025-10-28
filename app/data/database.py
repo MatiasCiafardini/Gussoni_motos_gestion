@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 from loguru import logger
 
+
 def _mysql_url() -> str:
     # Using mysql+mysqlconnector
     return (
@@ -13,16 +14,21 @@ def _mysql_url() -> str:
         f"?charset=utf8mb4"
     )
 
+
 engine = create_engine(
     _mysql_url(),
+    connect_args={
+        "ssl_ca": settings.DB_SSL_CA  # <- ruta al certificado CA de Aiven
+    },
     pool_size=settings.DB_POOL_SIZE,
     pool_pre_ping=True,
     pool_timeout=settings.DB_POOL_TIMEOUT,
     echo=False,
-    future=True
+    future=True,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
 
 def get_session():
     try:
