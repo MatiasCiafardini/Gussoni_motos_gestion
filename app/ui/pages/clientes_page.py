@@ -5,10 +5,10 @@ from PySide6.QtCore import Qt, Signal, QSize, QSettings
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QSizePolicy, QComboBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QHBoxLayout, QVBoxLayout, QLabel, QHeaderView, QMessageBox,
+    QTableWidgetItem, QHBoxLayout, QVBoxLayout, QLabel, QHeaderView, 
     QAbstractItemView, QListView, QMainWindow, QMenu
 )
-
+import app.ui.app_message as popUp
 # ----- Servicios/Páginas específicas de Clientes -----
 from app.services.clientes_service import ClientesService
 try:
@@ -343,11 +343,11 @@ class ClientesPage(QWidget):
     def _abrir_pantalla_agregar(self):
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
-            QMessageBox.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
+            popUp.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
             return
 
         if ClientesAgregarPage is None:
-            QMessageBox.information(self, "Clientes", "La pantalla de alta de clientes aún no está disponible.")
+            popUp.info(self, "Clientes", "La pantalla de alta de clientes aún no está disponible.")
             return
 
         if self._clientes_agregar_ref is None:

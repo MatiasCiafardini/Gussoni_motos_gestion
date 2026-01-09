@@ -6,9 +6,9 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QTextEdit, QComboBox, QPushButton,
-    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy, QMessageBox, QFrame, QSpacerItem, QDialog
+    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy,  QFrame, QSpacerItem, QDialog
 )
-
+import app.ui.app_message as popUp
 # Nota: Asumo que estos servicios manejan la DB
 from app.services.usuarios_service import UsuariosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
@@ -213,14 +213,14 @@ class UsuariosDetailPage(QWidget):
         try:
             self.service.change_password(self.Usuario_id, new_password)
         except Exception as ex:
-            QMessageBox.critical(
+            popUp.critical(
                 self,
                 "Usuarios",
                 f"No se pudo actualizar la contraseña.\n\n{ex}",
             )
             return
 
-        QMessageBox.information(
+        popUp.info(
             self,
             "Usuarios",
             "La contraseña se actualizó correctamente.",
@@ -254,7 +254,7 @@ class UsuariosDetailPage(QWidget):
         # Asumo que self.service.get(id) devuelve un dict con las keys de la tabla
         data = self.service.get(self.Usuario_id)
         if not data:
-            QMessageBox.warning(self, "Usuarios", "No se encontró el Usuario.")
+            popUp.warning(self, "Usuarios", "No se encontró el Usuario.")
             self.navigate_back.emit()
             return
         self.data = data
@@ -341,7 +341,7 @@ class UsuariosDetailPage(QWidget):
         
         if errs:
             msg = "\n".join(f"• {v}" for v in errs.values())
-            QMessageBox.warning(self, "Usuarios", msg)
+            popUp.warning(self, "Usuarios", msg)
             return
 
         try:
@@ -349,10 +349,10 @@ class UsuariosDetailPage(QWidget):
             changed = self.service.update(self.Usuario_id, payload)
         except Exception as ex:
             # Aquí puedes añadir lógica para manejar errores específicos de UNIQUE (ej. usuario ya existe)
-            QMessageBox.critical(self, "Usuarios", f"Error al guardar: {ex}")
+            popUp.critical(self, "Usuarios", f"Error al guardar: {ex}")
             return
         
-        QMessageBox.information(self, "Usuarios", "Usuario actualizado exitosamente.")
+        popUp.info(self, "Usuarios", "Usuario actualizado exitosamente.")
         
         # Volver a modo lectura y recargar la data
         self.edit_mode = False

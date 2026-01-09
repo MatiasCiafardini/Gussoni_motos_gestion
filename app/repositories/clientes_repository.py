@@ -123,6 +123,7 @@ class ClientesRepository:
         estado_id: Optional[int] = None,
         page: int = 1,
         page_size: int = 25,
+        q: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Retorna lista de resultados (dict) y total.
@@ -130,6 +131,10 @@ class ClientesRepository:
         Compatibilidad:
         - Si te llega un dict en el primer parámetro (nombre), se interpreta como 'filtros'
           y se mapean automáticamente los valores.
+
+        Nuevo:
+        - Si el dict trae 'q', se usa como búsqueda general (nombre, apellido, nombre completo, nro_doc),
+          pensado para combos/autocomplete.
         """
         # ------ COMPAT: permitir pasar un dict 'filtros' como primer parámetro ------
         if isinstance(nombre, dict):
@@ -142,11 +147,30 @@ class ClientesRepository:
             estado_id = filtros.get("estado_id")
             page = filtros.get("page", page)
             page_size = filtros.get("page_size", page_size)
+            q = filtros.get("q", q)
             nombre = filtros.get("nombre")
 
         where = ["(1=1)"]
         params: Dict[str, Any] = {}
 
+        # ---- NUEVO: búsqueda general 'q' (para combo de facturas) ----
+        if q:
+            q_str = str(q).strip()
+            if q_str:
+                q_lower = q_str.lower()
+                where.append(
+                    "("
+                    "LOWER(c.nombre) LIKE :q "
+                    "OR LOWER(c.apellido) LIKE :q "
+                    "OR LOWER(CONCAT_WS(' ', c.nombre, c.apellido)) LIKE :q "
+                    "OR REPLACE(COALESCE(c.nro_doc, ''), '-', '') LIKE :q_digits "
+                    ")"
+                )
+                params["q"] = f"%{q_lower}%"
+                q_digits = "".join(ch for ch in q_str if ch.isdigit())
+                params["q_digits"] = f"%{q_digits}%" if q_digits else params["q"]
+
+        # ---- filtros tradicionales (no se tocan, mantiene página Clientes igual) ----
         if nombre:
             where.append("LOWER(c.nombre) LIKE :nombre")
             params["nombre"] = f"%{nombre.lower()}%"

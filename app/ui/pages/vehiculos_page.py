@@ -6,10 +6,10 @@ from PySide6.QtCore import Qt, Signal, QSize, QSettings
 from PySide6.QtGui import QIntValidator, QAction, QIcon
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QSizePolicy, QComboBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QHBoxLayout, QVBoxLayout, QLabel, QHeaderView, QMessageBox,
+    QTableWidgetItem, QHBoxLayout, QVBoxLayout, QLabel, QHeaderView, 
     QAbstractItemView, QListView, QMainWindow, QMenu
 )
-
+import app.ui.app_message as popUp
 from app.services.vehiculos_service import VehiculosService
 from app.ui.pages.vehiculos_agregar import VehiculosAgregarPage
 from app.ui.widgets.loading_overlay import LoadingOverlay
@@ -356,7 +356,7 @@ class VehiculosPage(QWidget):
     def _abrir_pantalla_agregar(self):
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
-            QMessageBox.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
+            popUp.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
             return
         if self._vehiculos_agregar_ref is None:
             page = VehiculosAgregarPage(mw)

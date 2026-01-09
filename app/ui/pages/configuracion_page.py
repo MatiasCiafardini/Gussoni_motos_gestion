@@ -1,13 +1,12 @@
-# app/ui/pages/configuracion_page.py
 from __future__ import annotations
 from typing import Optional
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QGridLayout, QMainWindow, QMessageBox,
+    QWidget, QVBoxLayout, QLabel, QGridLayout, QMainWindow, 
     QSizePolicy, QSpacerItem, QPushButton, QHBoxLayout
 )
-
+import app.ui.app_message as popUp
 # --- Card minimalista, centrada, clickeable ---
 class OptionCard(QPushButton):
     """
@@ -74,7 +73,7 @@ class ConfiguracionPage(QWidget):
         root.setSpacing(14)
 
         title = QLabel("Configuración y Administración"); title.setObjectName("CfgH1")
-        subtitle = QLabel("Gestioná usuarios y opciones generales del sistema.")
+        subtitle = QLabel("Gestioná usuarios y las opciones generales del sistema (incluyendo ARCA / AFIP).")
         subtitle.setObjectName("CfgMuted")
 
         root.addWidget(title)
@@ -93,7 +92,7 @@ class ConfiguracionPage(QWidget):
         card_users.clicked_card.connect(self._open_usuarios)
         grid.addWidget(card_users, 0, 0)
 
-        # Card: Configuración general
+        # Card: Configuración general (placeholder para futuro)
         card_general = OptionCard(
             "Configuración General",
             icon=QIcon.fromTheme("settings"),
@@ -101,6 +100,24 @@ class ConfiguracionPage(QWidget):
         )
         card_general.clicked_card.connect(self._open_config_general)
         grid.addWidget(card_general, 0, 1)
+
+        # NUEVA Card: Configuración ARCA / AFIP
+        card_arca = OptionCard(
+            "Configuración ARCA / AFIP",
+            icon=QIcon.fromTheme("network-server"),
+            emoji="🧾"
+        )
+        card_arca.clicked_card.connect(self._open_config_arca)
+        grid.addWidget(card_arca, 1, 0)
+
+                # NUEVA Card: Importación de Datos
+        card_importacion = OptionCard(
+            "Importación de Datos",
+            icon=QIcon.fromTheme("document-import"),
+            emoji="📥"
+        )
+        card_importacion.clicked_card.connect(self._open_importacion_datos)
+        grid.addWidget(card_importacion, 1, 1)
 
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
@@ -127,20 +144,48 @@ class ConfiguracionPage(QWidget):
             from app.ui.pages.usuarios_page import UsuariosPage
             page = UsuariosPage(parent=self, main_window=self.main_window)
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"No pude abrir Usuarios.\n\n{e}")
+            popUp.critical(self, "Error", f"No pude abrir Usuarios.\n\n{e}")
             return
         if self._try_navigate_in_main(page, object_name="UsuariosPage"):
             return
         self.open_page_requested.emit(page)
 
     def _open_config_general(self):
-        QMessageBox.information(self, "En construcción", "Esta sección estará disponible pronto.")
+        popUp.info(self, "En construcción", "Esta sección estará disponible pronto.")
+
+    def _open_config_arca(self):
+        """
+        Abre la pantalla de Configuración ARCA / AFIP, donde podés
+        probar el próximo número a autorizar por tipo y punto de venta.
+        """
+        try:
+            from app.ui.pages.configuracion_arca_page import ConfiguracionArcaPage
+            page = ConfiguracionArcaPage(parent=self, main_window=self.main_window)
+        except Exception as e:
+            popUp.critical(self, f"No pude abrir la Configuración de ARCA.\n\n{e}")
+            return
+
+        if self._try_navigate_in_main(page, object_name="ConfiguracionArcaPage"):
+            return
+        self.open_page_requested.emit(page)
+        
+    def _open_importacion_datos(self):
+        try:
+            from app.ui.pages.importacion_datos_page import ImportacionDatosPage
+            page = ImportacionDatosPage(parent=self, main_window=self.main_window)
+        except Exception as e:
+            popUp.critical(self, f"No pude abrir Importación de Datos.\n\n{e}")
+            return
+
+        if self._try_navigate_in_main(page, object_name="ImportacionDatosPage"):
+            return
+        self.open_page_requested.emit(page)
 
     def _try_navigate_in_main(self, page: QWidget, object_name: str) -> bool:
         if not self.main_window:
             return False
         page.setObjectName(object_name)
-        for m in ("navigate_to", "push_page", "show_page"):
+        for m in ("navigate_to", "push_page", "show_page", "open_page_widget"):
             if hasattr(self.main_window, m) and callable(getattr(self.main_window, m)):
                 try:
                     getattr(self.main_window, m)(page)

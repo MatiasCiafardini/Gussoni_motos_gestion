@@ -1,11 +1,18 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple
 
-from PySide6.QtCore import Qt, QThreadPool, QRunnable, QObject, Signal
-from PySide6.QtGui import QIntValidator
+from PySide6.QtCore import (
+    Qt,
+    QThreadPool,
+    QRunnable,
+    QObject,
+    Signal,
+    QRegularExpression,
+)
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox, QTextEdit,
-    QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem, QMessageBox
+    QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem
 )
 
 from app.services.clientes_service import ClientesService
@@ -87,8 +94,22 @@ class ClientesAgregarPage(QWidget):
         self.in_apellido = QLineEdit();   self.in_apellido.setPlaceholderText("Ej: Pérez")
 
         self.in_tipo_doc = QComboBox();   self._setup_combo(self.in_tipo_doc)
-        self.in_nro_doc = QLineEdit();    self.in_nro_doc.setPlaceholderText("Ej: 30111222 (sólo números)")
-        self.in_nro_doc.setValidator(QIntValidator(0, 99999999, self))
+        self.in_nro_doc = QLineEdit()
+
+        # ----- Validadores dinámicos según tipo de documento -----
+        self._validator_dni = QRegularExpressionValidator(
+            QRegularExpression(r"^\d{1,8}$"), self
+        )
+        self._validator_cuit_cuil = QRegularExpressionValidator(
+            QRegularExpression(r"^\d{1,11}$"), self
+        )
+        self._validator_otro_doc = QRegularExpressionValidator(
+            QRegularExpression(r"^[A-Za-z0-9]{1,20}$"), self
+        )
+
+        # Por defecto asumimos DNI hasta que se carguen los catálogos
+        self.in_nro_doc.setValidator(self._validator_dni)
+        self.in_nro_doc.setPlaceholderText("Ej: 30111222 (sólo números)")
 
         self.in_email = QLineEdit();      self.in_email.setPlaceholderText("Ej: nombre@mail.com")
         self.in_telefono = QLineEdit();   self.in_telefono.setPlaceholderText("Ej: 11-6000-1111")
@@ -149,6 +170,9 @@ class ClientesAgregarPage(QWidget):
             cb.currentIndexChanged.connect(self._mark_dirty)
         self.in_observaciones.textChanged.connect(self._mark_dirty)
 
+        # Cambio de tipo doc → cambiar validador de nro_doc
+        self.in_tipo_doc.currentIndexChanged.connect(self._on_tipo_doc_changed)
+
         # Cargar catálogos (async + cache)
         self._load_filter_data_async()
 
@@ -161,6 +185,30 @@ class ClientesAgregarPage(QWidget):
 
     def _mark_dirty(self, *_):
         self._dirty = True
+
+    # -------------------- Cambio tipo doc → validadores --------------------
+    def _on_tipo_doc_changed(self, _idx: int) -> None:
+        """
+        Ajusta el validador y el placeholder del número de documento
+        según el tipo seleccionado (DNI, CUIT, CUIL, otros).
+        """
+        tipo = (self.in_tipo_doc.currentData() or "").upper()
+
+        if tipo in ("CUIT", "CUIL"):
+            # 11 dígitos numéricos
+            self.in_nro_doc.setValidator(self._validator_cuit_cuil)
+            self.in_nro_doc.setPlaceholderText("Ej: 20301122334 (11 dígitos)")
+        elif tipo == "DNI" or not tipo:
+            # 1–8 dígitos numéricos
+            self.in_nro_doc.setValidator(self._validator_dni)
+            self.in_nro_doc.setPlaceholderText("Ej: 30111222 (sólo números)")
+        else:
+            # Otros documentos: hasta 20 caracteres alfanuméricos
+            self.in_nro_doc.setValidator(self._validator_otro_doc)
+            self.in_nro_doc.setPlaceholderText("Documento (hasta 20 caracteres)")
+
+        # Limpiamos el campo cuando cambia el tipo
+        self.in_nro_doc.clear()
 
     # -------------------- Catálogos --------------------
     def _load_filter_data_async(self):
@@ -196,6 +244,9 @@ class ClientesAgregarPage(QWidget):
 
         for cb in (self.in_tipo_doc, self.in_estado):
             cb.setEnabled(True)
+
+        # Forzar ajuste de validador según el tipo actual
+        self._on_tipo_doc_changed(self.in_tipo_doc.currentIndex())
 
     # -------------------- Guardar --------------------
     def _on_guardar(self, abrir_detalle: bool):

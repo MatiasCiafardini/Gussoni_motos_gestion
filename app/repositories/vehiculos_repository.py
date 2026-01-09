@@ -11,21 +11,16 @@ class VehiculosRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    # -------------------- Lookups --------------------
+    # ==================================================
+    # Lookups
+    # ==================================================
 
     def list_colores(self) -> List[Dict[str, Any]]:
-        """
-        Retorna colores desde tabla 'colores(id, nombre)'.
-        """
         sql = text("SELECT id, nombre FROM colores ORDER BY nombre ASC")
         rows = self.db.execute(sql).mappings().all()
         return [dict(r) for r in rows]
 
     def list_estados_stock(self) -> List[Dict[str, Any]]:
-        """
-        Retorna estados de stock desde 'estados_stock(id, nombre)'.
-        Si en tu BD se llama 'estado_stock', intentamos fallback.
-        """
         try:
             rows = self.db.execute(
                 text("SELECT id, nombre FROM estados_stock ORDER BY nombre ASC")
@@ -38,21 +33,15 @@ class VehiculosRepository:
             return [dict(r) for r in rows]
 
     def list_estados_condicion(self) -> List[Dict[str, Any]]:
-        """
-        Condición de la moto (Nueva/Usada).
-        1) Intenta tabla 'estados_moto(id, nombre)' si existe.
-        2) Fallback: distinct desde vehiculos.estado_moto_id con nombres comunes.
-        """
         try:
             rows = self.db.execute(
-                text("SELECT id, nombre FROM estados where tipo = 'vehiculos' ORDER BY nombre ASC")
+                text("SELECT id, nombre FROM estados WHERE tipo = 'vehiculos' ORDER BY nombre ASC")
             ).mappings().all()
             if rows:
                 return [dict(r) for r in rows]
         except Exception:
             pass
 
-        # Fallback: inferido desde vehiculos
         rows = self.db.execute(
             text(
                 """
@@ -72,13 +61,9 @@ class VehiculosRepository:
         return [dict(r) for r in rows]
 
     def list_proveedores(self) -> List[Dict[str, Any]]:
-        """
-        Devuelve proveedores activos (campo 'activo' = 1) 
-        con id y razón social, ordenados alfabéticamente.
-        """
         try:
             sql = text("""
-                SELECT id, razon_social AS proveedor
+                SELECT id, razon_social AS nombre
                 FROM proveedores
                 WHERE activo = 1
                 ORDER BY razon_social ASC
@@ -89,44 +74,49 @@ class VehiculosRepository:
             logger.error(f"[repo] Error al obtener proveedores: {e}")
             return []
 
-    # -------------------- Alta --------------------
+    # ==================================================
+    # Validaciones de duplicados (IMPORTACIÓN)
+    # ==================================================
 
-    def exists_by_nro_cuadro(self, nro_cuadro: Optional[str]) -> bool:
-        """
-        True si ya existe una unidad con ese número de cuadro.
-        """
-        if not nro_cuadro:
+    def exists_by_numero_motor(self, numero_motor: Optional[str]) -> bool:
+        if not numero_motor:
             return False
         sql = text(
-            "SELECT 1 FROM vehiculos WHERE numero_cuadro = :nro_cuadro LIMIT 1"
+            "SELECT 1 FROM vehiculos WHERE numero_motor = :v LIMIT 1"
         )
-        return self.db.execute(sql, {"nro_cuadro": nro_cuadro}).first() is not None
+        return self.db.execute(sql, {"v": numero_motor}).first() is not None
 
-    def exists_by_nro_motor(self, nro_motor: Optional[str]) -> bool:
-        """
-        True si ya existe una unidad con ese número de motor.
-        """
-        if not nro_motor:
+    def exists_by_numero_cuadro(self, numero_cuadro: Optional[str]) -> bool:
+        if not numero_cuadro:
             return False
         sql = text(
-            "SELECT 1 FROM vehiculos WHERE numero_motor = :nro_motor LIMIT 1"
+            "SELECT 1 FROM vehiculos WHERE numero_cuadro = :v LIMIT 1"
         )
-        return self.db.execute(sql, {"nro_motor": nro_motor}).first() is not None
+        return self.db.execute(sql, {"v": numero_cuadro}).first() is not None
+
+    def exists_by_nro_dnrpa(self, nro_dnrpa: Optional[str]) -> bool:
+        if not nro_dnrpa:
+            return False
+        sql = text(
+            "SELECT 1 FROM vehiculos WHERE nro_dnrpa = :v LIMIT 1"
+        )
+        return self.db.execute(sql, {"v": nro_dnrpa}).first() is not None
+
+    # aliases (por compatibilidad / claridad semántica)
+    exists_by_nro_motor = exists_by_numero_motor
+    exists_by_nro_cuadro = exists_by_numero_cuadro
+
+    # ==================================================
+    # Alta
+    # ==================================================
 
     def create_vehiculo(self, data: Dict[str, Any]) -> int:
-        """
-        Inserta un vehículo y devuelve su ID.
-        Sólo incluye las columnas presentes en 'data' para tolerar esquemas distintos.
-        """
-        # Normalizaciones mínimas
         if "numero_cuadro" in data and data["numero_cuadro"]:
             data["numero_cuadro"] = str(data["numero_cuadro"]).strip().upper()
         if "numero_motor" in data and data["numero_motor"]:
             data["numero_motor"] = str(data["numero_motor"]).strip().upper()
-
-        columns = []
-        values = []
-        params: Dict[str, Any] = {}
+        if "nro_dnrpa" in data and data["nro_dnrpa"]:
+            data["nro_dnrpa"] = str(data["nro_dnrpa"]).strip().upper()
 
         allowed = [
             "marca", "modelo", "anio",
@@ -136,6 +126,9 @@ class VehiculosRepository:
             "color_id", "estado_stock_id", "estado_moto_id",
             "proveedor_id", "observaciones", "cliente_id"
         ]
+
+        columns, values, params = [], [], {}
+
         for k in allowed:
             if k in data:
                 columns.append(k)
@@ -149,21 +142,24 @@ class VehiculosRepository:
             f"INSERT INTO vehiculos ({', '.join(columns)}) "
             f"VALUES ({', '.join(values)})"
         )
+
         res = self.db.execute(sql, params)
 
-        # SQLAlchemy con MySQL: intentar lastrowid; fallback a LAST_INSERT_ID()
         new_id = getattr(res, "lastrowid", None)
         if not new_id:
-            try:
-                new_id = self.db.execute(text("SELECT LAST_INSERT_ID()")).scalar_one()
-            except Exception:
-                pass
+            new_id = self.db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
 
         if not new_id:
             raise RuntimeError("No se pudo obtener el ID del vehículo insertado.")
 
         logger.debug(f"[repo] Vehículo creado id={new_id}")
         return int(new_id)
+
+    # ==================================================
+    # Búsqueda / Detalle / Update (sin cambios)
+    # ==================================================
+    # (todo lo que ya tenías queda igual)
+
 
     # -------------------- Búsqueda / Detalle / Update --------------------
 
@@ -184,6 +180,7 @@ class VehiculosRepository:
         nro_certificado: Optional[str] = None,
         nro_dnrpa: Optional[str] = None,
         observaciones: Optional[str] = None,
+        q: Optional[str] = None,                    # <-- NUEVO para combos/autocomplete
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Retorna lista de resultados (dict) y total.
@@ -191,6 +188,10 @@ class VehiculosRepository:
         Compatibilidad:
         - Si te llega un dict en el primer parámetro (marca), se interpreta como 'filtros'
           y se mapean los valores automáticamente.
+
+        Nuevo:
+        - Si el dict trae 'q', se usa como búsqueda general (marca, modelo, nro_motor,
+          nro_cuadro, nro_certificado, nro_dnrpa, observaciones).
         """
         # ------ COMPAT: permitir pasar un dict 'filtros' como primer argumento ------
         if isinstance(marca, dict):
@@ -208,11 +209,31 @@ class VehiculosRepository:
             nro_certificado = filtros.get("nro_certificado")
             nro_dnrpa = filtros.get("nro_dnrpa")
             observaciones = filtros.get("observaciones")
+            q = filtros.get("q", q)   # <-- NUEVO
             marca = filtros.get("marca")
 
         where = ["(1=1)"]
         params: Dict[str, Any] = {}
 
+        # ---- NUEVO: búsqueda general 'q' (para combos) ----
+        if q:
+            q_str = str(q).strip()
+            if q_str:
+                q_lower = q_str.lower()
+                where.append(
+                    "("
+                    "LOWER(v.marca) LIKE :q "
+                    "OR LOWER(v.modelo) LIKE :q "
+                    "OR LOWER(COALESCE(v.numero_motor, '')) LIKE :q "
+                    "OR LOWER(COALESCE(v.numero_cuadro, '')) LIKE :q "
+                    "OR LOWER(COALESCE(v.nro_certificado, '')) LIKE :q "
+                    "OR LOWER(COALESCE(v.nro_dnrpa, '')) LIKE :q "
+                    "OR LOWER(COALESCE(v.observaciones, '')) LIKE :q "
+                    ")"
+                )
+                params["q"] = f"%{q_lower}%"
+
+        # ---- filtros específicos (se mantienen como estaban) ----
         if marca:
             where.append("v.marca LIKE :marca")
             params["marca"] = f"%{marca}%"
@@ -297,6 +318,7 @@ class VehiculosRepository:
         ).mappings().all()
 
         return [dict(r) for r in rows], int(total)
+
 
     def get_by_id(self, vehiculo_id: int) -> Optional[Dict[str, Any]]:
         row = self.db.execute(

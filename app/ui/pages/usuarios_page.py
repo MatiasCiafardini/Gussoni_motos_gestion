@@ -7,10 +7,10 @@ from PySide6.QtCore import Qt, Signal, QSettings
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QSizePolicy, QComboBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QHBoxLayout, QVBoxLayout, QLabel, QHeaderView, QMessageBox,
+    QTableWidgetItem, QHBoxLayout, QVBoxLayout, QLabel, QHeaderView, 
     QAbstractItemView, QListView, QMainWindow, QMenu
 )
-
+import app.ui.app_message as popUp
 from app.services.usuarios_service import UsuariosService
 from app.ui.pages.usuarios_agregar import UsuariosAgregarPage
 from app.ui.widgets.loading_overlay import LoadingOverlay
@@ -325,7 +325,7 @@ class UsuariosPage(QWidget):
     def _abrir_pantalla_agregar(self):
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
-            QMessageBox.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
+            popUp.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
             return
         if self._usuarios_agregar_ref is None:
             page = UsuariosAgregarPage(parent=mw, main_window=mw)
@@ -371,7 +371,7 @@ class UsuariosPage(QWidget):
         logger.debug(f"Abrir detalle usuario id={user_id}")
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
-            QMessageBox.critical(self, "Error", "No pude abrir el detalle (MainWindow no disponible).")
+            popUp.critical(self, "Error", "No pude abrir el detalle (MainWindow no disponible).")
             return
 
         # Ruta preferida (si tu MainWindow tiene router)
@@ -381,7 +381,7 @@ class UsuariosPage(QWidget):
                 return
             except Exception as e:
                 logger.exception("Falló mw.open_page('usuarios_detalle')")
-                QMessageBox.critical(self, "Error", f"No pude abrir el detalle.\n\n{e}")
+                popUp.critical(self, "Error", f"No pude abrir el detalle.\n\n{e}")
                 return
 
         # Fallback: crear la página manualmente
@@ -398,4 +398,4 @@ class UsuariosPage(QWidget):
                 mw.stack.setCurrentWidget(page)
         except Exception as e:
             logger.exception("Creación de UsuariosDetailPage falló")
-            QMessageBox.critical(self, "Error", f"No pude crear UsuariosDetailPage.\n\n{e}")
+            popUp.critical(self, "Error", f"No pude crear UsuariosDetailPage.\n\n{e}")

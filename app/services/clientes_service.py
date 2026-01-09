@@ -60,7 +60,7 @@ class ClientesService:
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Recibe un dict de filtros (nombre, apellido, tipo_doc, nro_doc, email,
-        direccion, estado_id, etc.) y delega al repositorio.
+        direccion, estado_id, q, etc.) y delega al repositorio.
         """
         db = SessionLocal()
         try:

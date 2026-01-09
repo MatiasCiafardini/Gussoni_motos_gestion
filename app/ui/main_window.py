@@ -68,7 +68,22 @@ try:
 except Exception:
     FacturacionPage = None
 
-# =================== CONFIGURACIÓN (cards) ===================
+FacturasAgregarPage = None
+try:
+    from app.ui.pages.facturas_agregar import FacturasAgregarPage as _FacturasAgregarPage
+    FacturasAgregarPage = _FacturasAgregarPage
+except Exception:
+    FacturasAgregarPage = None
+
+# NUEVO: página de consulta de factura
+FacturasConsultarPage = None
+try:
+    from app.ui.pages.facturas_consultar import FacturasConsultarPage as _FacturasConsultarPage
+    FacturasConsultarPage = _FacturasConsultarPage
+except Exception:
+    FacturasConsultarPage = None
+
+# =================== CONFIGURACIÓN ===================
 ConfiguracionPage = None
 try:
     from app.ui.pages.configuracion_page import ConfiguracionPage as _ConfiguracionPage
@@ -101,7 +116,7 @@ except Exception:
 # NotifyPopup propio
 from app.ui.notify import NotifyPopup
 
-# ==== Warmup de catálogos (carga en background) ====
+# ==== Warmup de catálogos ====
 from app.services.catalogos_service import CatalogosService
 from app.core.catalog_cache import CatalogCache
 
@@ -134,13 +149,18 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Gestión de Motos")
         self.resize(1100, 720)
+        # IMPORTANTE: fijamos un mínimo razonable para romper el min gigante de los hijos
+        self.setMinimumSize(900, 600)
         self.setObjectName("MainWindow")
 
         self.current_user = current_user
         self._on_logout_callback = on_logout
 
         central = QWidget(self)
+        # Permitimos que el central no imponga un mínimo enorme
+        central.setMinimumSize(0, 0)
         self.setCentralWidget(central)
+
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
@@ -179,16 +199,18 @@ class MainWindow(QMainWindow):
 
         # =============== Stack + historial ===============
         self.stack = QStackedWidget(self)
+        # Que el stack tampoco arrastre mínimos enormes
+        self.stack.setMinimumSize(0, 0)
+
         self._page_history: list[QWidget] = []
 
         self._vehiculos_agregar_ref: Optional[QWidget] = None
         self._clientes_agregar_ref: Optional[QWidget] = None
 
-        # Timestamp del último intento fallido de warmup de catálogos para evitar
-        # reintentos constantes que bloqueen la UI.
+        # Timestamp del warmup fallido
         self._catalog_warmup_fail_ts: Optional[float] = None
 
-        # Páginas fijas
+        # =============== Páginas principales ===============
         self.page_inicio = DashboardPage() if DashboardPage else PlaceholderPage("Inicio")
         self.page_clientes = self._make_clientes_page()
         self.page_vehiculos = self._make_vehiculos_page()
@@ -212,7 +234,7 @@ class MainWindow(QMainWindow):
         root.addWidget(sidebar)
         root.addWidget(self.stack, 1)
 
-        # Conexiones menú
+        # Sidebar events
         self.btn_inicio.clicked.connect(lambda: self.show_fixed_page(self.page_inicio))
         self.btn_clientes.clicked.connect(lambda: self.show_fixed_page(self.page_clientes))
         self.btn_vehiculos.clicked.connect(lambda: self.show_fixed_page(self.page_vehiculos))
@@ -225,7 +247,7 @@ class MainWindow(QMainWindow):
         self.btn_logout.clicked.connect(self._handle_logout)
         self.logout_requested.connect(self._emit_logout_callback)
 
-        # =============== Toast simple (overlay) ===============
+        # Toast overlay
         self._toast = QLabel("", self)
         self._toast.setObjectName("Toast")
         self._toast.setVisible(False)
@@ -237,6 +259,8 @@ class MainWindow(QMainWindow):
 
         self._apply_base_qss()
         self._preload_catalogos_async()
+        QTimer.singleShot(0, self.showMaximized)
+
 
     # ---------------------------------------------------------------------
     # Warmup de catálogos
@@ -260,7 +284,6 @@ class MainWindow(QMainWindow):
         if cache.loaded_once():
             return
 
-        # Evitamos reintentar en caliente continuamente si la última carga falló.
         if not force and self._catalog_warmup_fail_ts is not None:
             if time.monotonic() - self._catalog_warmup_fail_ts < 30:
                 return
@@ -276,7 +299,7 @@ class MainWindow(QMainWindow):
         return route.startswith("vehiculos")
 
     # ---------------------------------------------------------------------
-    # Integraciones de Páginas
+    # Integración de páginas
     # ---------------------------------------------------------------------
     def _make_vehiculos_page(self) -> QWidget:
         if not VehiculosPage:
@@ -310,16 +333,25 @@ class MainWindow(QMainWindow):
         if not FacturacionPage:
             return PlaceholderPage("Facturación")
         try:
-            page = FacturacionPage()
+            page = FacturacionPage(parent=self, main_window=self)
         except Exception:
-            page = PlaceholderPage("Facturación")
+            return PlaceholderPage("Facturación")
+
+        try:
+            if hasattr(page, "open_add"):
+                page.open_add.connect(lambda: self.open_page("facturas_agregar"))
+
+            if hasattr(page, "open_detail"):
+                # AHORA: abrir pantalla de consulta de factura
+                page.open_detail.connect(
+                    lambda fid: self.open_page("facturas_consultar", factura_id=int(fid))
+                )
+        except Exception:
+            pass
+
         return page
 
     def _make_configuracion_page(self) -> QWidget:
-        """
-        Crea la página de Configuración (cards). Si no existe, usa Placeholder.
-        Además conecta la señal para abrir páginas hijas (Usuarios).
-        """
         if not ConfiguracionPage:
             return PlaceholderPage("Configuración")
         try:
@@ -327,7 +359,6 @@ class MainWindow(QMainWindow):
         except Exception:
             return PlaceholderPage("Configuración")
 
-        # Si la ConfiguracionPage emite open_page_requested(QWidget), la montamos.
         if hasattr(page, "open_page_requested"):
             try:
                 page.open_page_requested.connect(self._on_open_page_requested)
@@ -359,9 +390,6 @@ class MainWindow(QMainWindow):
         self.navigate_to(detail)
 
     def open_usuario_detail(self, user_id: int):
-        """
-        Navega al detalle de usuario (si existe la página).
-        """
         if not UsuariosDetailPage:
             self.notify("La página de detalle de usuario no está disponible.", "error")
             return
@@ -377,7 +405,7 @@ class MainWindow(QMainWindow):
     # Router
     # ---------------------------------------------------------------------
     def open_page(self, name: str, *args, **kwargs):
-        if self._route_requires_catalogs(name):
+        if self._ensure_catalogs_ready and self._route_requires_catalogs(name):
             self._ensure_catalogs_ready()
 
         # -------- Vehículos --------
@@ -410,10 +438,8 @@ class MainWindow(QMainWindow):
 
         # -------- Usuarios --------
         if name == "usuarios":
-            # Si existe UsuariosPage real, la montamos temporal o la reutilizamos.
             if UsuariosPage:
                 page = UsuariosPage(parent=self, main_window=self)
-                # Conectar señales si están disponibles (abrir agregar/detalle)
                 try:
                     if hasattr(page, "open_add_user_requested"):
                         page.open_add_user_requested.connect(lambda: self.open_page("usuarios_agregar"))
@@ -421,7 +447,9 @@ class MainWindow(QMainWindow):
                     pass
                 try:
                     if hasattr(page, "open_user_detail_requested"):
-                        page.open_user_detail_requested.connect(lambda uid: self.open_page("usuarios_detalle", usuario_id=int(uid)))
+                        page.open_user_detail_requested.connect(
+                            lambda uid: self.open_page("usuarios_detalle", usuario_id=int(uid))
+                        )
                 except Exception:
                     pass
                 self.stack.setCurrentWidget(self._mount(page))
@@ -437,48 +465,70 @@ class MainWindow(QMainWindow):
                 self.notify("Falta usuario_id para abrir detalle.", "error")
             return
 
-        # -------- Usuarios --------
         if name == "usuarios_agregar":
             if UsuariosAgregarPage:
                 page = UsuariosAgregarPage(parent=self, main_window=self)
-        
-                # ← conectar el botón Volver (con confirm) a la navegación hacia atrás
                 if hasattr(page, "go_back"):
                     page.go_back.connect(self.navigate_back)
-        
-                # opcional: si tu alta emite ir a detalle
                 if hasattr(page, "go_to_detalle"):
                     page.go_to_detalle.connect(lambda uid: self.open_page("usuarios_detalle", usuario_id=uid))
-        
-                # ← MUY IMPORTANTE: usar navigate_to para apilar en el historial
                 self.navigate_to(page)
             else:
                 self.notify("La página de alta de usuario no está disponible.", "error")
             return
-
 
         # -------- Facturación --------
         if name == "facturacion":
             self.show_fixed_page(self.page_facturacion)
             return
 
+        if name == "facturas_agregar":
+            if FacturasAgregarPage:
+                page = FacturasAgregarPage(parent=self, main_window=self)
+                if hasattr(page, "go_back"):
+                    page.go_back.connect(self.navigate_back)
+                if hasattr(page, "go_to_detalle"):
+                    page.go_to_detalle.connect(
+                        lambda fid: self.open_page("facturas_consultar", factura_id=fid)
+                    )
+                self.navigate_to(page)
+            else:
+                self.notify("La página de alta de factura no está disponible.", "error")
+            return
+        # NUEVO: consulta de factura
+        if name == "facturas_consultar":
+            fid = kwargs.get("factura_id") or (args[0] if args else None)
+            if not fid:
+                self.notify("Falta factura_id para abrir la consulta.", "error")
+                return
+            if not FacturasConsultarPage:
+                self.notify("La página de consulta de factura no está disponible.", "error")
+                return
+            try:
+                page = FacturasConsultarPage(factura_id=int(fid), parent=self, main_window=self)
+            except Exception as ex:
+                print("Error creando FacturasConsultarPage:", ex)
+                self.notify("No se pudo abrir la consulta de factura.", "error")
+                return
+
+            if hasattr(page, "go_back"):
+                try:
+                    page.go_back.connect(self.navigate_back)
+                except Exception:
+                    pass
+            self.navigate_to(page)
+            return
+
         self.notify(f"Ruta no reconocida: {name}", "error")
 
     # ---------------------------------------------------------------------
-    # Manejo de páginas emitidas desde Configuración (cards)
+    # Navegación
     # ---------------------------------------------------------------------
     def _on_open_page_requested(self, page_widget: QWidget):
-        """
-        Permite que ConfiguracionPage nos pida abrir una subpágina (por ejemplo, UsuariosPage).
-        """
         if page_widget is None:
             return
-        # Intentamos montarla y mostrarla.
         self.stack.setCurrentWidget(self._mount(page_widget))
 
-    # ---------------------------------------------------------------------
-    # Navegación y helpers
-    # ---------------------------------------------------------------------
     def navigate_to(self, widget: QWidget):
         self._page_history.append(self.stack.currentWidget())
         self.stack.addWidget(widget)
@@ -505,7 +555,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(page)
 
     # ---------------------------------------------------------------------
-    # Toast & notify
+    # Toast & Notify
     # ---------------------------------------------------------------------
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
