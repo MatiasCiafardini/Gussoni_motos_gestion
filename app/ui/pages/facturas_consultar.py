@@ -20,10 +20,17 @@ from app.services.vehiculos_service import VehiculosService
 from app.services.comprobantes_service import ComprobantesService
 from app.ui.notify import NotifyPopup
 from app.ui.widgets.confirm_dialog import ConfirmDialog
-
+from PySide6.QtGui import QColor
 
 # -------------------- Ventana popup movible --------------------
+from datetime import date
 
+CUOTA_COLORS = {
+    "PENDIENTE": "#f5f6f7",   # gris muy suave
+    "PARCIAL":   "#fff7e6",   # amarillo pastel
+    "PAGADA":    "#eaf7ee",   # verde pastel
+    "VENCIDA":   "#fdecec",   # rojo pastel
+}
 
 class MovableDialog(QDialog):
     """
@@ -279,13 +286,30 @@ class FacturasConsultarPage(QWidget):
 
     # ---------------- UI ----------------
     def _build_ui(self) -> None:
-        main = QVBoxLayout(self)
+                # ===== Scroll principal =====
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        root_layout.addWidget(scroll)
+
+        # Contenedor real del contenido
+        container = QWidget()
+        scroll.setWidget(container)
+
+        main = QVBoxLayout(container)
         main.setContentsMargins(12, 12, 12, 12)
         main.setSpacing(6)
 
         title = QLabel("Consulta de factura")
         title.setStyleSheet("font-size: 18px; font-weight: 600;")
         main.addWidget(title)
+
 
         # --- Sección 1: Datos factura ---
         sec1 = QFrame(self)
@@ -440,6 +464,60 @@ class FacturasConsultarPage(QWidget):
 
         main.addWidget(sec2)
 
+                # --- Sección 2B: Datos de la venta ---
+        secv = QFrame(self)
+        secv.setObjectName("Panel")
+        secv.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        secv_l = QVBoxLayout(secv)
+        secv_l.setContentsMargins(10, 10, 10, 10)
+        secv_l.setSpacing(8)
+
+        lblv = QLabel("Datos de la venta")
+        _style_section_label(lblv)
+        secv_l.addWidget(lblv)
+
+        gridv = QGridLayout()
+        gridv.setHorizontalSpacing(8)
+        gridv.setVerticalSpacing(6)
+        secv_l.addLayout(gridv)
+
+        for col, stretch in enumerate((1, 3, 1, 3, 1, 3)):
+            gridv.setColumnStretch(col, stretch)
+
+        self.in_precio_real = QLineEdit()
+        self.in_forma_pago = QLineEdit()
+        self.in_anticipo = QLineEdit()
+        self.in_interes = QLineEdit()
+        self.in_cant_cuotas = QLineEdit()
+
+        for w in (
+            self.in_precio_real,
+            self.in_forma_pago,
+            self.in_anticipo,
+            self.in_interes,
+            self.in_cant_cuotas,
+        ):
+            self._make_readonly(w, align_right=True)
+
+        r = 0
+        gridv.addWidget(QLabel("Precio real"), r, 0)
+        gridv.addWidget(self.in_precio_real, r, 1)
+        gridv.addWidget(QLabel("Forma de pago"), r, 2)
+        gridv.addWidget(self.in_forma_pago, r, 3)
+
+        r += 1
+        gridv.addWidget(QLabel("Anticipo"), r, 0)
+        gridv.addWidget(self.in_anticipo, r, 1)
+        gridv.addWidget(QLabel("Interés (%)"), r, 2)
+        gridv.addWidget(self.in_interes, r, 3)
+        gridv.addWidget(QLabel("Cuotas"), r, 4)
+        gridv.addWidget(self.in_cant_cuotas, r, 5)
+
+        main.addWidget(secv)
+        self.sec_venta = secv
+
+
         le_cli.textEdited.connect(self._on_cliente_text_edited)
         self.cb_cliente.currentIndexChanged.connect(self._on_cliente_selected)
         self.btn_cliente_limpiar.clicked.connect(self._on_cliente_limpiar)
@@ -533,6 +611,40 @@ class FacturasConsultarPage(QWidget):
 
         main.addWidget(sec3, 1)
 
+                # --- Sección 4: Cuotas (solo lectura) ---
+        secc = QFrame(self)
+        secc.setObjectName("Panel")
+        secc.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        secc_l = QVBoxLayout(secc)
+        secc_l.setContentsMargins(10, 10, 10, 10)
+        secc_l.setSpacing(8)
+
+        lblc = QLabel("Cuotas de la financiación")
+        _style_section_label(lblc)
+        secc_l.addWidget(lblc)
+
+        self.tbl_cuotas = QTableWidget(0, 5, self)
+        self.tbl_cuotas.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tbl_cuotas.setSelectionMode(QAbstractItemView.NoSelection)
+        self.tbl_cuotas.verticalHeader().setVisible(False)
+        self.tbl_cuotas.setAlternatingRowColors(True)
+        self.tbl_cuotas.setHorizontalHeaderLabels(
+            ["N°", "Vencimiento", "Monto", "Pagado", "Estado"]
+        )
+        self.tbl_cuotas.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.tbl_cuotas.verticalScrollBar().setSingleStep(12)
+
+        self._lock_scroll_inside_table(self.tbl_cuotas)
+        header = self.tbl_cuotas.horizontalHeader()
+        for c in range(5):
+            header.setSectionResizeMode(c, QHeaderView.Stretch)
+
+        secc_l.addWidget(self.tbl_cuotas)
+        main.addWidget(secc)
+        self.sec_cuotas = secc
+
+
         # --- Botones pie ---
         btns = QHBoxLayout()
         btns.setContentsMargins(0, 8, 0, 0)
@@ -566,8 +678,66 @@ class FacturasConsultarPage(QWidget):
         self.btn_modificar.clicked.connect(self._on_modificar)
         self.btn_guardar.clicked.connect(self._on_guardar_cambios)
         self.btn_cancelar_edicion.clicked.connect(self._on_cancelar_edicion)
+        container.setMinimumWidth(self.width())
 
         self._set_edit_mode(False)
+
+    def _resolve_estado_cuota(
+        self,
+        estado_db: str,
+        vencimiento,
+        monto: float,
+        pagado: float,
+    ) -> str:
+        if estado_db == "PAGADA":
+            return "PAGADA"
+
+        if pagado > 0 and pagado < monto:
+            return "PARCIAL"
+
+        if vencimiento and vencimiento < date.today():
+            return "VENCIDA"
+
+        return "PENDIENTE"
+
+    def _apply_cuota_row_style(self, row: int, estado: str):
+        if not estado:
+            return
+
+        color = CUOTA_COLORS.get(estado.upper())
+        if not color:
+            return
+
+        for col in range(self.tbl_cuotas.columnCount()):
+            item = self.tbl_cuotas.item(row, col)
+            if item:
+                item.setBackground(QColor(color))
+    def _lock_scroll_inside_table(self, table: QTableWidget) -> None:
+        """
+        Evita que el scroll de la tabla se propague al ScrollArea padre
+        cuando se llega al límite.
+        """
+        table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        table.viewport().installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == event.Type.Wheel:
+            # Si el evento viene de la tabla de cuotas
+            if obj is self.tbl_cuotas.viewport():
+                bar = self.tbl_cuotas.verticalScrollBar()
+                delta = event.angleDelta().y()
+
+                # Scroll hacia arriba
+                if delta > 0 and bar.value() == bar.minimum():
+                    return True  # 🚫 bloquea propagación
+
+                # Scroll hacia abajo
+                if delta < 0 and bar.value() == bar.maximum():
+                    return True  # 🚫 bloquea propagación
+
+                return False  # ✅ la tabla maneja el scroll
+
+        return super().eventFilter(obj, event)
 
     def _on_comprobante_pdf(self) -> None:
         try:
@@ -930,6 +1100,94 @@ class FacturasConsultarPage(QWidget):
             ).mappings().all()
 
             self._load_detalle_grid(rows)
+
+                        # -------- Datos de venta + cuotas --------
+            venta_id = factura.get("venta_id")
+            if venta_id:
+                row_venta = db.execute(
+                    text("""
+                        SELECT
+                            v.precio_total,
+                            v.forma_pago_id,
+                            v.anticipo,
+                            pf.interes_pct,
+                            fp.nombre AS forma_pago,
+                            pf.id AS plan_id,
+                            pf.cantidad_cuotas
+                        FROM ventas v
+                        LEFT JOIN forma_pago fp ON fp.id = v.forma_pago_id
+                        LEFT JOIN plan_financiacion pf ON pf.venta_id = v.id
+                        WHERE v.id = :id
+                    """),
+                    {"id": venta_id},
+                ).mappings().first()
+
+                if row_venta:
+                    self.in_precio_real.setText(_format_money(row_venta["precio_total"] or 0))
+                    self.in_forma_pago.setText(row_venta.get("forma_pago") or "")
+                    self.in_anticipo.setText(_format_money(row_venta.get("anticipo") or 0))
+                    self.in_interes.setText(str(row_venta.get("interes_pct") or 0))
+                    self.in_cant_cuotas.setText(str(row_venta.get("cantidad_cuotas") or 0))
+
+                    plan_id = row_venta.get("plan_id")
+                    if plan_id:
+                        cuotas = db.execute(
+                            text("""
+                                SELECT
+                                    nro_cuota,
+                                    fecha_vencimiento,
+                                    monto,
+                                    monto_pagado,
+                                    estado
+                                FROM cuotas
+                                WHERE plan_id = :pid
+                                ORDER BY nro_cuota
+                            """),
+                            {"pid": plan_id},
+                        ).mappings().all()
+
+                        self.tbl_cuotas.setRowCount(0)
+                        for c in cuotas:
+                            r = self.tbl_cuotas.rowCount()
+                            self.tbl_cuotas.insertRow(r)
+
+                            nro = c["nro_cuota"]
+                            venc = c["fecha_vencimiento"]
+                            monto = float(c["monto"] or 0.0)
+                            pagado = float(c["monto_pagado"] or 0.0)
+                            estado_db = c["estado"]
+
+                            # 🔎 estado real (pendiente / parcial / vencida / pagada)
+                            estado = self._resolve_estado_cuota(
+                                estado_db,
+                                venc,
+                                monto,
+                                pagado,
+                            )
+
+                            self.tbl_cuotas.setItem(r, 0, QTableWidgetItem(str(nro)))
+                            self.tbl_cuotas.setItem(r, 1, QTableWidgetItem(str(venc)))
+                            self.tbl_cuotas.setItem(r, 2, QTableWidgetItem(_format_money(monto)))
+                            self.tbl_cuotas.setItem(r, 3, QTableWidgetItem(_format_money(pagado)))
+                            self.tbl_cuotas.setItem(r, 4, QTableWidgetItem(estado))
+
+                            # 🎨 color suave por estado
+                            self._apply_cuota_row_style(r, estado)
+
+                            # ℹ️ tooltip informativo
+                            self.tbl_cuotas.item(r, 4).setToolTip(
+                                f"Vencimiento: {venc}\n"
+                                f"Monto: {_format_money(monto)}\n"
+                                f"Pagado: {_format_money(pagado)}"
+                            )
+
+                        self.sec_cuotas.setVisible(True)
+                    else:
+                        self.sec_cuotas.setVisible(False)
+            else:
+                self.sec_venta.setVisible(False)
+                self.sec_cuotas.setVisible(False)
+
 
             subtotal = factura.get("subtotal")
             iva = factura.get("iva")

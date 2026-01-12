@@ -13,6 +13,9 @@ from app.services.catalogos_service import CatalogosService
 from app.integrations.arca.wsaa_client import ArcaWSAAClient, ArcaAuthData
 from app.integrations.arca.wsfe_client import ArcaWSFEClient, ArcaWSFEResult
 
+#ventas service
+from app.services.ventas_service import VentasService
+
 
 class FacturasService:
     """Orquesta casos de uso de Facturación (listado, detalle, alta, ARCA, etc.)."""
@@ -562,14 +565,73 @@ class FacturasService:
             }
 
             # ---------------- Insert cabecera ----------------
+            # ================== CREAR VENTA BASE ==================
+            ventas_service = VentasService()
+            
+            vehiculo_id = items[0]["vehiculo_id"] if items else None
+            cliente_id = cabecera_db.get("cliente_id")
+            
+            venta_id = ventas_service.crear_venta(
+                db=db,  # 👈 MISMA SESIÓN
+                cliente_id=cliente_id,
+                vehiculo_id=vehiculo_id,
+                fecha=cabecera_db.get("fecha_emision"),
+            )
+            
+            
+            # ---------------- Insert cabecera ----------------
+            cabecera_db["venta_id"] = venta_id
             factura_id = repo.insert_factura(cabecera_db)
+            
+
+            db.execute(
+                text("""
+                    UPDATE facturas
+                    SET venta_id = :venta
+                    WHERE id = :factura
+                """),
+                {
+                    "venta": venta_id,
+                    "factura": factura_id,
+                }
+            )
+
+
 
             # ---------------- Insert detalle ----------------
             repo.insert_detalle(factura_id, items)
 
+
+            # ================== COMPLETAR VENTA ==================
+
+            precio_real = float(cabecera.get("precio_real") or 0.0)
+            forma_pago_id = cabecera.get("forma_pago_id")
+            anticipo = float(cabecera.get("anticipo") or 0.0)
+            cantidad_cuotas = int(cabecera.get("cantidad_cuotas") or 0)
+            interes_pct = float(cabecera.get("interes_pct") or 0.0)
+
+
+            # Si no es financiación, no pasamos anticipo ni cuotas
+            if forma_pago_id != 3:
+                anticipo = 0.0
+                cantidad_cuotas = 0
+                interes_pct = 0.0
+
+            ventas_service.completar_venta(
+                db=db,  # 👈 MISMA sesión
+                venta_id=venta_id,
+                precio_total=precio_real,
+                forma_pago_id=forma_pago_id,
+                interes_pct=interes_pct,
+                anticipo=anticipo,
+                cantidad_cuotas=cantidad_cuotas,
+                fecha_inicio=cabecera_db.get("fecha_emision"),
+            )
+
+            # ======================================================
+
             db.commit()
             return factura_id
-
         except Exception:
             db.rollback()
             raise

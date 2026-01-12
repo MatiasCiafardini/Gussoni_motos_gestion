@@ -14,6 +14,9 @@ from app.services.clientes_service import ClientesService
 from app.services.vehiculos_service import VehiculosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.notify import NotifyPopup
+from PySide6.QtCore import Qt, QDate
+from app.data.database import SessionLocal
+from sqlalchemy import text
 
 
 # -------- Helpers --------
@@ -115,6 +118,7 @@ class VehiculoSelectorCombo(QComboBox):
 
         le.textEdited.connect(self._on_text_edited)
         self.currentIndexChanged.connect(self._on_index_changed)
+        
 
     @property
     def selected_vehiculo(self) -> Optional[Dict[str, Any]]:
@@ -203,6 +207,12 @@ class FacturasAgregarPage(QWidget):
 
         self._build_ui()
         self._load_tipos_comprobante()
+        self._load_formas_pago()
+        self.cb_forma_pago.currentIndexChanged.connect(self._on_forma_pago_changed)
+
+        self._load_formas_pago()
+        self.cb_forma_pago.currentIndexChanged.connect(self._on_forma_pago_changed)
+
         self._load_puntos_venta()
         self._load_condicion_iva_receptor()
         self._add_detalle_row()
@@ -210,6 +220,7 @@ class FacturasAgregarPage(QWidget):
         self._ajustar_ancho_detalle()
         # Aseguramos que arranca en modo "factura normal"
         self._actualizar_modo_nc()
+        self._on_forma_pago_changed()
 
     # ---------------- UI ----------------
     def _build_ui(self) -> None:
@@ -378,6 +389,64 @@ class FacturasAgregarPage(QWidget):
         self.cb_cliente.currentIndexChanged.connect(self._on_cliente_selected)
         self.btn_cliente_limpiar.clicked.connect(self._on_cliente_limpiar)
 
+        # --- Sección: Datos de la venta / Forma de pago ---
+
+        sec_venta = QFrame(self)
+        sec_venta.setObjectName("Panel")
+        sec_venta.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        sec_venta_l = QVBoxLayout(sec_venta)
+        sec_venta_l.setContentsMargins(10, 10, 10, 10)
+        sec_venta_l.setSpacing(8)
+
+        lblv = QLabel("Datos de la venta")
+        _style_section_label(lblv)
+        sec_venta_l.addWidget(lblv)
+
+        gridv = QGridLayout()
+        gridv.setHorizontalSpacing(8)
+        gridv.setVerticalSpacing(6)
+        sec_venta_l.addLayout(gridv)
+
+        # columnas 1 3 1 3 1 3
+        for col, stretch in enumerate((1, 3, 1, 3, 1, 3)):
+            gridv.setColumnStretch(col, stretch)
+
+        self.in_precio_real = QLineEdit()
+        self.in_precio_real.setPlaceholderText("Precio total de la operación")
+
+        self.cb_forma_pago = QComboBox()
+        _setup_combo(self.cb_forma_pago)
+
+        self.in_anticipo = QLineEdit()
+        self.in_anticipo.setPlaceholderText("Anticipo")
+        self.lbl_anticipo = QLabel("Anticipo")
+        self.in_cantidad_cuotas = QLineEdit()
+        self.in_cantidad_cuotas.setPlaceholderText("Cantidad de cuotas")
+        self.lbl_cantidad_cuotas = QLabel("Cantidad de cuotas")
+        self.in_interes_pct = QLineEdit()
+        self.in_interes_pct.setPlaceholderText("Interés %")
+        self.lbl_interes = QLabel("Interés")
+
+        row = 0
+        gridv.addWidget(QLabel("Precio real"), row, 0)
+        gridv.addWidget(self.in_precio_real, row, 1)
+        gridv.addWidget(QLabel("Forma de pago"), row, 2)
+        gridv.addWidget(self.cb_forma_pago, row, 3)
+        gridv.addWidget(self.lbl_anticipo, row, 4)
+        gridv.addWidget(self.in_anticipo, row, 5)
+
+        row += 1
+        gridv.addWidget(self.lbl_cantidad_cuotas, row, 0)
+        gridv.addWidget(self.in_cantidad_cuotas, row, 1)
+        gridv.addWidget(self.lbl_interes, row, 2)
+        gridv.addWidget(self.in_interes_pct, row, 3)
+        
+
+
+        main.addWidget(sec_venta)
+
+        
         # --- Sección 3: Detalle (responsive) ---
         sec3 = QFrame(self)
         sec3.setObjectName("Panel")
@@ -730,6 +799,57 @@ class FacturasAgregarPage(QWidget):
             self.in_pto_vta.setCurrentIndex(0)
 
         self._on_tipo_or_pto_changed()
+    def _load_formas_pago(self) -> None:
+        """
+        Carga las formas de pago desde BD.
+        Requiere tabla forma_pago.
+        """
+        db = SessionLocal()
+        try:
+            rows = db.execute(
+                text(
+                    """
+                    SELECT id, nombre
+                    FROM forma_pago
+                    ORDER BY nombre
+                    """
+                )
+            ).mappings().all()
+        except Exception:
+            rows = []
+        finally:
+            db.close()
+
+        self.cb_forma_pago.blockSignals(True)
+        self.cb_forma_pago.clear()
+        for r in rows:
+            self.cb_forma_pago.addItem(r["nombre"], r["id"])
+        self.cb_forma_pago.blockSignals(False)
+
+    def _on_forma_pago_changed(self) -> None:
+        """
+        Si la forma de pago es financiación (id = 3),
+        mostramos anticipo y cuotas.
+        """
+        forma_pago_id = self.cb_forma_pago.currentData()
+
+        if forma_pago_id == 3:  # Financiación
+            self.in_anticipo.show() 
+            self.lbl_interes.show() 
+            self.lbl_anticipo.show() 
+            self.lbl_cantidad_cuotas.show() 
+            self.in_cantidad_cuotas.show()
+            self.in_interes_pct.show()
+        else:
+            self.in_anticipo.hide()
+            self.in_cantidad_cuotas.hide()
+            self.in_anticipo.setText("")
+            self.in_cantidad_cuotas.setText("")
+            self.in_interes_pct.hide()
+            self.in_interes_pct.setText("")
+            self.lbl_interes.hide() 
+            self.lbl_anticipo.hide() 
+            self.lbl_cantidad_cuotas.hide() 
 
     def _load_condicion_iva_receptor(self) -> None:
         """
@@ -1119,6 +1239,12 @@ class FacturasAgregarPage(QWidget):
             "condicion_iva_receptor_id": condicion_iva_receptor_id,
             # observaciones
             "observaciones": observaciones_text or None,
+            "precio_real": _parse_decimal(self.in_precio_real.text()),
+            "forma_pago_id": self.cb_forma_pago.currentData(),
+            "anticipo": _parse_decimal(self.in_anticipo.text()),
+            "cantidad_cuotas": int(self.in_cantidad_cuotas.text() or 0),
+            "interes_pct": float(self.in_interes_pct.text() or 0.0),
+
         }
 
         items: List[Dict[str, Any]] = []

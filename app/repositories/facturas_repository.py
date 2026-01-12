@@ -165,6 +165,8 @@ class FacturasRepository:
             "estado_id": cabecera.get("estado_id"),
             "cliente_id": cabecera.get("cliente_id"),
             "condicion_iva_receptor_id": cabecera.get("condicion_iva_receptor_id"),
+            "venta_id": cabecera.get("venta_id"),
+
         }
 
         # Opcionales (NC asociada)
@@ -201,7 +203,8 @@ class FacturasRepository:
                             condicion_iva_receptor_id,
                             cbte_asoc_tipo,
                             cbte_asoc_pto_vta,
-                            cbte_asoc_numero
+                            cbte_asoc_numero,
+                            venta_id
                         )
                         VALUES (
                             :tipo,
@@ -222,7 +225,8 @@ class FacturasRepository:
                             :condicion_iva_receptor_id,
                             :cbte_asoc_tipo,
                             :cbte_asoc_pto_vta,
-                            :cbte_asoc_numero
+                            :cbte_asoc_numero,
+                            :venta_id
                         )
                         """
                     ),
