@@ -14,7 +14,9 @@ from app.services.vehiculos_service import VehiculosService
 from app.ui.pages.vehiculos_agregar import VehiculosAgregarPage
 from app.ui.widgets.loading_overlay import LoadingOverlay
 from app.ui.utils.loading_decorator import with_loading
+from pathlib import Path
 
+ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 class VehiculosPage(QWidget):
     open_detail = Signal(int)

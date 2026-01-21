@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-import os
+
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
-from app.integrations.arca.config import ArcaEnv
+from app.core.config import settings
+
+
 import ssl
 # -------------------- Resultado WSFE --------------------
 
@@ -40,32 +42,13 @@ class ArcaWSFEResult:
 
 
 class ArcaWSFEConfig:
-    """
-    Configuración necesaria para hablar con el WSFEv1 de AFIP/ARCA.
-    """
+    def __init__(self) -> None:
+        self.mode = (settings.ARCA_ENV or "HOMOLOGACION").upper()
 
-    def __init__(self, mode: str = "HOMOLOGACION", wsfe_url: Optional[str] = None) -> None:
-        self.mode = (mode or "HOMOLOGACION").upper()
-
-        if wsfe_url:
-            self.wsfe_url = wsfe_url
+        if self.mode == "PRODUCCION":
+            self.wsfe_url = "https://servicios1.afip.gov.ar/wsfev1/service.asmx"
         else:
-            if self.mode == "PRODUCCION":
-                self.wsfe_url = "https://servicios1.afip.gov.ar/wsfev1/service.asmx"
-            else:
-                # Homologación / testing
-                self.wsfe_url = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx"
-
-    @classmethod
-    def from_env(cls) -> "ArcaWSFEConfig":
-        """
-        Config centralizada desde ArcaEnv.
-        El entorno se controla únicamente con ARCA_ENV.
-        """
-        return cls(
-            mode="PRODUCCION" if ArcaEnv.IS_PROD else "HOMOLOGACION",
-            wsfe_url=ArcaEnv.WSFE_URL,
-        )
+            self.wsfe_url = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx"
 
 
 
@@ -85,7 +68,8 @@ class ArcaWSFEClient:
     """
 
     def __init__(self, config: Optional[ArcaWSFEConfig] = None) -> None:
-        self._config = config or ArcaWSFEConfig.from_env()
+        self._config = config or ArcaWSFEConfig()
+
 
     # -------- API principal --------
 
@@ -305,12 +289,15 @@ class ArcaWSFEClient:
 
     def _call_wsfe_action(self, soap_xml: str, action: str) -> str:
         data = soap_xml.encode("utf-8")
+
+        soap_action = f"http://ar.gov.afip.dif.FEV1/{action}"
+    
         req = urllib.request.Request(
             self._config.wsfe_url,
             data=data,
             headers={
                 "Content-Type": "text/xml; charset=utf-8",
-                "SOAPAction": f'"http://ar.gov.afip.dif.FEV1/{action}"',
+                "SOAPAction": soap_action,  # ✅ BIEN
             },
             method="POST",
         )
@@ -320,14 +307,19 @@ class ArcaWSFEClient:
             context.set_ciphers("DEFAULT@SECLEVEL=1")
 
             with urllib.request.urlopen(req, timeout=30, context=context) as resp:
-                resp_data = resp.read()
+                return resp.read().decode("utf-8", errors="ignore")
+
         except urllib.error.HTTPError as e:
             body = e.read().decode(errors="ignore")
-            raise RuntimeError(f"Error HTTP al llamar WSFEv1 ({e.code}): {body}") from e
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"No se pudo conectar al WSFEv1: {e}") from e
+            raise RuntimeError(
+                f"Error WSFE HTTP {e.code} ({action}): {body}"
+            ) from e
 
-        return resp_data.decode("utf-8", errors="ignore")
+        except urllib.error.URLError as e:
+            raise RuntimeError(
+                f"No se pudo conectar a WSFE ({action}): {e}"
+            ) from e
+
 
     # -------- Parseo respuesta FECAESolicitar --------
 

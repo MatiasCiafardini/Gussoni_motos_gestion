@@ -17,7 +17,8 @@ from app.ui.notify import NotifyPopup
 from PySide6.QtCore import Qt, QDate
 from app.data.database import SessionLocal
 from sqlalchemy import text
-
+from app.ui.widgets.money_spinbox import MoneySpinBox
+from app.services.catalogos_service import CatalogosService
 
 # -------- Helpers --------
 
@@ -106,6 +107,7 @@ class VehiculoSelectorCombo(QComboBox):
         le = self.lineEdit()
         le.setPlaceholderText("Buscar vehículo...")
         le.setClearButtonEnabled(True)
+        
 
         self._svc = vehiculos_service
         self._timer = QTimer(self)
@@ -191,7 +193,7 @@ class FacturasAgregarPage(QWidget):
         self._main_window = main_window
         self._dirty = False
         self._selected_cliente: Optional[Dict[str, Any]] = None
-
+        self._catalogos = CatalogosService()
         self._cliente_search_timer = QTimer(self)
         self._cliente_search_timer.setSingleShot(True)
         self._cliente_search_timer.setInterval(150)
@@ -207,9 +209,6 @@ class FacturasAgregarPage(QWidget):
 
         self._build_ui()
         self._load_tipos_comprobante()
-        self._load_formas_pago()
-        self.cb_forma_pago.currentIndexChanged.connect(self._on_forma_pago_changed)
-
         self._load_formas_pago()
         self.cb_forma_pago.currentIndexChanged.connect(self._on_forma_pago_changed)
 
@@ -412,21 +411,22 @@ class FacturasAgregarPage(QWidget):
         for col, stretch in enumerate((1, 3, 1, 3, 1, 3)):
             gridv.setColumnStretch(col, stretch)
 
-        self.in_precio_real = QLineEdit()
-        self.in_precio_real.setPlaceholderText("Precio total de la operación")
+        self.in_precio_real = MoneySpinBox()
+        self.in_precio_real.setValue(0)
 
         self.cb_forma_pago = QComboBox()
         _setup_combo(self.cb_forma_pago)
 
-        self.in_anticipo = QLineEdit()
-        self.in_anticipo.setPlaceholderText("Anticipo")
+        self.in_anticipo = MoneySpinBox()
+        self.in_anticipo.setValue(0)
         self.lbl_anticipo = QLabel("Anticipo")
         self.in_cantidad_cuotas = QLineEdit()
         self.in_cantidad_cuotas.setPlaceholderText("Cantidad de cuotas")
         self.lbl_cantidad_cuotas = QLabel("Cantidad de cuotas")
-        self.in_interes_pct = QLineEdit()
-        self.in_interes_pct.setPlaceholderText("Interés %")
-        self.lbl_interes = QLabel("Interés")
+        self.in_importe_cuota = MoneySpinBox()
+        self.in_importe_cuota.setValue(0)
+        self.lbl_importe_cuota = QLabel("Importe cuota")
+
 
         row = 0
         gridv.addWidget(QLabel("Precio real"), row, 0)
@@ -439,14 +439,18 @@ class FacturasAgregarPage(QWidget):
         row += 1
         gridv.addWidget(self.lbl_cantidad_cuotas, row, 0)
         gridv.addWidget(self.in_cantidad_cuotas, row, 1)
-        gridv.addWidget(self.lbl_interes, row, 2)
-        gridv.addWidget(self.in_interes_pct, row, 3)
+        gridv.addWidget(self.lbl_importe_cuota, row, 2)
+        gridv.addWidget(self.in_importe_cuota, row, 3)
+
         
 
 
         main.addWidget(sec_venta)
 
-        
+        self.in_anticipo.valueChanged.connect(self._recalcular_precio_real)
+        self.in_importe_cuota.valueChanged.connect(self._recalcular_precio_real)
+        self.in_cantidad_cuotas.textChanged.connect(self._recalcular_precio_real)
+    
         # --- Sección 3: Detalle (responsive) ---
         sec3 = QFrame(self)
         sec3.setObjectName("Panel")
@@ -598,6 +602,18 @@ class FacturasAgregarPage(QWidget):
         self.btn_guardar_ver.clicked.connect(lambda: self._on_guardar(True))
 
     # --- layout: lógica de ancho responsive con mínimo para Vehículo ---
+    def _recalcular_precio_real(self):
+        anticipo = self.in_anticipo.value()
+
+        try:
+            cuotas = int(self.in_cantidad_cuotas.text() or 0)
+        except ValueError:
+            cuotas = 0
+
+        importe_cuota = self.in_importe_cuota.value()
+
+        total = anticipo + (cuotas * importe_cuota)
+        self.in_precio_real.setValue(total)
 
     def _ajustar_ancho_detalle(self) -> None:
         """
@@ -747,163 +763,98 @@ class FacturasAgregarPage(QWidget):
 
     # ---------------- Datos iniciales / cabecera ----------------
 
-    def _load_tipos_comprobante(self) -> None:
-        try:
-            tipos = self._svc_facturas.get_tipos_comprobante()
-        except Exception:
-            tipos = []
-        if not tipos:
-            tipos = [
-                {"codigo": "FA", "nombre": "Factura A"},
-                {"codigo": "FB", "nombre": "Factura B"},
-                {"codigo": "FC", "nombre": "Factura C"},
-            ]
+    def _load_tipos_comprobante(self):
+        tipos = self._catalogos.get_tipos_comprobante() or []
+
         self.in_tipo.blockSignals(True)
         self.in_tipo.clear()
         for t in tipos:
-            self.in_tipo.addItem(t.get("nombre") or t.get("codigo"), t.get("codigo"))
+            self.in_tipo.addItem(t["nombre"], t["codigo"])
         self.in_tipo.blockSignals(False)
+
         idx_fb = self.in_tipo.findData("FB")
-        self.in_tipo.setCurrentIndex(idx_fb if idx_fb != -1 else 0)
-        self._on_tipo_or_pto_changed()
+        self.in_tipo.setCurrentIndex(idx_fb if idx_fb >= 0 else 0)
 
-    def _load_puntos_venta(self) -> None:
-        """
-        Carga los puntos de venta desde el servicio de facturas.
-        Espera que get_puntos_venta() devuelva una lista de dicts con
-        al menos la clave 'punto_venta'.
-        """
-        try:
-            pvs = self._svc_facturas.get_puntos_venta()
-        except Exception:
-            pvs = []
 
+    def _load_puntos_venta(self):
+        pvs = self._catalogos.get_puntos_venta() or []
+    
         self.in_pto_vta.blockSignals(True)
         self.in_pto_vta.clear()
-
-        for pv in pvs or []:
+    
+        for pv in pvs:
             nro = pv.get("punto_venta")
             if nro is None:
                 continue
-            try:
-                nro_int = int(nro)
-            except (TypeError, ValueError):
-                continue
-            # Se muestra con cero a la izquierda tipo "0002"
+            
+            nro_int = int(nro)
             label = str(nro_int).zfill(4)
             self.in_pto_vta.addItem(label, nro_int)
-
+    
         self.in_pto_vta.blockSignals(False)
-
-        if self.in_pto_vta.count() > 0:
+    
+        # Default: punto de venta 3 si existe
+        idx = self.in_pto_vta.findData(3)
+        if idx >= 0:
+            self.in_pto_vta.setCurrentIndex(idx)
+        elif self.in_pto_vta.count() > 0:
             self.in_pto_vta.setCurrentIndex(0)
+    
 
-        self._on_tipo_or_pto_changed()
+        
     def _load_formas_pago(self) -> None:
-        """
-        Carga las formas de pago desde BD.
-        Requiere tabla forma_pago.
-        """
-        db = SessionLocal()
-        try:
-            rows = db.execute(
-                text(
-                    """
-                    SELECT id, nombre
-                    FROM forma_pago
-                    ORDER BY nombre
-                    """
-                )
-            ).mappings().all()
-        except Exception:
-            rows = []
-        finally:
-            db.close()
+        rows = self._catalogos.get_formas_pago() or []
 
         self.cb_forma_pago.blockSignals(True)
         self.cb_forma_pago.clear()
+
         for r in rows:
             self.cb_forma_pago.addItem(r["nombre"], r["id"])
+
         self.cb_forma_pago.blockSignals(False)
 
+
     def _on_forma_pago_changed(self) -> None:
-        """
-        Si la forma de pago es financiación (id = 3),
-        mostramos anticipo y cuotas.
-        """
         forma_pago_id = self.cb_forma_pago.currentData()
 
         if forma_pago_id == 3:  # Financiación
-            self.in_anticipo.show() 
-            self.lbl_interes.show() 
-            self.lbl_anticipo.show() 
-            self.lbl_cantidad_cuotas.show() 
+            self.in_anticipo.show()
             self.in_cantidad_cuotas.show()
-            self.in_interes_pct.show()
+            self.in_importe_cuota.show()
+            self.lbl_anticipo.show()
+            self.lbl_cantidad_cuotas.show()
+            self.lbl_importe_cuota.show()
         else:
             self.in_anticipo.hide()
             self.in_cantidad_cuotas.hide()
-            self.in_anticipo.setText("")
+            self.in_importe_cuota.hide()
+            self.in_anticipo.setValue(0)
             self.in_cantidad_cuotas.setText("")
-            self.in_interes_pct.hide()
-            self.in_interes_pct.setText("")
-            self.lbl_interes.hide() 
-            self.lbl_anticipo.hide() 
-            self.lbl_cantidad_cuotas.hide() 
+            self.in_importe_cuota.setValue(0)
+            self.lbl_anticipo.hide()
+            self.lbl_cantidad_cuotas.hide()
+            self.lbl_importe_cuota.hide()
 
-    def _load_condicion_iva_receptor(self) -> None:
-        """
-        Carga la lista de condiciones frente al IVA del receptor.
-        Usa FacturasService.get_condiciones_iva_receptor().
-        Cada item del combo guarda el ID (INT) en userData.
-        """
+
+    def _load_condicion_iva_receptor(self):
+        conds = self._catalogos.get_condicion_iva_receptor() or []
+
+        self._cond_iva_receptor_list = conds
+
         self.in_condicion_iva_receptor.blockSignals(True)
         self.in_condicion_iva_receptor.clear()
 
-        conds: List[Dict[str, Any]] = []
-        getter = getattr(self._svc_facturas, "get_condiciones_iva_receptor", None)
-        if callable(getter):
-            try:
-                conds = getter() or []
-            except Exception:
-                conds = []
-
-        # Cacheamos la lista para luego poder buscar por código (CF, RI, etc.)
-        self._cond_iva_receptor_list = conds or []
-
-        if not conds:
-            # fallback simple (aunque con IDs fijos)
-            conds = [
-                {"id": 5, "codigo": "CF", "descripcion": "Consumidor Final"},
-                {"id": 1, "codigo": "RI", "descripcion": "Responsable Inscripto"},
-                {"id": 6, "codigo": "MT", "descripcion": "Monotributista"},
-                {"id": 4, "codigo": "EX", "descripcion": "Exento"},
-            ]
-            self._cond_iva_receptor_list = conds
-
         idx_cf = -1
-        for i, c in enumerate(conds):
-            desc = (
-                c.get("descripcion")
-                or c.get("nombre")
-                or c.get("codigo")
-                or str(c.get("id", ""))
+        for c in conds:
+            self.in_condicion_iva_receptor.addItem(
+                c["descripcion"], c["id"]
             )
-            cid = c.get("id")
-            try:
-                cid_int = int(cid)
-            except Exception:
-                continue
-            self.in_condicion_iva_receptor.addItem(desc, cid_int)
-            if str(c.get("codigo") or "").strip().upper() == "CF":
+            if c["codigo"] == "CF":
                 idx_cf = self.in_condicion_iva_receptor.count() - 1
 
         self.in_condicion_iva_receptor.blockSignals(False)
-        # Por defecto: Consumidor Final si lo encontramos, si no el primero
-        if idx_cf >= 0:
-            self.in_condicion_iva_receptor.setCurrentIndex(idx_cf)
-        elif self.in_condicion_iva_receptor.count() > 0:
-            self.in_condicion_iva_receptor.setCurrentIndex(0)
+        self.in_condicion_iva_receptor.setCurrentIndex(idx_cf if idx_cf >= 0 else 0)
+
 
     def _select_condicion_iva_por_codigo(self, codigo: str) -> None:
         """
@@ -1084,9 +1035,9 @@ class FacturasAgregarPage(QWidget):
         in_cant.editingFinished.connect(lambda r=row: self._on_detalle_valor_editado(r))
         self.tbl_detalle.setCellWidget(row, 1, in_cant)
 
-        in_pu = QLineEdit("0,00")
+        in_pu = MoneySpinBox()
         in_pu.setAlignment(Qt.AlignRight)
-        in_pu.editingFinished.connect(lambda r=row: self._on_detalle_valor_editado(r))
+        in_pu.valueChanged.connect(lambda r=row: self._on_detalle_valor_editado(r))
         self.tbl_detalle.setCellWidget(row, 2, in_pu)
 
         in_iva = QLineEdit("21")
@@ -1119,11 +1070,11 @@ class FacturasAgregarPage(QWidget):
         if row < 0 or row >= self.tbl_detalle.rowCount():
             return
         pu_widget = self.tbl_detalle.cellWidget(row, 2)
-        if isinstance(pu_widget, QLineEdit):
-            actual = _parse_decimal(pu_widget.text())
-            if actual == 0.0:
+        if isinstance(pu_widget, MoneySpinBox):
+            if pu_widget.value() == 0:
                 precio = vehiculo.get("precio_lista") or vehiculo.get("precio") or 0
-                pu_widget.setText(_format_money(float(precio)))
+                pu_widget.setValue(float(precio))
+
         self._dirty = True
         self._recalcular_fila(row)
 
@@ -1138,12 +1089,11 @@ class FacturasAgregarPage(QWidget):
     def _on_detalle_valor_editado(self, row: int) -> None:
         if row < 0 or row >= self.tbl_detalle.rowCount():
             return
+    
+        self._dirty = True
+        self._recalcular_fila(row)
+    
 
-        # Normalizar formato de precio unitario con decimales siempre
-        pu_w = self.tbl_detalle.cellWidget(row, 2)
-        if isinstance(pu_w, QLineEdit):
-            val = _parse_decimal(pu_w.text())
-            pu_w.setText(_format_money(val))
 
         self._dirty = True
         self._recalcular_fila(row)
@@ -1152,23 +1102,29 @@ class FacturasAgregarPage(QWidget):
         cant_w = self.tbl_detalle.cellWidget(row, 1)
         pu_w = self.tbl_detalle.cellWidget(row, 2)
         iva_w = self.tbl_detalle.cellWidget(row, 3)
-
-        cantidad = _parse_decimal(cant_w.text()) if isinstance(cant_w, QLineEdit) else 0.0
-        precio_unit = _parse_decimal(pu_w.text()) if isinstance(pu_w, QLineEdit) else 0.0
+    
+        cantidad = float(cant_w.text()) if isinstance(cant_w, QLineEdit) else 0.0
+        precio_unit = pu_w.value() if isinstance(pu_w, MoneySpinBox) else 0.0
         alic_iva = _parse_decimal(iva_w.text()) if isinstance(iva_w, QLineEdit) else 0.0
-
-        neto = cantidad * precio_unit
-        iva = neto * alic_iva / 100.0
-        total = neto + iva
-
+    
+        total = cantidad * precio_unit
+    
+        if alic_iva > 0:
+            neto = total / (1 + alic_iva / 100.0)
+            iva = total - neto
+        else:
+            neto = total
+            iva = 0.0
+    
         for col, val in zip((4, 5, 6), (neto, iva, total)):
             item = self.tbl_detalle.item(row, col)
             if not item:
                 item = QTableWidgetItem()
                 self.tbl_detalle.setItem(row, col, item)
             item.setText(_format_money(val))
-
+    
         self._recalcular_totales()
+    
 
     def _recalcular_totales(self) -> None:
         subtotal = iva_total = total_total = 0.0
@@ -1176,7 +1132,7 @@ class FacturasAgregarPage(QWidget):
             neto_item = self.tbl_detalle.item(r, 4)
             iva_item = self.tbl_detalle.item(r, 5)
             tot_item = self.tbl_detalle.item(r, 6)
-            subtotal += _parse_decimal(neto_item.text() if neto_item else "0")
+            subtotal += _parse_decimal(neto_item.text())
             iva_total += _parse_decimal(iva_item.text() if iva_item else "0")
             total_total += _parse_decimal(tot_item.text() if tot_item else "0")
         self.in_subtotal.setText(_format_money(subtotal))
@@ -1213,7 +1169,12 @@ class FacturasAgregarPage(QWidget):
         fecha_emision = self.in_fecha_emision.text().strip()
         moneda = self.in_moneda.text().strip() or "ARS"
         cotizacion = 1.0  # fijo (ya no se muestra campo)
-        total = _parse_decimal(self.in_total.text())
+        total = 0.0
+        for r in range(self.tbl_detalle.rowCount()):
+            tot_item = self.tbl_detalle.item(r, 6)
+            if tot_item:
+                total += _parse_decimal(tot_item.text())
+
         cliente_id = self._selected_cliente.get("id") if self._selected_cliente else None
 
         condicion_id_raw = self.in_condicion_iva_receptor.currentData()
@@ -1239,11 +1200,10 @@ class FacturasAgregarPage(QWidget):
             "condicion_iva_receptor_id": condicion_iva_receptor_id,
             # observaciones
             "observaciones": observaciones_text or None,
-            "precio_real": _parse_decimal(self.in_precio_real.text()),
+            "precio_real": self.in_precio_real.value(),
             "forma_pago_id": self.cb_forma_pago.currentData(),
-            "anticipo": _parse_decimal(self.in_anticipo.text()),
+            "anticipo": self.in_anticipo.value(),
             "cantidad_cuotas": int(self.in_cantidad_cuotas.text() or 0),
-            "interes_pct": float(self.in_interes_pct.text() or 0.0),
 
         }
 
@@ -1264,7 +1224,7 @@ class FacturasAgregarPage(QWidget):
             tot_it = self.tbl_detalle.item(r, 6)
 
             cantidad = _parse_decimal(cant_w.text()) if isinstance(cant_w, QLineEdit) else 0.0
-            precio_unit = _parse_decimal(pu_w.text()) if isinstance(pu_w, QLineEdit) else 0.0
+            precio_unit = pu_w.value() if isinstance(pu_w, MoneySpinBox) else 0.0
             alic_iva = _parse_decimal(iva_w.text()) if isinstance(iva_w, QLineEdit) else 0.0
             importe_neto = _parse_decimal(neto_it.text() if neto_it else "0")
             importe_iva = _parse_decimal(iva_it.text() if iva_it else "0")
@@ -1564,7 +1524,11 @@ class FacturasAgregarPage(QWidget):
             iva_w = self.tbl_detalle.cellWidget(r, 3)
 
             cant = _parse_decimal(cant_w.text()) if isinstance(cant_w, QLineEdit) else 0.0
-            pu = _parse_decimal(pu_w.text()) if isinstance(pu_w, QLineEdit) else 0.0
+            if isinstance(pu_w, MoneySpinBox):
+                pu = pu_w.value()
+            else:
+                pu = 0.0
+
             iva = _parse_decimal(iva_w.text()) if isinstance(iva_w, QLineEdit) else 0.0
 
             if cant != 1.0 or pu != 0.0 or iva != 21.0:

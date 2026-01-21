@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Dict, Any
+from loguru import logger
+from pathlib import Path
+from typing import Optional
 
+from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt
+
+from app.ui.utils.resources import resource_path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -115,21 +122,32 @@ class LoginDialog(QDialog):
     # Internal helpers
     # ------------------------------------------------------------------
     def _load_logo(self) -> None:
-        assets_dir = Path(__file__).resolve().parent.parent / "assets"
+        assets_dir = resource_path("app/assets")
+        print("ASSETS DIR:", assets_dir)
+        print("ASSETS EXISTS:", assets_dir.exists())
         candidates = ["logo.png", "logo.jpg", "logo.jpeg"]
         pixmap: Optional[QPixmap] = None
+
         for name in candidates:
             path = assets_dir / name
             if path.exists():
                 pixmap = QPixmap(str(path))
                 if not pixmap.isNull():
-                    pixmap = pixmap.scaled(160, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    pixmap = pixmap.scaled(
+                        160,
+                        160,
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
                     break
+
         if pixmap and not pixmap.isNull():
             self.logo_label.setPixmap(pixmap)
         else:
             self.logo_label.setText("Tu logo aquí")
-            self.logo_label.setStyleSheet("color: #6c757d; font-size: 16px; font-weight: 500;")
+            self.logo_label.setStyleSheet(
+                "color: #6c757d; font-size: 16px; font-weight: 500;"
+            )
 
     def _clear_error(self) -> None:
         if self.error_label.isVisible():
@@ -148,7 +166,8 @@ class LoginDialog(QDialog):
         try:
             user = self._auth_service.authenticate(username, password)
         except Exception as exc:
-            self._show_error(f"No se pudo iniciar sesión. {exc}")
+            logger.exception("Error real durante el login")
+            self._show_error("No se pudo iniciar sesión.")
             return
         finally:
             self.login_button.setEnabled(True)

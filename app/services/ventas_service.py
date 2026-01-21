@@ -283,3 +283,78 @@ class VentasService:
                 "venta": venta_id,
             }
         )
+    # =========================
+    # CONSULTAS
+    # =========================
+
+    def get_by_cliente(self, cliente_id: int) -> list[dict]:
+        """
+        Devuelve las ventas de un cliente con estado financiero calculado.
+        NO recalcula nada.
+        """
+
+        db = SessionLocal()
+        try:
+            rows = db.execute(
+                text("""
+                    SELECT
+                        v.id,
+                        v.fecha,
+                        v.precio_total,
+                        v.forma_pago_id,
+                        fp.nombre AS forma_pago,            
+
+                        f.id AS factura_id,         
+
+                        -- cuotas
+                        COUNT(c.id) AS total_cuotas,
+                        SUM(CASE WHEN c.estado = 'PAGADA' THEN 1 ELSE 0 END) AS cuotas_pagadas,
+                        SUM(
+                            CASE
+                                WHEN c.estado != 'PAGADA'
+                                 AND c.fecha_vencimiento < CURDATE()
+                                THEN 1 ELSE 0
+                            END
+                        ) AS cuotas_vencidas            
+
+                    FROM ventas v
+                    LEFT JOIN forma_pago fp ON fp.id = v.forma_pago_id
+                    LEFT JOIN facturas f ON f.venta_id = v.id
+                    LEFT JOIN plan_financiacion p ON p.venta_id = v.id
+                    LEFT JOIN cuotas c ON c.plan_id = p.id
+                    WHERE v.cliente_id = :cliente
+                    GROUP BY v.id, f.id
+                    ORDER BY v.fecha DESC
+                """),
+                {"cliente": cliente_id}
+            ).mappings().all()
+
+            ventas: list[dict] = []
+
+            for r in rows:
+                # ----------------------------
+                # Estado financiero calculado
+                # ----------------------------
+                if r["total_cuotas"] == 0:
+                    estado = "PAGADA"
+                elif r["cuotas_pagadas"] == r["total_cuotas"]:
+                    estado = "PAGADA"
+                elif r["cuotas_vencidas"] > 0:
+                    estado = "CON DEUDA"
+                else:
+                    estado = "PENDIENTE"
+
+                ventas.append({
+                    "id": r["id"],
+                    "fecha": r["fecha"],
+                    "descripcion": "Venta",  # luego podés enriquecer (vehículo, etc.)
+                    "precio_operacion": float(r["precio_total"]),
+                    "forma_pago": r["forma_pago"],
+                    "factura_id": r["factura_id"],
+                    "estado_financiero": estado,
+                })
+
+            return ventas
+
+        finally:
+            db.close()

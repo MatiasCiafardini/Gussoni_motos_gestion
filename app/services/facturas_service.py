@@ -468,15 +468,45 @@ class FacturasService:
 
     def get(self, factura_id: int) -> Optional[Dict[str, Any]]:
         """
-        Devuelve solo la cabecera de factura (+ datos de cliente/estado).
-        Usado para la pantalla de consulta.
+        Devuelve la cabecera de factura enriquecida con datos de venta
+        (forma de pago, cuotas, etc.).
         """
         db = SessionLocal()
         try:
-            return self._repo(db).get_by_id(factura_id)
+            repo = self._repo(db)
+
+            fn = getattr(repo, "get_by_id_con_venta", None)
+            if callable(fn):
+                fac = fn(factura_id)
+            else:
+                fac = repo.get_by_id(factura_id)
+
+            if fac:
+                fac["forma_pago_texto"] = self._build_forma_pago_texto(fac)
+
+            return fac
         finally:
             db.close()
 
+    def _build_forma_pago_texto(self, row: Dict[str, Any]) -> str:
+        nombre = str(row.get("forma_pago_nombre") or "").strip()
+        if not nombre:
+            return ""
+    
+        if nombre.lower() == "financiación":
+            cuotas = row.get("cantidad_cuotas")
+            interes = row.get("interes_pct")
+    
+            partes = ["Financiación"]
+            if cuotas:
+                partes.append(f"{int(cuotas)} cuotas")
+            if interes:
+                partes.append(f"{float(interes):g}% interés")
+    
+            return " – ".join(partes)
+    
+        return nombre
+    
     def get_detalle(self, factura_id: int) -> List[Dict[str, Any]]:
         """
         Devuelve el detalle de la factura (facturas_detalle).

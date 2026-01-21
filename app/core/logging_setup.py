@@ -1,11 +1,34 @@
 from __future__ import annotations
+
 from loguru import logger
-import sys
 from pathlib import Path
+import sys
+
+from app.shared.paths import user_data_path
+
 
 def setup_logging(app_name: str = "MotoAgency Desk") -> None:
-    log_dir = Path.cwd() / "logs"
+    # Carpeta segura de logs (AppData)
+    log_dir = Path(user_data_path()) / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
+
     logger.remove()
-    logger.add(sys.stdout, level="INFO", format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{message}</cyan>")
-    logger.add(log_dir / "app.log", rotation="1 week", retention="4 weeks", level="INFO")
+
+    # 🔹 Consola SOLO si existe (en exe windowed NO existe)
+    if sys.stdout:
+        logger.add(
+            sys.stdout,
+            level="INFO",
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{message}</cyan>",
+        )
+
+    # 🔹 Archivo (siempre válido)
+    logger.add(
+        log_dir / f"{app_name}.log",
+        rotation="1 week",
+        retention="4 weeks",
+        level="INFO",
+        encoding="utf-8",
+    )
+
+    logger.info("Logging inicializado correctamente")

@@ -50,8 +50,9 @@ ClientesDetailPage = None
 try:
     from app.ui.pages.clientes_detail_page import ClientesDetailPage as _ClientesDetailPage
     ClientesDetailPage = _ClientesDetailPage
-except Exception:
-    ClientesDetailPage = None
+except Exception as e:
+    print("ERROR importando ClientesDetailPage:", e)
+    raise
 
 ClientesAgregarPage = None
 try:
@@ -80,8 +81,10 @@ FacturasConsultarPage = None
 try:
     from app.ui.pages.facturas_consultar import FacturasConsultarPage as _FacturasConsultarPage
     FacturasConsultarPage = _FacturasConsultarPage
-except Exception:
-    FacturasConsultarPage = None
+except Exception as e:
+    print("❌ ERROR importando FacturasConsultarPage:", e)
+    raise
+
 
 # =================== CONFIGURACIÓN ===================
 ConfiguracionPage = None
@@ -344,6 +347,7 @@ class MainWindow(QMainWindow):
             if hasattr(page, "open_detail"):
                 # AHORA: abrir pantalla de consulta de factura
                 page.open_detail.connect(
+                    print("aca llega"),
                     lambda fid: self.open_page("facturas_consultar", factura_id=int(fid))
                 )
         except Exception:
@@ -381,13 +385,33 @@ class MainWindow(QMainWindow):
 
     def open_cliente_detail(self, cliente_id: int):
         self._ensure_catalogs_ready()
+        print("mainwindow cliente")
         if not ClientesDetailPage:
+            print("aca tira el error")
             self.notify("La página de detalle de cliente no está disponible.", "error")
             return
+        print("mainwindow cliente pasa")
+    
         detail = ClientesDetailPage(cliente_id)
+    
+        # volver
         if hasattr(detail, "navigate_back"):
             detail.navigate_back.connect(lambda: self.navigate_back())
+    
+        # 👉 NUEVO: ir a factura desde lupa
+        if hasattr(detail, "navigate_to_factura"):
+            detail.navigate_to_factura.connect(
+                lambda fid, cid=cliente_id: self.open_page(
+                    "facturas_consultar",
+                    factura_id=int(fid),
+                    return_to="cliente",
+                    cliente_id=cid,
+                )
+            )
+
+    
         self.navigate_to(detail)
+    
 
     def open_usuario_detail(self, user_id: int):
         if not UsuariosDetailPage:
@@ -497,15 +521,29 @@ class MainWindow(QMainWindow):
             return
         # NUEVO: consulta de factura
         if name == "facturas_consultar":
+            print("hasta aca 4")
+            print(FacturasConsultarPage)
+            
             fid = kwargs.get("factura_id") or (args[0] if args else None)
             if not fid:
                 self.notify("Falta factura_id para abrir la consulta.", "error")
                 return
             if not FacturasConsultarPage:
+                print("hasta aca 4")
                 self.notify("La página de consulta de factura no está disponible.", "error")
                 return
             try:
-                page = FacturasConsultarPage(factura_id=int(fid), parent=self, main_window=self)
+                return_to = kwargs.get("return_to")
+                cliente_id = kwargs.get("cliente_id")
+
+                page = FacturasConsultarPage(
+                    factura_id=int(fid),
+                    parent=self,
+                    main_window=self,
+                    return_to=return_to,
+                    cliente_id=cliente_id,
+                )
+
             except Exception as ex:
                 print("Error creando FacturasConsultarPage:", ex)
                 self.notify("No se pudo abrir la consulta de factura.", "error")
@@ -513,9 +551,18 @@ class MainWindow(QMainWindow):
 
             if hasattr(page, "go_back"):
                 try:
-                    page.go_back.connect(self.navigate_back)
+                    if return_to == "cliente" and cliente_id:
+                        page.go_back.connect(
+                            lambda: self.open_page(
+                                "clientes_detalle",
+                                cliente_id=cliente_id
+                            )
+                        )
+                    else:
+                        page.go_back.connect(self.navigate_back)
                 except Exception:
                     pass
+                
             self.navigate_to(page)
             return
 

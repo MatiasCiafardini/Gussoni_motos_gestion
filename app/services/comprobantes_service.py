@@ -7,6 +7,9 @@ from datetime import datetime, date
 import base64
 import json
 import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parents[1]  # app/
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -22,31 +25,30 @@ from app.services.facturas_service import FacturasService
 
 @dataclass(frozen=True)
 class EmpresaConfig:
-    nombre_fantasia: str = "GUSSONI MOTORS"
-    razon_social: str = "MACHADO MOTOVEHICULOS S.A."
-    domicilio: str = "Av. Smith 238"
-    localidad: str = "(2760) San Antonio de Areco. Provincia de Buenos Aires"
+    nombre_fantasia: str = "GUSSONI AUTOMOTORES 2021 SAS"
+    razon_social: str = "GUSSONI AUTOMOTORES 2021 SAS"
+    domicilio: str = "Vieytes 664 - San Antonio De Areco, Buenos Aires"
     telefono: str = "Tel: 02326 497388"
     condicion_iva: str = "IVA Responsable Inscripto"
-    cuit: str = "30-71532774-7"
-    iibb: str = "30-71532774-7"
-    inicio_actividades: str = "27/05/2016"
-    punto_venta_default: int = 2
+    cuit: str = "33717057479"
+    iibb: str = "33-71705747-9"
+    inicio_actividades: str = "01/07/2021"
+    punto_venta_default: int = 3
 
 
 class ComprobantesService:
     HEADER_H = 36 * mm
     CLIENTE_H = 22 * mm
     TABLE_H = 150 * mm
-    RESUMEN_H = 14 * mm
+    RESUMEN_H = 22 * mm
     FOOTER_H = 24 * mm
 
     def __init__(self, *, empresa: Optional[EmpresaConfig] = None) -> None:
         self._svc = FacturasService()
         self._empresa = empresa or EmpresaConfig()
 
-        self.LOGO_GUSSONI_PATH = os.getenv("GUSSONI_LOGO_PATH", "").strip() or None
-        self.LOGO_AFIP_PATH = os.getenv("AFIP_LOGO_PATH", "").strip() or None
+        self.LOGO_GUSSONI_PATH = str(BASE_DIR / "assets" / "logo.png")
+        self.LOGO_AFIP_PATH   = str(BASE_DIR / "assets" / "logo_arca.jpg")
 
     def generar_pdf(self, factura_id: int) -> str:
         fac = self._svc.get(int(factura_id))
@@ -156,82 +158,145 @@ class ComprobantesService:
         x = M
         y = y_top - h
         w = W - 2 * M
-
+    
         c.setLineWidth(0.6)
         c.rect(x, y, w, h, stroke=1, fill=0)
-
-        # cuadrado B (PEGADO AL BORDE SUPERIOR del header)
+    
+        # ==================================================
+        # CUADRADO LETRA
+        # ==================================================
         sq = 16 * mm
         sq_x = x + w / 2 - sq / 2
-        sq_y = y + h - sq  # <-- pegado arriba (antes -1.5mm)
-
+        sq_y = y + h - sq
+    
         c.rect(sq_x, sq_y, sq, sq, stroke=1, fill=0)
         c.setFont("Helvetica-Bold", 18)
         c.drawCentredString(sq_x + sq / 2, sq_y + sq * 0.62, letra)
         c.setFont("Helvetica-Bold", 7)
         c.drawCentredString(sq_x + sq / 2, sq_y + sq * 0.22, f"COD. {cod_afip}")
-
+    
         split_x = sq_x + sq / 2
-
-        # IZQ: empresa
+    
+        # ==================================================
+        # IZQUIERDA
+        # ==================================================
         lx = x + 3 * mm
-        ly = y + h - 4.0 * mm
-
-        self._draw_logo_if_exists(c, self.LOGO_GUSSONI_PATH, lx, ly - 10 * mm, 28 * mm, 10 * mm)
-
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(lx, ly, self._empresa.nombre_fantasia)
-        c.setFont("Helvetica-Bold", 8)
-        c.drawString(lx, ly - 4 * mm, self._empresa.razon_social)
-
-        c.setFont("Helvetica", 7.2)
-        c.drawString(lx, ly - 8 * mm, self._empresa.domicilio)
-        c.drawString(lx, ly - 12 * mm, self._empresa.localidad)
-        c.drawString(lx, ly - 16 * mm, self._empresa.telefono)
-        c.drawString(lx, ly - 20 * mm, self._empresa.condicion_iva)
-
-        # DER: factura (arranca debajo del cuadrado)
-        rx = split_x + 3 * mm
-        right_w = (x + w) - rx - 3 * mm
+        top_y = y + h - 6 * mm
+    
+        logo_w = 14 * mm
+        logo_h = 10 * mm
+    
+        self._draw_logo_if_exists(
+            c,
+            self.LOGO_GUSSONI_PATH,
+            lx,
+            top_y - logo_h,
+            logo_w,
+            logo_h
+        )
+    
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(lx + logo_w + 3 * mm, top_y - 2 * mm, self._empresa.nombre_fantasia)
+    
+        info_y = top_y - logo_h - 4 * mm
+    
+        c.setFont("Helvetica-Bold", 7)
+        lbl_rs = "Razón Social:"
+        lbl_dom = "Domicilio Comercial:"
+        lbl_iva = "Condición frente al IVA:"
+    
+        c.drawString(lx, info_y, lbl_rs)
+        c.drawString(lx, info_y - 4 * mm, lbl_dom)
+        c.drawString(lx, info_y - 8 * mm, lbl_iva)
+    
+        c.setFont("Helvetica", 7)
+        c.drawString(lx + stringWidth(lbl_rs, "Helvetica-Bold", 7) + 1.5 * mm, info_y, self._empresa.razon_social)
+        c.drawString(lx + stringWidth(lbl_dom, "Helvetica-Bold", 7) + 1.5 * mm, info_y - 4 * mm, self._empresa.domicilio)
+        c.drawString(lx + stringWidth(lbl_iva, "Helvetica-Bold", 7) + 1.5 * mm, info_y - 8 * mm, self._empresa.condicion_iva)
+    
+        # ==================================================
+        # DERECHA: FACTURA / NOTA DE CRÉDITO
+        # ==================================================
+        rx = split_x + 9 * mm   # <<< un poco más a la derecha
 
         tipo = (fac.get("tipo") or "").upper() or "FB"
-        titulo = "Factura" if not tipo.startswith("NC") else "Nota de crédito"
+        titulo = "NOTA DE CRÉDITO" if tipo.startswith("NC") else "FACTURA"
 
-        pv = self._to_int(fac.get("punto_venta") or fac.get("pto_vta") or self._empresa.punto_venta_default) or 0
+        pv = self._to_int(
+            fac.get("punto_venta") or fac.get("pto_vta") or self._empresa.punto_venta_default
+        ) or 0
         nro = self._to_int(fac.get("numero") or 0) or 0
         fecha = self._fmt_fecha(fac.get("fecha_emision") or fac.get("fecha"))
 
-        top_line_y = y + h - 5.0 * mm
+        # ==================================================
+        # BLOQUE SUPERIOR (COMPROBANTE) — OK
+        # ==================================================
+        fy = sq_y + sq - 4 * mm
+
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(rx, fy, titulo)
 
         c.setFont("Helvetica", 8)
-        c.drawCentredString(rx + right_w / 2, top_line_y, titulo)
-        c.drawRightString(x + w - 3 * mm, top_line_y, f"Original      Página {page} de {total_pages}")
+        c.drawRightString(
+            x + w - 3 * mm,
+            fy,
+            f"Original    Página {page} de {total_pages}"
+        )
 
-        # bajamos un poco el N° para que no choque visualmente con la línea/box
-        nro_y = sq_y - 3.5 * mm
-        fecha_y = nro_y - 5.0 * mm
-
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(rx, nro_y, f"N°:  {str(pv).zfill(5)}-{str(nro).zfill(8)}")
-
+        fy -= 5 * mm
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, fy, "Punto de Venta:")
         c.setFont("Helvetica", 8)
-        c.drawString(rx, fecha_y, f"Fecha:  {fecha}" if fecha else "Fecha:")
+        c.drawString(rx + 32 * mm, fy, str(pv).zfill(5))
 
-        # Línea vertical: baja desde el cuadrado, pero NO pasa por el renglón del N°
-        # Cortamos la línea justo por debajo del N°.
-        # (dejamos 2mm de margen)
-        # Línea vertical continua (sin hueco)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx + 55 * mm, fy, "Comp. Nro:")
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + 75 * mm, fy, str(nro).zfill(8))
+
+        fy -= 4 * mm
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, fy, "Fecha de Emisión:")
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + 32 * mm, fy, fecha)
+
+        # ==================================================
+        # BLOQUE INFERIOR (FISCAL) — LABEL EN NEGRITA
+        # ==================================================
+        fy = y + 12 * mm
+        
+        # CUIT
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, fy, "CUIT:")
+        label_w = stringWidth("CUIT:", "Helvetica-Bold", 8)
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + label_w + 1.5 * mm, fy, self._empresa.cuit)
+        
+        # Ingresos Brutos
+        fy -= 4 * mm
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, fy, "Ingresos Brutos:")
+        label_w = stringWidth("Ingresos Brutos:", "Helvetica-Bold", 8)
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + label_w + 1.5 * mm, fy, self._empresa.iibb)
+        
+        # Fecha Inicio Actividades
+        fy -= 4 * mm
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, fy, "Fecha de Inicio de Actividades:")
+        label_w = stringWidth("Fecha de Inicio de Actividades:", "Helvetica-Bold", 8)
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + label_w + 1.5 * mm, fy, self._empresa.inicio_actividades)
+        
+
+    
+        # ==================================================
+        # LÍNEA DIVISORIA
+        # ==================================================
         c.line(split_x, y, split_x, sq_y)
+    
+    
 
-
-        # Datos fiscales abajo
-        c.setFont("Helvetica", 7.2)
-        if self._empresa.cuit:
-            c.drawString(rx, y + 7 * mm, f"CUIT: {self._empresa.cuit}")
-        if self._empresa.iibb:
-            c.drawString(rx + 55 * mm, y + 7 * mm, f"I. Brutos: {self._empresa.iibb}")
-        if self._empresa.inicio_actividades:
-            c.drawString(rx, y + 3 * mm, f"Inicio de Actividades: {self._empresa.inicio_actividades}")
 
     # =========================
     # CLIENTE
@@ -241,68 +306,88 @@ class ComprobantesService:
         x = M
         y = y_top - h
         w = W - 2 * M
-
+    
         c.setLineWidth(0.6)
         c.rect(x, y, w, h, stroke=1, fill=0)
-
+    
+        # Márgenes
         left_x = x + 3 * mm
-        mid_x = x + w * 0.52
-        right_x = x + w * 0.74
-
-        line1_y = y_top - 6 * mm
-        line2_y = y_top - 11 * mm
-        line3_y = y_top - 16 * mm
-
-        # Forma de pago más abajo (así no se “pega” con Localidad)
-        bottom_y = y + 2.0 * mm
-
+        right_x = x + w * 0.52
+    
+        # Líneas (una sola grilla)
+        l1 = y_top - 6 * mm
+        l2 = y_top - 11 * mm
+        l3 = y_top - 16 * mm
+    
+        # -------------------------
+        # Datos
+        # -------------------------
         cliente = (
             f"{(fac.get('cliente_nombre') or '').strip()} {(fac.get('cliente_apellido') or '').strip()}".strip()
-            or (fac.get("cliente") or "").strip()
-            or ""
+            or str(fac.get("cliente") or "").strip()
         )
-        cli_dir = str(fac.get("cliente_direccion") or fac.get("direccion") or "").strip() or ""
-        provincia = "BUENOS AIRES"
-
-        pedido = str(fac.get("pedido") or "").strip()
-        remito = str(fac.get("remito") or "").strip()
-
-        cuit_cli = self._fmt_doc(
+    
+        domicilio = str(
+            fac.get("cliente_direccion")
+            or fac.get("direccion")
+            or ""
+        ).strip()
+    
+        condicion_iva = str(
+            fac.get("cliente_condicion_iva")
+            or fac.get("condicion_iva_cliente")
+            or "Consumidor Final"
+        ).strip()
+    
+        cuil = self._fmt_doc(
             str(fac.get("cliente_tipo_doc") or fac.get("tipo_doc") or ""),
             str(fac.get("cliente_nro_doc") or fac.get("nro_doc") or ""),
-        ).strip()
-
+        )
+    
+        condicion_venta = (
+            str(
+                fac.get("forma_pago_texto")
+                or fac.get("forma_pago_nombre")
+                or fac.get("forma_pago")
+                or fac.get("condicion_venta")
+                or fac.get("forma_pago_descripcion")
+                or ""
+            ).strip()
+        )
+    
+        # -------------------------
+        # Línea 1
+        # -------------------------
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left_x, l1, "CUIL:")
+        c.drawString(right_x, l1, "Apellido y Nombre / Razón Social:")
+    
         c.setFont("Helvetica", 7.2)
+        c.drawString(left_x + 10 * mm, l1, cuil)
+        c.drawString(right_x + 52 * mm, l1, cliente)
+    
+        # -------------------------
+        # Línea 2
+        # -------------------------
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left_x, l2, "Condición frente al IVA:")
+        c.drawString(right_x, l2, "Domicilio:")
+    
+        c.setFont("Helvetica", 7.2)
+        c.drawString(left_x + 38 * mm, l2, condicion_iva)
+        c.drawString(right_x + 20 * mm, l2, domicilio)
+    
+        # -------------------------
+        # Línea 3
+        # -------------------------
+        c.setFont("Helvetica-Bold", 7.2)
+        c.drawString(left_x, l3, "Condición de Venta:")
+    
+        c.setFont("Helvetica", 7.2)
+        c.drawString(left_x + 32 * mm, l3, condicion_venta)
+    
 
-        c.drawString(left_x, line1_y, "Sr.(s):")
-        if cliente:
-            c.setFont("Helvetica-Bold", 7.2)
-            c.drawString(left_x + 17 * mm, line1_y, cliente)
-            c.setFont("Helvetica", 7.2)
 
-        c.drawString(left_x, line2_y, "Dirección:")
-        if cli_dir:
-            c.drawString(left_x + 17 * mm, line2_y, cli_dir)
-
-        c.drawString(left_x, line3_y, "Localidad:")
-
-        c.drawString(mid_x, line1_y, "Pedido:")
-        if pedido:
-            c.drawString(mid_x + 15 * mm, line1_y, pedido)
-
-        c.drawString(mid_x, line2_y, "Fecha de Vencimiento de Pago:")
-        c.drawString(mid_x, line3_y, "Provincia:")
-        c.drawString(mid_x + 18 * mm, line3_y, provincia)
-
-        c.drawString(right_x, line1_y, "CUIL:")
-        if cuit_cli:
-            c.drawString(right_x + 12 * mm, line1_y, cuit_cli)
-
-        c.drawString(right_x, line2_y, "Remito N°:")
-        if remito:
-            c.drawString(right_x + 18 * mm, line2_y, remito)
-
-        c.drawString(left_x, bottom_y, "Forma de Pago:")
 
     # ====== lo demás igual (tabla/resumen/footer/helpers) ======
     def _draw_table(self, c: canvas.Canvas, items: List[Dict[str, Any]], M: float, y_top: float, h: float) -> None:
@@ -454,20 +539,35 @@ class ComprobantesService:
         c.setFont("Helvetica", 7)
         base_y = y + h - 6 * mm
 
-        c.drawString(x + 3 * mm, base_y, "Descuentos:")
-        c.drawString(x + 25 * mm, base_y, "0")
+        # ---- BLOQUE TOTALES A LA DERECHA ----
+        bx = x + w - 80 * mm
+        by = y + h - 6 * mm
 
-        c.drawString(x + 40 * mm, base_y, "No Gravado")
-        c.drawRightString(x + 65 * mm, base_y, "0,01")
+        c.setFont("Helvetica", 7)
+        c.drawRightString(bx + 76 * mm, by, f"Subtotal: $ {self._fmt_money(neto)}")
+        c.drawRightString(bx + 76 * mm, by - 4 * mm, "Importe Otros Tributos: $ 0,00")
 
-        c.drawString(x + 75 * mm, base_y, "Exento")
-        c.drawRightString(x + 95 * mm, base_y, "0,00")
+        c.setFont("Helvetica-Bold", 8)
+        c.drawRightString(
+            bx + 76 * mm,
+            by - 9 * mm,
+            f"Importe Total: $ {self._fmt_money(total)}"
+        )
 
-        c.drawString(x + 110 * mm, base_y, "Neto")
-        c.drawRightString(x + 140 * mm, base_y, self._fmt_money(neto))
+        # ---- IVA CONTENIDO ----
+        c.setFont("Helvetica", 7)
+        c.drawString(
+            x + 3 * mm,
+            y + 6 * mm,
+            "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)"
+        )
+        c.drawString(
+            x + 3 * mm,
+            y + 2 * mm,
+            f"IVA Contenido: $ {self._fmt_money(iva21)}"
+        )
 
-        c.drawString(x + 150 * mm, base_y, "Subtotal:")
-        c.drawRightString(x + w - 3 * mm, base_y, self._fmt_money(neto))
+        
 
     def _draw_footer(
         self,
@@ -487,7 +587,6 @@ class ComprobantesService:
         w = W - 2 * M
 
         c.setLineWidth(0.6)
-        c.rect(x, y, w, h, stroke=1, fill=0)
 
         neto, iva21, total = self._calc_totals_iva21(fac, items)
 
@@ -496,31 +595,52 @@ class ComprobantesService:
 
         if autorizado:
             payload = self._build_qr_payload(fac)
-            self._draw_qr(c, payload, x + 3 * mm, y + 3 * mm, 18 * mm)
+            qr_size = 24 * mm  # un poco más chico para que respire
+
+            qr_x = x + 4 * mm
+            qr_y = y + 0 * mm
+
+            self._draw_qr(c, payload, qr_x, qr_y, qr_size)
         else:
             c.rect(x + 3 * mm, y + 3 * mm, 18 * mm, 18 * mm, stroke=1, fill=0)
 
-        ax = x + 25 * mm
-        self._draw_logo_if_exists(c, self.LOGO_AFIP_PATH, ax, y + 7 * mm, 22 * mm, 10 * mm)
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(ax, y + 11 * mm, "AFIP")
+        ax = qr_x + qr_size + 6 * mm
+
+        self._draw_logo_if_exists(
+            c,
+            self.LOGO_AFIP_PATH,
+            ax,
+            y + 14 * mm,
+            18 * mm,
+            9 * mm
+        )
+        # Texto DEBAJO del logo ARCA
+        text_x = ax
+        text_y = y + 10 * mm  # arranca justo debajo del logo
 
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(x + 75 * mm, y + 15 * mm, f"C.A.E. N°: {cae}" if cae else "C.A.E. N°:")
+        c.drawString(text_x, text_y, "Comprobante Autorizado")
+
+        c.setFont("Helvetica", 6.5)
+        c.drawString(
+            text_x,
+            text_y - 4 * mm,
+            "Esta agencia no se responsabiliza por los datos ingresados en el detalle de la operación"
+        )
+
+        # CAE y vencimiento ARRIBA A LA DERECHA
+        c.setFont("Helvetica-Bold", 8)
+        c.drawRightString(x + w - 4 * mm, y + h - 6 * mm, f"CAE N°: {cae}" if cae else "CAE N°:")
 
         c.setFont("Helvetica", 7)
-        c.drawString(x + 75 * mm, y + 9 * mm, f"Fecha Vto. CAE: {vto}" if vto else "Fecha Vto. CAE:")
+        c.drawRightString(
+            x + w - 4 * mm,
+            y + h - 11 * mm,
+            f"Fecha de Vto. CAE: {vto}" if vto else "Fecha de Vto. CAE:"
+        )
 
-        c.setFont("Helvetica", 7)
-        c.drawString(x + w - 60 * mm, y + 13 * mm, "IVA 21%")
-        c.drawRightString(x + w - 3 * mm, y + 13 * mm, self._fmt_money(iva21))
 
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(x + w - 60 * mm, y + 6 * mm, "Total:")
-        box_w = 35 * mm
-        box_h = 8 * mm
-        c.rect(x + w - 3 * mm - box_w, y + 3 * mm, box_w, box_h, stroke=1, fill=0)
-        c.drawRightString(x + w - 5 * mm, y + 5.5 * mm, self._fmt_money(total))
+        
 
     def _draw_logo_if_exists(self, c: canvas.Canvas, path: Optional[str], x: float, y: float, w: float, h: float) -> None:
         if not path:

@@ -244,7 +244,10 @@ class FacturasConsultarPage(QWidget):
         factura_id: int,
         parent: Optional[QWidget] = None,
         main_window: Optional[QMainWindow] = None,
+        return_to: Optional[str] = None,
+        cliente_id: Optional[int] = None,
     ) -> None:
+
         super().__init__(parent)
         self.setObjectName("FacturasConsultarPage")
 
@@ -254,11 +257,14 @@ class FacturasConsultarPage(QWidget):
         self._svc_vehiculos = VehiculosService()
         self._svc_comprobantes = ComprobantesService()
         self._main_window = main_window
+        self._return_to = return_to
+        self._cliente_id = cliente_id
 
         self._tipo: Optional[str] = None
         self._estado_id: Optional[int] = None
         self._factura: Optional[Dict[str, Any]] = None  # cache cabecera
 
+        print("hola")
         # baja/anulada (para bloquear acciones)
         self._baja: bool = False
         self._can_edit_current: bool = False
@@ -1962,10 +1968,17 @@ class FacturasConsultarPage(QWidget):
     # ---------------- Navegación ----------------
 
     def _on_volver(self) -> None:
+        # 🔁 Si la factura se abrió desde el perfil del cliente,
+        # volvemos explícitamente a ese cliente
+        if self._return_to == "cliente" and self._cliente_id:
+            mw = self._main_window
+            if mw and hasattr(mw, "open_page"):
+                mw.open_page(
+                    "clientes_detalle",
+                    cliente_id=int(self._cliente_id),
+                )
+            return
+    
+        # 🔙 Caso general: usar navegación normal
         self.go_back.emit()
-        mw = getattr(self, "_main_window", None) or self.window()
-        if isinstance(mw, QMainWindow) and hasattr(mw, "navigate_back"):
-            try:
-                mw.navigate_back()
-            except Exception:
-                pass
+    

@@ -9,7 +9,9 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QListView, QMainWindow, QMenu, QDateEdit, QAbstractSpinBox,
     
 )
+from pathlib import Path
 
+ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 from app.services.facturas_service import FacturasService
 from app.ui.widgets.loading_overlay import LoadingOverlay
 from app.ui.utils.loading_decorator import with_loading
@@ -487,13 +489,13 @@ class FacturasPage(QWidget):
     def _abrir_consultar(self, factura_id: Optional[int]) -> None:
         if factura_id is None:
             return
-
         self.open_detail.emit(factura_id)
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
             return
         try:
             if hasattr(mw, "open_page"):
+                
                 mw.open_page("facturas_consultar", factura_id)
         except TypeError:
             try:
@@ -550,7 +552,6 @@ class FacturasPage(QWidget):
             print(">>> [FacturasPage] ERROR en sincronizar_borradores_con_arca:", repr(e))
             popUp.critical(
                 self,
-                "Error al sincronizar con ARCA",
                 f"Ocurrió un error al sincronizar con ARCA:\n{e}",
             )
             return

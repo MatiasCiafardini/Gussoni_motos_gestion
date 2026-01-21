@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import sys
+import ctypes
 from typing import Optional, Dict, Any
 
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QApplication, QDialog
-
+from app.ui.utils.resources import resource_path
+from PySide6.QtGui import QIcon
 from app.core.logging_setup import setup_logging
 from app.core.config import settings
 from app.ui.main_window import MainWindow
 from app.ui.theme import apply_theme   # <-- importa tu theme
 from app.ui.login_dialog import LoginDialog
+from app.shared.paths import ensure_user_dirs
 
 
 class ApplicationController(QObject):
@@ -50,11 +53,16 @@ class ApplicationController(QObject):
 
 
 def main():
+    ensure_user_dirs()
     setup_logging(settings.APP_NAME)
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        "gussoni.app"
+    )
     app = QApplication(sys.argv)
 
     apply_theme(app, base_font_pt=11)  # <-- aplica tu estilo
-
+    icon_path = resource_path("app/assets/logo.ico")
+    app.setWindowIcon(QIcon(str(icon_path)))
     controller = ApplicationController(app)
     controller.start()
     sys.exit(app.exec())
