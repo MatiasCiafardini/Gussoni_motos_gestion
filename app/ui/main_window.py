@@ -433,6 +433,7 @@ class MainWindow(QMainWindow):
     # buscador de actualizaciones
     # ---------------------------------------------------------------------
     def check_updates_ui(self):
+        print("Funciona perfectamente")
         try:
             update = check_for_update()
             if not update:
