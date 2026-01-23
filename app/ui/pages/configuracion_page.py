@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import Optional
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QIcon, QPixmap
+from app.core.updater import check_for_update
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QGridLayout, QMainWindow, 
     QSizePolicy, QSpacerItem, QPushButton, QHBoxLayout
@@ -119,6 +121,17 @@ class ConfiguracionPage(QWidget):
         card_importacion.clicked_card.connect(self._open_importacion_datos)
         grid.addWidget(card_importacion, 1, 1)
 
+        # NUEVA Card: Buscar actualizaciones
+        card_updates = OptionCard(
+            "Buscar actualizaciones",
+            icon=QIcon.fromTheme("system-software-update"),
+            emoji="🔄"
+        )
+        card_updates.clicked_card.connect(self._check_updates)
+        grid.addWidget(card_updates, 0, 3)
+        
+
+
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
 
@@ -193,3 +206,25 @@ class ConfiguracionPage(QWidget):
                 except Exception:
                     pass
         return False
+    
+    def _check_updates(self):
+        """
+        Dispara la búsqueda de actualizaciones desde la ventana principal.
+        """
+        if not self.main_window:
+            popUp.warning(
+                self,
+                "Actualizaciones",
+                "No se pudo acceder a la ventana principal."
+            )
+            return
+
+        if hasattr(self.main_window, "check_updates_ui"):
+            self.main_window.check_updates_ui()
+        else:
+            popUp.warning(
+                self,
+                "Actualizaciones",
+                "La función de actualización no está disponible."
+            )
+

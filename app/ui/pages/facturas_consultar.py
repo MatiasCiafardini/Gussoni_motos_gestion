@@ -494,14 +494,14 @@ class FacturasConsultarPage(QWidget):
         self.in_precio_real = QLineEdit()
         self.in_forma_pago = QLineEdit()
         self.in_anticipo = QLineEdit()
-        self.in_interes = QLineEdit()
+        self.in_importe_cuota = QLineEdit()
         self.in_cant_cuotas = QLineEdit()
 
         for w in (
             self.in_precio_real,
             self.in_forma_pago,
             self.in_anticipo,
-            self.in_interes,
+            self.in_importe_cuota,
             self.in_cant_cuotas,
         ):
             self._make_readonly(w, align_right=True)
@@ -516,7 +516,7 @@ class FacturasConsultarPage(QWidget):
         gridv.addWidget(QLabel("Anticipo"), r, 0)
         gridv.addWidget(self.in_anticipo, r, 1)
         gridv.addWidget(QLabel("Interés (%)"), r, 2)
-        gridv.addWidget(self.in_interes, r, 3)
+        gridv.addWidget(self.in_importe_cuota, r, 3)
         gridv.addWidget(QLabel("Cuotas"), r, 4)
         gridv.addWidget(self.in_cant_cuotas, r, 5)
 
@@ -1116,7 +1116,7 @@ class FacturasConsultarPage(QWidget):
                             v.precio_total,
                             v.forma_pago_id,
                             v.anticipo,
-                            pf.interes_pct,
+                            pf.importe_cuota,
                             fp.nombre AS forma_pago,
                             pf.id AS plan_id,
                             pf.cantidad_cuotas
@@ -1132,7 +1132,7 @@ class FacturasConsultarPage(QWidget):
                     self.in_precio_real.setText(_format_money(row_venta["precio_total"] or 0))
                     self.in_forma_pago.setText(row_venta.get("forma_pago") or "")
                     self.in_anticipo.setText(_format_money(row_venta.get("anticipo") or 0))
-                    self.in_interes.setText(str(row_venta.get("interes_pct") or 0))
+                    self.in_importe_cuota.setText(str(row_venta.get("importe_cuota") or 0))
                     self.in_cant_cuotas.setText(str(row_venta.get("cantidad_cuotas") or 0))
 
                     plan_id = row_venta.get("plan_id")

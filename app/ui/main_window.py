@@ -1,7 +1,11 @@
 from __future__ import annotations
 from typing import Optional, Callable
 import time
-
+from PySide6.QtWidgets import QMessageBox
+from app.core.updater import check_for_update
+from app.core.downloader import download_file
+from pathlib import Path
+import os
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QSizePolicy
@@ -424,6 +428,57 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         self.navigate_to(detail)
+
+    # ---------------------------------------------------------------------
+    # buscador de actualizaciones
+    # ---------------------------------------------------------------------
+    def check_updates_ui(self):
+        try:
+            update = check_for_update()
+            if not update:
+                QMessageBox.information(
+                    self,
+                    "Actualizaciones",
+                    "La aplicación ya está actualizada."
+                )
+                return
+
+            reply = QMessageBox.question(
+                self,
+                "Actualización disponible",
+                (
+                    f"Hay una nueva versión disponible: {update['version']}\n\n"
+                    f"{update.get('notes', '')}\n\n"
+                    "¿Deseás actualizar ahora?"
+                ),
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if reply != QMessageBox.Yes:
+                return
+
+            # -------- descargar --------
+            updates_dir = Path(os.getenv("LOCALAPPDATA")) / "GussoniApp" / "updates"
+            filename = Path(update["url"]).name
+            dest = updates_dir / filename
+
+            download_file(update["url"], dest)
+
+            QMessageBox.information(
+                self,
+                "Actualización",
+                "La actualización se descargó correctamente.\n"
+                "Se instalará en el próximo paso."
+            )
+
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"No se pudo actualizar:\n{e}"
+            )
+
+
 
     # ---------------------------------------------------------------------
     # Router

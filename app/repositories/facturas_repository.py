@@ -115,49 +115,46 @@ class FacturasRepository:
             return [dict(r) for r in rows]
         except Exception:
             return []
-    def get_by_id_con_venta(self, factura_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Devuelve la cabecera de factura + datos de venta y forma de pago.
-        Pensado para PDF y vistas fiscales.
-        """
+    def get_by_id_con_venta(self, factura_id: int) -> dict | None:
         row = self.db.execute(
-            text(
-                """
+            text("""
                 SELECT
                     f.*,
     
-                    -- datos de venta
+                    -- Cliente
+                    c.id        AS cliente_id,
+                    c.nombre    AS cliente_nombre,
+                    c.apellido  AS cliente_apellido,
+                    c.tipo_doc  AS cliente_tipo_doc,
+                    c.nro_doc   AS cliente_nro_doc,
+                    c.email     AS cliente_email,
+                    c.telefono  AS cliente_telefono,
+                    c.direccion AS cliente_direccion,
+    
+                    -- Venta
+                    v.precio_total,
                     v.forma_pago_id,
+                    v.anticipo,
     
-                    -- forma de pago
-                    fp.nombre AS forma_pago_nombre,
-    
-                    -- financiación (si aplica)
+                    -- Plan de financiación (si existe)
                     pf.cantidad_cuotas,
-                    pf.interes_pct,
+                    pf.importe_cuota,
     
-                    -- cliente (repetimos lo mínimo útil)
-                    CONCAT_WS(' ', c.nombre, c.apellido) AS cliente,
-                    c.tipo_doc    AS cliente_tipo_doc,
-                    c.nro_doc     AS cliente_nro_doc,
-                    c.direccion   AS cliente_direccion,
-    
-                    -- estado
-                    e.nombre AS estado_nombre
+                    -- Forma de pago
+                    fp.nombre AS forma_pago_nombre
     
                 FROM facturas f
-                LEFT JOIN ventas v            ON v.id = f.venta_id
-                LEFT JOIN forma_pago fp       ON fp.id = v.forma_pago_id
+                LEFT JOIN clientes c ON c.id = f.cliente_id
+                LEFT JOIN ventas v ON v.id = f.venta_id
                 LEFT JOIN plan_financiacion pf ON pf.venta_id = v.id
-                LEFT JOIN clientes c          ON c.id = f.cliente_id
-                LEFT JOIN estados e           ON e.id = f.estado_id
+                LEFT JOIN forma_pago fp ON fp.id = v.forma_pago_id
                 WHERE f.id = :id
-                """
-            ),
-            {"id": factura_id},
+            """),
+            {"id": factura_id}
         ).mappings().first()
     
         return dict(row) if row else None
+    
     
     # -------------------- Alta / helpers de numeración --------------------
 

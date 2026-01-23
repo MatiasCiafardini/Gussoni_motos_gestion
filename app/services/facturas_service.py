@@ -495,13 +495,13 @@ class FacturasService:
     
         if nombre.lower() == "financiación":
             cuotas = row.get("cantidad_cuotas")
-            interes = row.get("interes_pct")
+            importe_cuota = row.get("importe_cuota")
     
             partes = ["Financiación"]
             if cuotas:
                 partes.append(f"{int(cuotas)} cuotas")
-            if interes:
-                partes.append(f"{float(interes):g}% interés")
+            if importe_cuota:
+                partes.append(f"{float(importe_cuota):g}% importe_cuota")
     
             return " – ".join(partes)
     
@@ -638,21 +638,21 @@ class FacturasService:
             forma_pago_id = cabecera.get("forma_pago_id")
             anticipo = float(cabecera.get("anticipo") or 0.0)
             cantidad_cuotas = int(cabecera.get("cantidad_cuotas") or 0)
-            interes_pct = float(cabecera.get("interes_pct") or 0.0)
+            importe_cuota = float(cabecera.get("importe_cuota") or 0.0)
 
 
             # Si no es financiación, no pasamos anticipo ni cuotas
             if forma_pago_id != 3:
                 anticipo = 0.0
                 cantidad_cuotas = 0
-                interes_pct = 0.0
+                importe_cuota = 0.0
 
             ventas_service.completar_venta(
                 db=db,  # 👈 MISMA sesión
                 venta_id=venta_id,
                 precio_total=precio_real,
                 forma_pago_id=forma_pago_id,
-                interes_pct=interes_pct,
+                importe_cuota=importe_cuota,
                 anticipo=anticipo,
                 cantidad_cuotas=cantidad_cuotas,
                 fecha_inicio=cabecera_db.get("fecha_emision"),

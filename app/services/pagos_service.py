@@ -76,7 +76,7 @@ class PagosService:
                         ve.modelo,
                         ve.anio,
                         pf.cantidad_cuotas,
-                        pf.interes_pct,
+                        pf.importe_cuota,
                         pf.monto_financiado
                     FROM ventas v
                     JOIN vehiculos ve ON ve.id = v.vehiculo_id
@@ -99,7 +99,7 @@ class PagosService:
             if row["cantidad_cuotas"]:
                 financiacion = (
                     f'{row["cantidad_cuotas"]} cuotas'
-                    f' (interés {row["interes_pct"] or 0}%)'
+                    f' (importe_cuota {row["importe_cuota"] or 0}%)'
                 )
             else:
                 financiacion = "Contado"

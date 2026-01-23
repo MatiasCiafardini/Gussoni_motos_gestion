@@ -37,6 +37,7 @@ class EmpresaConfig:
 
 
 class ComprobantesService:
+    TOP_BAND_H = 10 * mm
     HEADER_H = 36 * mm
     CLIENTE_H = 22 * mm
     TABLE_H = 150 * mm
@@ -125,8 +126,14 @@ class ComprobantesService:
 
         y_top = H - M
 
+        # Banda ORIGINAL
+        self._draw_top_band(c, M, y_top)
+        y_top -= self.TOP_BAND_H
+
+        # Header principal
         self._draw_header(c, fac, M, y_top, self.HEADER_H, page, total_pages, letra, cod_afip)
         y = y_top - self.HEADER_H
+
 
         self._draw_cliente(c, fac, M, y, self.CLIENTE_H)
         y -= self.CLIENTE_H
@@ -138,6 +145,22 @@ class ComprobantesService:
         y -= self.RESUMEN_H
 
         self._draw_footer(c, fac, all_items, M, y, self.FOOTER_H, autorizado, page, total_pages)
+
+
+    def _draw_top_band(self, c: canvas.Canvas, M: float, y_top: float) -> None:
+        W, _ = A4
+        h = self.TOP_BAND_H
+
+        # línea inferior de la banda
+        c.setLineWidth(0.6)
+        c.line(M, y_top - h, W - M, y_top - h)
+
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(
+            W / 2,
+            y_top - h + 3.5 * mm,
+            "ORIGINAL"
+        )
 
     # =========================
     # HEADER: B pegada arriba + línea no pisa N°
@@ -240,7 +263,7 @@ class ComprobantesService:
         c.drawRightString(
             x + w - 3 * mm,
             fy,
-            f"Original    Página {page} de {total_pages}"
+            f"Página {page} de {total_pages}"
         )
 
         fy -= 5 * mm
@@ -477,53 +500,53 @@ class ComprobantesService:
         return [(n, w * scale) for n, w in cols]
 
     def _desc_like_original(self, it: Dict[str, Any]) -> str:
-        raw_desc = str(it.get("descripcion") or "").strip()
+        raw = str(it.get("descripcion") or "").strip()
+        if not raw:
+            return ""
 
-        nombre = raw_desc
+        # Ejemplo:
+        # Motomel C110DLX 2026 | Motor: XXXXX | Cuadro: YYYYY
+        parts = [p.strip() for p in raw.split("|") if p.strip()]
+
+        marca = ""
+        modelo = ""
+        anio = ""
         motor = ""
         chasis = ""
-        anio = ""
-        modelo = ""
-        nro_int = ""
 
-        if "|" in raw_desc:
-            parts = [p.strip() for p in raw_desc.split("|") if p.strip()]
-            if parts:
-                nombre = parts[0]
-            for p in parts[1:]:
-                low = p.lower()
-                if "motor" in low:
-                    motor = p.split(":", 1)[-1].strip() if ":" in p else p.strip()
-                if "cuadro" in low or "chasis" in low:
-                    chasis = p.split(":", 1)[-1].strip() if ":" in p else p.strip()
+        if parts:
+            tokens = parts[0].split()
+            if len(tokens) >= 3:
+                marca = tokens[0]
+                modelo = " ".join(tokens[1:-1])
+                anio = tokens[-1] if tokens[-1].isdigit() else ""
 
-        tokens = (nombre or "").split()
-        if tokens and tokens[-1].isdigit() and len(tokens[-1]) == 4:
-            anio = tokens[-1]
-            nombre = " ".join(tokens[:-1]).strip()
+        for p in parts[1:]:
+            low = p.lower()
+            if "motor" in low:
+                motor = p.split(":", 1)[-1].strip()
+            if "cuadro" in low or "chasis" in low:
+                chasis = p.split(":", 1)[-1].strip()
 
-        modelo = str(it.get("modelo") or "").strip()
-        anio = str(it.get("anio") or anio or "").strip()
+        lines = []
 
-        nro_int = str(it.get("nro_interno") or it.get("numero_interno") or "").strip()
-        if not nro_int and it.get("vehiculo_id") is not None:
-            nro_int = str(it.get("vehiculo_id"))
-
-        lines: List[str] = []
-        if nombre:
-            lines.append(nombre)
+        if marca:
+            lines.append(f"MOTOVEHÍCULO MARCA: {marca.upper()}")
         if modelo:
-            lines.append(f"Modelo: {modelo}")
+            lines.append(f"MODELO: {modelo}")
         if anio:
-            lines.append(f"Año: {anio}")
-        if motor:
-            lines.append(f"Nro. de Motor: {motor}")
+            lines.append(f"AÑO: {anio}")
+        if marca:
+            lines.append(f"MARCA CHASIS: {marca.upper()}")
         if chasis:
-            lines.append(f"Nro. de Chasis: {chasis}")
-        if nro_int:
-            lines.append(f"Nro. Int: {nro_int}")
+            lines.append(f"NÚMERO CHASIS: {chasis}")
+        if marca:
+            lines.append(f"MARCA MOTOR: {marca.upper()}")
+        if motor:
+            lines.append(f"NÚMERO MOTOR: {motor}")
 
-        return "\n".join(lines[:7])
+        return "\n".join(lines)
+
 
     def _draw_resumen(self, c: canvas.Canvas, fac: Dict[str, Any], items: List[Dict[str, Any]], M: float, y_top: float, h: float) -> None:
         W, _H = A4
@@ -544,7 +567,7 @@ class ComprobantesService:
         by = y + h - 6 * mm
 
         c.setFont("Helvetica", 7)
-        c.drawRightString(bx + 76 * mm, by, f"Subtotal: $ {self._fmt_money(neto)}")
+        c.drawRightString(bx + 76 * mm, by, f"Subtotal: $ {self._fmt_money(total)}")
         c.drawRightString(bx + 76 * mm, by - 4 * mm, "Importe Otros Tributos: $ 0,00")
 
         c.setFont("Helvetica-Bold", 8)

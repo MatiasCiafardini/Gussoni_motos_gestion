@@ -56,9 +56,9 @@ class VentasService:
         venta_id: int,
         precio_total: float,
         forma_pago_id: int,
-        interes_pct: float | None = None,
         anticipo: float | None = None,
         cantidad_cuotas: int | None = None,
+        importe_cuota: float | None = None,
         fecha_inicio: datetime | None = None,
     ):
         """
@@ -73,7 +73,7 @@ class VentasService:
             fecha_inicio = datetime.now()
 
         anticipo = anticipo or 0.0
-        interes_pct = interes_pct or 0.0
+        importe_cuota = importe_cuota or 0.0
 
         # -------- Actualizar venta --------
         db.execute(
@@ -93,37 +93,30 @@ class VentasService:
             }
         )
 
-        # -------- Financiación --------
         if forma_pago_id == 3:
             if not cantidad_cuotas or cantidad_cuotas <= 0:
                 raise ValueError("Cantidad de cuotas inválida")
 
-            monto_base = precio_total - anticipo
-            if monto_base <= 0:
-                raise ValueError("El monto financiado debe ser mayor a 0")
+            if not importe_cuota or importe_cuota <= 0:
+                raise ValueError("Importe de cuota inválido")
 
-            if interes_pct < 0:
-                raise ValueError("El interés no puede ser negativo")
-
-            total_financiado = monto_base * (1 + interes_pct / 100)
+            monto_financiado = cantidad_cuotas * importe_cuota
 
             plan_id = db.execute(
                 text("""
                     INSERT INTO plan_financiacion
-                    (venta_id, cantidad_cuotas, fecha_inicio, monto_financiado, interes_pct)
+                    (venta_id, cantidad_cuotas, importe_cuota, fecha_inicio, monto_financiado)
                     VALUES
-                    (:venta_id, :cuotas, :fecha, :monto, :interes)
+                    (:venta_id, :cuotas, :importe_cuota, :fecha, :monto)
                 """),
                 {
                     "venta_id": venta_id,
                     "cuotas": cantidad_cuotas,
+                    "importe_cuota": importe_cuota,
                     "fecha": fecha_inicio,
-                    "monto": total_financiado,
-                    "interes": interes_pct,
+                    "monto": monto_financiado,
                 }
             ).lastrowid
-
-            importe_cuota = round(total_financiado / cantidad_cuotas, 2)
 
             for nro in range(1, cantidad_cuotas + 1):
                 db.execute(
@@ -136,11 +129,12 @@ class VentasService:
                     {
                         "plan": plan_id,
                         "nro": nro,
-                        "fecha": fecha_inicio,
                         "mes": nro,
+                        "fecha": fecha_inicio,
                         "importe": importe_cuota,
                     }
                 )
+
 
 
     # =========================
