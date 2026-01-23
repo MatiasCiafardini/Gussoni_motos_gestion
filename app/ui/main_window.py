@@ -433,6 +433,7 @@ class MainWindow(QMainWindow):
     # buscador de actualizaciones
     # ---------------------------------------------------------------------
     def check_updates_ui(self):
+        print("Esta es la version 1.0.1 no funciona nada.")
         try:
             update = check_for_update()
             if not update:
@@ -448,7 +449,7 @@ class MainWindow(QMainWindow):
                 "Actualización disponible",
                 (
                     f"Hay una nueva versión disponible: {update['version']}\n\n"
-                    f"{update.get('notes', '')}\n\n"
+                    f"{update.get('changelog', '')}\n\n"
                     "¿Deseás actualizar ahora?"
                 ),
                 QMessageBox.Yes | QMessageBox.No
@@ -459,6 +460,8 @@ class MainWindow(QMainWindow):
 
             # -------- descargar --------
             updates_dir = Path(os.getenv("LOCALAPPDATA")) / "GussoniApp" / "updates"
+            updates_dir.mkdir(parents=True, exist_ok=True)
+
             filename = Path(update["url"]).name
             dest = updates_dir / filename
 
@@ -468,8 +471,25 @@ class MainWindow(QMainWindow):
                 self,
                 "Actualización",
                 "La actualización se descargó correctamente.\n"
-                "Se instalará en el próximo paso."
+                "La aplicación se cerrará para instalar la actualización."
             )
+
+            # -------- lanzar updater --------
+            current_exe = Path(sys.executable)
+            updater_exe = current_exe.parent / "updater.exe"
+
+            if not updater_exe.exists():
+                raise RuntimeError("No se encontró updater.exe")
+
+            subprocess.Popen([
+                str(updater_exe),
+                str(current_exe),
+                str(dest),
+                update["version"]
+            ])
+
+            # cerrar la app
+            QApplication.quit()
 
         except Exception as e:
             QMessageBox.warning(
@@ -477,6 +497,7 @@ class MainWindow(QMainWindow):
                 "Error",
                 f"No se pudo actualizar:\n{e}"
             )
+
 
 
 
