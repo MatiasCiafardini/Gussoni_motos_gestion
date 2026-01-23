@@ -208,6 +208,11 @@ class ConfiguracionPage(QWidget):
         return False
     
     def _check_updates(self):
+        popUp.warning(
+                self,
+                "Actualizaciones",
+                "Te cuento que si ves esto esta funcionando correctamente."
+            )
         """
         Dispara la búsqueda de actualizaciones desde la ventana principal.
         """

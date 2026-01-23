@@ -5,10 +5,13 @@ from PySide6.QtWidgets import QMessageBox
 from app.core.updater import check_for_update
 from app.core.downloader import download_file
 from pathlib import Path
+import sys
 import os
+import subprocess
+from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QSizePolicy
+    QPushButton, QLabel, QSizePolicy, QApplication, QMessageBox
 )
 from PySide6.QtCore import Qt, QTimer, QThreadPool, QRunnable, QObject, Signal
 
@@ -476,7 +479,7 @@ class MainWindow(QMainWindow):
 
             # -------- lanzar updater --------
             current_exe = Path(sys.executable)
-            updater_exe = current_exe.parent / "updater.exe"
+            updater_exe = current_exe.parent / "updater_app.exe"
 
             if not updater_exe.exists():
                 raise RuntimeError("No se encontró updater.exe")
