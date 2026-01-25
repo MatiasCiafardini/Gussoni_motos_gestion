@@ -15,7 +15,8 @@ from app.ui.pages.vehiculos_agregar import VehiculosAgregarPage
 from app.ui.widgets.loading_overlay import LoadingOverlay
 from app.ui.utils.loading_decorator import with_loading
 from pathlib import Path
-
+from app.ui.utils.table_utils import setup_compact_table
+from app.ui.utils.text_utils import tail_ellipsis
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 class VehiculosPage(QWidget):
@@ -117,6 +118,7 @@ class VehiculosPage(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.setSortingEnabled(True)
+        setup_compact_table(self.table)
 
         header = self.table.horizontalHeader()
         header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -306,13 +308,17 @@ class VehiculosPage(QWidget):
                     r.get("proveedor") or r.get("proveedor_nombre")
                     or r.get("proveedor_razon_social") or r.get("proveedor_nombre_fantasia") or ""
                 )
+                cert = r.get("nro_certificado", "") or r.get("numero_certificado", "")
+                dnrpa = r.get("nro_dnrpa", "") or r.get("numero_dnrpa", "")
+                cuadro = r.get("numero_cuadro", "") or r.get("nro_cuadro", "")
+                motor = r.get("numero_motor", "") or r.get("nro_motor", "")
                 values = {
                     self.COL_MARCA: r.get("marca", ""), self.COL_MODELO: r.get("modelo", ""),
                     self.COL_ANIO: str(r.get("anio", "") or ""),
-                    self.COL_CERT: r.get("nro_certificado", "") or r.get("numero_certificado", ""),
-                    self.COL_DNRPA: r.get("nro_dnrpa", "") or r.get("numero_dnrpa", ""),
-                    self.COL_CUADRO: r.get("numero_cuadro", "") or r.get("nro_cuadro", ""),
-                    self.COL_MOTOR: r.get("numero_motor", "") or r.get("nro_motor", ""),
+                    self.COL_CERT: tail_ellipsis(cert, 8),
+                    self.COL_DNRPA: tail_ellipsis(dnrpa, 8),
+                    self.COL_CUADRO: tail_ellipsis(cuadro, 8),
+                    self.COL_MOTOR: tail_ellipsis(motor, 8),
                     self.COL_COLOR: r.get("color", "") or r.get("color_nombre", ""),
                     self.COL_ESTADO: r.get("estado_stock", "") or r.get("estado_stock_nombre", ""),
                     self.COL_CONDICION: r.get("estado_moto", "") or r.get("estado_moto_nombre", "") or r.get("condicion", ""),
@@ -320,18 +326,30 @@ class VehiculosPage(QWidget):
                     self.COL_PRECIO: self._fmt_currency(r.get("precio_lista")),
                     self.COL_OBS: r.get("observaciones", "") or r.get("obs", ""),
                 }
-                for col, val in values.items():
-                    item = QTableWidgetItem(val if isinstance(val, str) else str(val))
+                for col, display_text in values.items():
+                    item = QTableWidgetItem(display_text if isinstance(display_text, str) else str(display_text))
+                
+                    # 🔹 Tooltip con valor completo
+                    if col == self.COL_CERT:
+                        item.setToolTip(cert)
+                    elif col == self.COL_DNRPA:
+                        item.setToolTip(dnrpa)
+                    elif col == self.COL_CUADRO:
+                        item.setToolTip(cuadro)
+                    elif col == self.COL_MOTOR:
+                        item.setToolTip(motor)
+                
                     if col == self.COL_PRECIO:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                
                     self.table.setItem(row, col, item)
+                
                 btn = QPushButton("🔍"); btn.setObjectName("BtnGhost")
                 btn.setToolTip("Consultar"); btn.setCursor(Qt.PointingHandCursor)
                 try: vid = int(id_val)
                 except Exception: vid = None
                 btn.clicked.connect(lambda _=False, _vid=vid: (self.open_detail.emit(_vid) if _vid is not None else None))
                 self.table.setCellWidget(row, self.COL_ACCION, btn)
-            self.table.resizeRowsToContents()
         finally:
             if was_sorting:
                 self.table.setSortingEnabled(True)

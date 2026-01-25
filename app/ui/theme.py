@@ -24,6 +24,17 @@ QTableCornerButton::section {{
     border: 1px solid {p['border']};
     image: none;
 }}
+/* =========================
+   Tooltips
+   ========================= */
+QToolTip {{
+    background-color: #E0F2FE;      /* celestito suave */
+    color: #0F172A;                 /* texto oscuro */
+    border: 1px solid #7DD3FC;      /* borde celeste */
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.95em;
+}}
 
 /* =========================
    Sidebar
@@ -57,18 +68,13 @@ QPushButton#SideLogout {{
     color: #E8EAED; 
     background: #2A3040; 
     border: 1px solid #3A4050;
-    border-radius:
-    10px; padding: 10px 14px;
+    border-radius: 10px;
+    padding: 10px 14px;
     text-align: left; 
     font-size: 14px;
-       
 }}
-QPushButton#SideLogout:hover {{
-    background: #343B4D;
-}}
-QPushButton#SideLogout:pressed {{
-    background: #6C5CE7;
-}}
+QPushButton#SideLogout:hover {{ background: #343B4D; }}
+QPushButton#SideLogout:pressed {{ background: #6C5CE7; }}
 
 /* =========================
    Botones
@@ -83,7 +89,6 @@ QPushButton {{
 QPushButton:hover {{ background: {p['bg']}; }}
 QPushButton:disabled {{ color: {p['muted']}; background: {p['bg']}; }}
 
-/* CTA principal (compat: #Primary y #BtnPrimary) */
 QPushButton#Primary, QPushButton#BtnPrimary {{
     background: {p['ink']};
     color: {p['white']};
@@ -98,22 +103,19 @@ QPushButton#Primary:pressed, QPushButton#BtnPrimary:pressed {{
     border-color: {p['ink']};
 }}
 
-/* Botón “fantasma” (para Limpiar / naveg.) */
 QPushButton#BtnGhost {{
     background: {p['bg']};
     color: {p['ink']};
     border: 1px solid {p['border']};
     border-radius: 10px;
     padding: 8px 12px;
-    transition: all 0.15s ease;
 }}
-
 QPushButton#BtnGhost:hover {{
-    background: #eef1f5;        /* leve aclarado al hover */
+    background: #eef1f5;
     border-color: #cfd5db;
 }}
 QPushButton#BtnGhost:pressed {{
-    background: #e6e9ee;        /* tono más oscuro al presionar */
+    background: #e6e9ee;
     border-color: #c6ccd4;
 }}
 QPushButton#BtnGhost:disabled {{
@@ -122,7 +124,6 @@ QPushButton#BtnGhost:disabled {{
     border-color: {p['border']};
 }}
 
-/* Botón plano (paginación) */
 QPushButton#BtnFlat {{
     background: transparent;
     border: 1px solid {p['border']};
@@ -130,16 +131,8 @@ QPushButton#BtnFlat {{
     padding: 6px 10px;
 }}
 
-/* =========================
-   Quitar borde de foco en botones
-   ========================= */
-QPushButton:focus {{
-    outline: none;
-}}
-QPushButton:focus-visible {{
-    outline: none;
-}}
-
+QPushButton:focus {{ outline: none; }}
+QPushButton:focus-visible {{ outline: none; }}
 
 /* =========================
    GroupBox
@@ -152,13 +145,14 @@ QGroupBox {{
 }}
 QGroupBox::title {{
     subcontrol-origin: margin;
-    left: 10px; top: -6px; padding: 0 6px;
+    left: 10px;
+    top: -6px;
+    padding: 0 6px;
     color: {p['secondary']};
-    background: transparent;
 }}
 
 /* =========================
-   Inputs (base)
+   Inputs
    ========================= */
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit {{
     background: {p['white']};
@@ -167,11 +161,13 @@ QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit {{
     border-radius: 8px;
     padding: 6px 8px;
 }}
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {{
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus,
+QDoubleSpinBox:focus, QDateEdit:focus {{
     border: 1px solid {p['secondary']};
-    outline: none;
 }}
-QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QDateEdit:disabled {{
+QLineEdit:disabled, QComboBox:disabled,
+QSpinBox:disabled, QDoubleSpinBox:disabled,
+QDateEdit:disabled {{
     color: {p['muted']};
     background: {p['bg']};
 }}
@@ -179,9 +175,7 @@ QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabl
 /* =========================
    Login
    ========================= */
-QDialog#LoginDialog {{
-    background: {p['bg']};
-}}
+QDialog#LoginDialog {{ background: {p['bg']}; }}
 QFrame#LoginCard {{
     background: {p['white']};
     border: 1px solid {p['border']};
@@ -190,7 +184,6 @@ QFrame#LoginCard {{
 QLabel#LoginTitle {{
     font-size: 20px;
     font-weight: 600;
-    color: {p['ink']};
 }}
 QLabel#LoginSubtitle {{
     color: {p['secondary']};
@@ -202,150 +195,25 @@ QLabel#LoginError {{
 }}
 
 /* =========================
-   Date inputs (QDateEdit)
-   ========================= */
-QDateEdit {{
-    /* hereda base de Inputs; solo afinamos detalles */
-    padding-right: 10px;       /* espacio cómodo */
-    min-height: 36px;
-}}
-
-/* Ocultar flechitas de subir/bajar */
-QDateEdit::up-button, QDateEdit::down-button {{
-    width: 0px; height: 0px;
-    border: none; margin: 0; padding: 0;
-}}
-
-/* Ocultar el triángulo del drop-down (dejamos solo click en el campo para abrir calendario) */
-QDateEdit::drop-down {{
-    width: 0px;
-    border: none;
-}}
-
-/* Calendario popup */
-QCalendarWidget QWidget {{
-    background: {PALETTE['white']};
-    color: {PALETTE['ink']};
-}}
-QCalendarWidget QToolButton {{
-    background: {PALETTE['bg']};
-    border: 1px solid {PALETTE['border']};
-    border-radius: 8px;
-    padding: 4px 8px;
-    font-weight: 600;
-}}
-QCalendarWidget QToolButton:hover {{
-    background: #eef1f5;
-}}
-QCalendarWidget QAbstractItemView:enabled {{
-    background: {PALETTE['white']};
-    selection-background-color: {PALETTE['secondary']};
-    selection-color: {PALETTE['white']};
-    gridline-color: {PALETTE['border']};
-}}
-
-
-
-/* =========================
-   Combos de Filtros (bonitos)
-   ========================= */
-/* El page setea objectName="FilterCombo" y usa QListView#ComboPopup como popup */
-QComboBox#FilterCombo {{
-    background: {p['white']};
-    color: {p['ink']};
-    border: 1px solid {p['border']};
-    border-radius: 10px;
-    padding: 6px 36px 6px 10px;  /* espacio derecha para drop-down */
-    min-height: 36px;
-}}
-QComboBox#FilterCombo:hover {{
-    background: #fcfcfe;
-    border-color: #cfd5db;
-}}
-QComboBox#FilterCombo:focus {{
-    border-color: {p['secondary']};
-}}
-QComboBox#FilterCombo:disabled {{
-    color: {p['muted']};
-    background: {p['bg']};
-}}
-
-QComboBox#FilterCombo::drop-down {{
-    width: 32px;
-    border-left: 1px solid {p['border']};
-    margin-left: 6px;
-}}
-/* Si usás un recurso SVG, descomentá y ajustá la ruta:
-QComboBox#FilterCombo::down-arrow {{
-    image: url(:/icons/chevron-down.svg);
-}}
-*/
-QComboBox#FilterCombo::down-arrow {{
-    /* fallback al arrow por defecto del sistema */
-    image: none;
-}}
-
-/* Popup del combo (aplica aunque no tenga setView, pero optimizado para QListView#ComboPopup) */
-QComboBox#FilterCombo QAbstractItemView {{
-    background: {p['white']};
-    border: 1px solid {p['border']};
-    border-radius: 10px;
-    outline: 0;
-    selection-background-color: rgba(31,31,46,0.08);
-    selection-color: {p['ink']};
-}}
-QListView#ComboPopup {{
-    background: {p['white']};
-    border: 1px solid {p['border']};
-    border-radius: 10px;
-    padding: 6px;
-}}
-QListView#ComboPopup::item {{
-    padding: 8px 10px;
-    border-radius: 8px;
-}}
-QListView#ComboPopup::item:selected {{
-    background: rgba(31,31,46,0.08);
-    color: {p['ink']};
-}}
-QListView#ComboPopup::item:hover {{
-    background: #f3f4f7;
-}}
-
-/* =========================
    Tablas
    ========================= */
-QTableView {{
-    background: {p['white']};
+QTableView {{background: {p['white']};
     color: {p['ink']};
-    gridline-color: {p['border']};
+    gridline-color: #E5E7EB;                /* líneas divisorias */
     border: 1px solid {p['border']};
     border-radius: 8px;
     selection-background-color: rgba(31,31,46,0.10);
     selection-color: {p['ink']};
-}}
-QTableView#DataTable {{  /* id específico por si querés tunear aparte */ }}
+    alternate-background-color: #F3F4F6;   /* 👈 gris claro interlineado */}}
 
-/* Tabla base (si la usan en páginas) */
-QTableView#DataTable, QTableWidget#DataTable {{
-    background: #FFFFFF; 
-    border: 1px solid #E5E7EB; 
-    border-radius: 12px;
-    gridline-color: #ECECEC; 
-    alternate-background-color: #FAFAFD;}}
 QHeaderView::section {{
-    text-align:left;
     background: {p['ink']};
-    color: {p['white']}; 
-    border: none; 
+    color: {p['white']};
+    border: none;
     padding: 8px 10px;
-    font-size: 13px; 
+    font-size: 13px;
     font-weight: 600;
 }}
-QHeaderView {{
-    text-align:left;
-}}
-        
 
 /* =========================
    Cards / Panels
@@ -355,79 +223,40 @@ QFrame#Card, QFrame#Panel {{
     border: 1px solid {p['border']};
     border-radius: 12px;
 }}
-QLabel#KpiValue {{ color: {p['ink']}; 
-}}
-
 
 /* =========================
-   Diálogo bonito (ConfirmDialog)
+   Dialogs
    ========================= */
-QFrame#DialogPanel {{
-    background: {p['white']};
-    border: 1px solid {p['border']};
-    border-radius: 12px;
-}}
 #NiceDialog QLabel#DialogTitle {{
     font-weight: 700;
     font-size: 15px;
-    color: {p['ink']};
 }}
-#NiceDialog QLabel#DialogText {{
-    font-size: 13px;
-    color: {p['ink']};
-}}
+#NiceDialog QLabel#DialogText {{ font-size: 13px; }}
 #NiceDialog QLabel#DialogInfo {{
     font-size: 12px;
     color: {p['secondary']};
 }}
 #NiceDialog QLabel#DialogIcon {{
-    font-size: 18px; /* tamaño del emoji/icono */
+    font-size: 18px;
 }}
-
-/* =========================
-   Configuración – OptionCard minimal
-   ========================= */
-QPushButton#CfgOption {{
-    background: #ffffff;
-    border: 1px solid #E5E7EB;
-    border-radius: 14px;
-    padding: 14px;
-}}
-QPushButton#CfgOption:hover {{
-    border-color: #D1D5DB;              /* leve énfasis */
-    background: #dddddd;
-}}
-QPushButton#CfgOption:pressed {{
-    background: #F8FAFC;
-}}
-
-/* Contenido */
-QPushButton#CfgOption QLabel#CfgOptionIcon {{
-    font-size: 40px;                     /* si usa emoji */
-    color: #6B7280;
-}}
-QPushButton#CfgOption QLabel#CfgOptionTitle {{
-    font-size: 14px;
-    font-weight: 700;
-    color: #1F2937; /* ink-like */
-}}
-
-/* Sombra muy sutil (fake) para plataformas sin efecto nativo) */
-QPushButton#CfgOption {{
-    box-shadow: 0px 6px 16px rgba(0,0,0,0.10);   /* Qt ignora, pero sirve en algunos estilos */
-}}
-/* La elevación real visual la logramos con el contraste del borde + bg del layout; 
-   si querés más punch, podés sumar QGraphicsDropShadowEffect desde código. */
-
-
-
 """
 
 
+def apply_theme(
+    app: QApplication,
+    base_font_pt: int = 11,
+    scale: float = 1.0
+) -> None:
+    """
+    Aplica tema visual y tipografía global.
+    - base_font_pt: tamaño base (pt)
+    - scale: factor de escala (1.0 = default)
+    """
 
-def apply_theme(app: QApplication, base_font_pt: int = 11) -> None:
-    f = QFont(); f.setFamily("Segoe UI"); f.setPointSize(base_font_pt)
-    app.setFont(f)
+    font = QFont()
+    font.setFamily("Segoe UI")
+    font.setPointSizeF(base_font_pt * scale)
+    app.setFont(font)
 
     pal = QPalette()
     pal.setColor(QPalette.Window, QColor(PALETTE["bg"]))

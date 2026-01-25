@@ -164,7 +164,17 @@ class ConfiguracionPage(QWidget):
         self.open_page_requested.emit(page)
 
     def _open_config_general(self):
-        popUp.info(self, "En construcción", "Esta sección estará disponible pronto.")
+        try:
+            from app.ui.pages.configuracion_general_page import ConfiguracionGeneralPage
+            page = ConfiguracionGeneralPage(parent=self, main_window=self.main_window)
+        except Exception as e:
+            popUp.critical(self, "Error", f"No pude abrir Configuración General.\n\n{e}")
+            return
+    
+        if self._try_navigate_in_main(page, object_name="ConfiguracionGeneralPage"):
+            return
+        self.open_page_requested.emit(page)
+    
 
     def _open_config_arca(self):
         """
@@ -208,11 +218,6 @@ class ConfiguracionPage(QWidget):
         return False
     
     def _check_updates(self):
-        popUp.warning(
-                self,
-                "Actualizaciones",
-                "Te cuento que si ves esto esta funcionando correctamente."
-            )
         """
         Dispara la búsqueda de actualizaciones desde la ventana principal.
         """

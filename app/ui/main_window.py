@@ -479,7 +479,7 @@ class MainWindow(QMainWindow):
 
             # -------- lanzar updater --------
             current_exe = Path(sys.executable)
-            updater_exe = current_exe.parent / "updater_app.exe"
+            updater_exe = current_exe.parent / "updater.exe"
 
             if not updater_exe.exists():
                 raise RuntimeError("No se encontró updater.exe")

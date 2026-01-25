@@ -3,17 +3,19 @@ from __future__ import annotations
 import sys
 import ctypes
 from typing import Optional, Dict, Any
-
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QSettings, QObject
 from PySide6.QtWidgets import QApplication, QDialog
-from app.ui.utils.resources import resource_path
 from PySide6.QtGui import QIcon
+
+from app.ui.utils.resources import resource_path
 from app.core.logging_setup import setup_logging
-from app.core.config import settings
+from app.core.config import settings   # 👈 config global
 from app.ui.main_window import MainWindow
-from app.ui.theme import apply_theme   # <-- importa tu theme
+from app.ui.theme import apply_theme
 from app.ui.login_dialog import LoginDialog
 from app.shared.paths import ensure_user_dirs
+from app.core.db_state import db_config_completa
+from app.ui.config_dialog import ConfigDialog
 
 
 class ApplicationController(QObject):
@@ -26,7 +28,10 @@ class ApplicationController(QObject):
         self._current_user: Optional[Dict[str, Any]] = None
 
     def start(self) -> None:
-        self._show_login()
+        if not db_config_completa():
+            self._show_config()
+        else:
+            self._show_login()
 
     def _show_login(self) -> None:
         dialog = LoginDialog()
@@ -38,10 +43,24 @@ class ApplicationController(QObject):
         self._current_user = dialog.user
         self._show_main_window()
 
+    def _show_config(self) -> None:
+        dialog = ConfigDialog()
+        result = dialog.exec()
+
+        if result != QDialog.Accepted:
+            self._app.quit()
+            return
+
+        self._show_login()
+
     def _show_main_window(self) -> None:
         if self._main_window:
             self._main_window.deleteLater()
-        self._main_window = MainWindow(current_user=self._current_user, on_logout=self._handle_logout)
+
+        self._main_window = MainWindow(
+            current_user=self._current_user,
+            on_logout=self._handle_logout
+        )
         self._main_window.show()
 
     def _handle_logout(self) -> None:
@@ -54,15 +73,26 @@ class ApplicationController(QObject):
 
 def main():
     ensure_user_dirs()
+
+    # 👇 usa el settings GLOBAL
     setup_logging(settings.APP_NAME)
+
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
         "gussoni.app"
     )
+
     app = QApplication(sys.argv)
 
-    apply_theme(app, base_font_pt=11)  # <-- aplica tu estilo
+    # 👇 settings de UI (QSettings)
+    ui_settings = QSettings("Gussoni", "GussoniApp")
+    scale = ui_settings.value("ui/font_scale", 1.0, float)
+
+    apply_theme(app, base_font_pt=11, scale=scale)
+
     icon_path = resource_path("app/assets/logo.ico")
     app.setWindowIcon(QIcon(str(icon_path)))
+
     controller = ApplicationController(app)
     controller.start()
+
     sys.exit(app.exec())

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     
 )
 from pathlib import Path
+from app.ui.utils.table_utils import setup_compact_table
 
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 from app.services.facturas_service import FacturasService
@@ -156,10 +157,8 @@ class FacturasPage(QWidget):
         self.table.setSortingEnabled(True)
 
         # Altura fija de filas y sin word-wrap para que Observaciones no agrande la fila
-        self.table.setWordWrap(False)
-        vh = self.table.verticalHeader()
-        vh.setSectionResizeMode(QHeaderView.Fixed)
-        vh.setDefaultSectionSize(32)
+        setup_compact_table(self.table)
+
 
         header = self.table.horizontalHeader()
         header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)

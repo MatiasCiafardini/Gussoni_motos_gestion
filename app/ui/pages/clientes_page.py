@@ -15,6 +15,7 @@ try:
     from app.ui.pages.clientes_agregar import ClientesAgregarPage
 except Exception:
     ClientesAgregarPage = None  # fallback si aún no existe
+from app.ui.utils.table_utils import setup_compact_table
 
 from app.ui.widgets.loading_overlay import LoadingOverlay
 from app.ui.utils.loading_decorator import with_loading
@@ -112,6 +113,7 @@ class ClientesPage(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.table.setSortingEnabled(True)
+        setup_compact_table(self.table)
 
         header = self.table.horizontalHeader()
         header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -320,8 +322,6 @@ class ClientesPage(QWidget):
                 except Exception: cid = None
                 btn.clicked.connect(lambda _=False, _cid=cid: (self.open_detail.emit(_cid) if _cid is not None else None))
                 self.table.setCellWidget(row, self.COL_ACCION, btn)
-
-            self.table.resizeRowsToContents()
         finally:
             if was_sorting:
                 self.table.setSortingEnabled(True)
