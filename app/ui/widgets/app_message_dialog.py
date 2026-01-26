@@ -120,14 +120,15 @@ class AppMessageDialog(QDialog):
                 background: transparent;
             }
             QLabel#AppMessageTitle {
-                font-size: 15px;
+                font-size: 1.2em;
                 font-weight: 600;
             }
             QLabel#AppMessageText {
-                font-size: 13px;
+                font-size: 1em;
             }
             """
         )
+        
 
     # ---------------- Drag para mover ----------------
     def mousePressEvent(self, event):

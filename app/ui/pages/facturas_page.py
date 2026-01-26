@@ -11,10 +11,9 @@ from PySide6.QtWidgets import (
 )
 from pathlib import Path
 from app.ui.utils.table_utils import setup_compact_table
-
+from PySide6.QtWidgets import QApplication
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 from app.services.facturas_service import FacturasService
-from app.ui.widgets.loading_overlay import LoadingOverlay
 from app.ui.utils.loading_decorator import with_loading
 
 
@@ -205,34 +204,10 @@ class FacturasPage(QWidget):
         root.addLayout(pager)
         root.setStretch(1, 1)
 
-        self.loading_overlay = LoadingOverlay(self, text="")
 
         # Menú de columnas con estilo propio
         self._column_menu = QMenu(self)
         self._column_menu.setObjectName("ColumnMenu")
-        self._column_menu.setStyleSheet(
-            """
-            QMenu#ColumnMenu {
-                background-color: #FFFFFF;
-                border: 1px solid #E5E7EB;
-                border-radius: 10px;
-                padding: 6px 0;
-            }
-            QMenu#ColumnMenu::item {
-                padding: 4px 22px;
-                color: #111827;
-                font-size: 13px;
-            }
-            QMenu#ColumnMenu::item:selected {
-                background-color: #EEF2FF;
-            }
-            QMenu#ColumnMenu::separator {
-                height: 1px;
-                margin: 4px 8px;
-                background: #E5E7EB;
-            }
-            """
-        )
         self._build_column_menu()
 
         # Eventos
@@ -529,7 +504,15 @@ class FacturasPage(QWidget):
 
     def on_columnas_clicked(self):
         self._build_column_menu()
-        self._column_menu.exec(self.btn_columnas.mapToGlobal(self.btn_columnas.rect().bottomLeft()))
+
+        # 👇 CLAVE: forzar font global (ya escalado)
+        self._column_menu.setFont(QApplication.font())
+
+        self._column_menu.exec(
+            self.btn_columnas.mapToGlobal(
+                self.btn_columnas.rect().bottomLeft()
+            )
+        )
 
     def _abrir_pantalla_agregar(self):
         self.open_add.emit()
@@ -549,7 +532,7 @@ class FacturasPage(QWidget):
             resumen = self.service.sincronizar_borradores_con_arca()
         except Exception as e:
             print(">>> [FacturasPage] ERROR en sincronizar_borradores_con_arca:", repr(e))
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"Ocurrió un error al sincronizar con ARCA:\n{e}",
             )

@@ -71,7 +71,7 @@ QPushButton#SideLogout {{
     border-radius: 10px;
     padding: 10px 14px;
     text-align: left; 
-    font-size: 14px;
+    font-size: 1em;
 }}
 QPushButton#SideLogout:hover {{ background: #343B4D; }}
 QPushButton#SideLogout:pressed {{ background: #6C5CE7; }}
@@ -182,12 +182,12 @@ QFrame#LoginCard {{
     border-radius: 16px;
 }}
 QLabel#LoginTitle {{
-    font-size: 20px;
+    font-size: 1.6em;
     font-weight: 600;
 }}
 QLabel#LoginSubtitle {{
     color: {p['secondary']};
-    font-size: 13px;
+    font-size: 1em;
 }}
 QLabel#LoginError {{
     color: #d64545;
@@ -211,7 +211,7 @@ QHeaderView::section {{
     color: {p['white']};
     border: none;
     padding: 8px 10px;
-    font-size: 13px;
+    font-size: 0.9em;
     font-weight: 600;
 }}
 
@@ -229,16 +229,132 @@ QFrame#Card, QFrame#Panel {{
    ========================= */
 #NiceDialog QLabel#DialogTitle {{
     font-weight: 700;
-    font-size: 15px;
+    font-size: 1.4em;
 }}
-#NiceDialog QLabel#DialogText {{ font-size: 13px; }}
+
+#NiceDialog QLabel#DialogText {{
+    font-size: 1.05em;
+}}
+
 #NiceDialog QLabel#DialogInfo {{
-    font-size: 12px;
+    font-size: 0.95em;
     color: {p['secondary']};
 }}
+
 #NiceDialog QLabel#DialogIcon {{
-    font-size: 18px;
+    font-size: 1.6em;
 }}
+
+QDialog#NiceDialog {{
+    background: transparent;
+}}
+
+QFrame#DialogPanel {{
+    background: #ffffff;
+    border-radius: 14px;
+}}
+
+QLabel#DialogTitle {{
+    font-size: 1.4em;
+    font-weight: 600;
+}}
+
+QLabel#DialogText {{
+    font-size: 1.05em;
+}}
+
+QLabel#DialogInfo {{
+    color: #555;
+    font-size: 0.95em;
+}}
+
+
+/* =========================
+   COMBOBOX (INPUT)
+   ========================= */
+QComboBox {{
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 6px 10px;
+    min-height: 34px;
+    color: #111827;
+}}
+
+QComboBox:hover {{
+    border-color: #C7D2FE;
+}}
+
+QComboBox:focus {{
+    border-color: #6C5CE7;
+    outline: none;
+}}
+
+/* Flecha */
+QComboBox::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 28px;
+    border-left: 1px solid #E5E7EB;
+}}
+
+QComboBox::down-arrow {{
+    image: none;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #6B7280;
+}}
+
+/* =========================
+   COMBOBOX POPUP (DESPLEGABLE)
+   ========================= */
+QComboBox QAbstractItemView {{
+    background-color: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 4px;
+    outline: none;
+    selection-background-color: #EEF2FF;
+    selection-color: #1E1B4B;
+}}
+
+/* Items */
+QComboBox QAbstractItemView::item {{
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: #111827;
+}}
+
+/* Hover */
+QComboBox QAbstractItemView::item:hover {{
+    background-color: #E0E7FF;
+}}
+
+/* Selected */
+QComboBox QAbstractItemView::item:selected {{
+    background-color: #6C5CE7;
+    color: white;
+}}
+ QMenu {{
+    font-size: 2em;
+    background-color: #111827;
+    color: #FFFFFF;
+    border: 1px solid #1f2937;
+    padding: 6px;
+}}
+QMenu::item {{
+    font-size: 2em;
+    padding: 6px 12px;
+    background-color: transparent;
+}}
+QMenu::item:selected {{
+    background-color: #1f2937;
+    color: #FFFFFF;
+}}
+
+
 """
 
 

@@ -25,7 +25,7 @@ HTML_TEMPLATE = """
     body { background: linear-gradient(180deg,#f7f8fb 0,#eef2ff 100%); }
     .card { border-radius: 16px; box-shadow: 0 10px 24px rgba(16,24,40,0.08); }
     .badge { font-weight: 600; }
-    .kpi-value { font-size: 34px; font-weight: 800; }
+    .kpi-value { font-size: 2em; font-weight: 800; }
     .chip { border-radius: 999px; }
     .section-title { color:#475569; font-weight:700; letter-spacing:.2px; }
   </style>

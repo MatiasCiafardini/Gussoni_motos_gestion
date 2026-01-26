@@ -14,7 +14,6 @@ from app.shared.openssl import get_openssl_path  # noqa: E402
 
 def main() -> None:
     openssl = get_openssl_path()
-    print("OpenSSL path:", openssl)
 
     result = subprocess.run(
         [str(openssl), "version"],
@@ -22,14 +21,6 @@ def main() -> None:
         stderr=subprocess.PIPE,
         text=True,
     )
-
-    print("STDOUT:")
-    print(result.stdout)
-
-    print("STDERR:")
-    print(result.stderr)
-
-    print("RETURN CODE:", result.returncode)
 
 
 if __name__ == "__main__":

@@ -105,7 +105,7 @@ class ConfigDialog(QDialog):
         ok, error = probar_conexion_db(db_config)
 
         if not ok:
-            QMessageBox.critical(
+            QMessageBox.toast(
                 self,
                 "Error de conexión",
                 f"No se pudo conectar a la base de datos:\n\n{error}"

@@ -17,7 +17,7 @@ class OptionCard(QPushButton):
     """
     clicked_card = Signal()  # alias semántico si lo querés usar
 
-    def __init__(self, title: str, icon: Optional[QIcon] = None, emoji: Optional[str] = None, parent=None):
+    def __init__(self, title: str, icon: Optional[QIcon] = None, emoji: Optional[str] = None,icon_size: QSize | None = None, parent=None):
         super().__init__(parent)
         self.setObjectName("CfgOption")
         self.setCursor(Qt.PointingHandCursor)
@@ -37,9 +37,10 @@ class OptionCard(QPushButton):
         self.icon_label = QLabel(self)
         self.icon_label.setObjectName("CfgOptionIcon")
         self.icon_label.setAlignment(Qt.AlignCenter)
-
+        size = icon_size or QSize(72, 72)
         if icon and not icon.isNull():
-            pm = icon.pixmap(QSize(56, 56))
+            pm = icon.pixmap(size)
+            pm = pm.scaled(size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             if not pm.isNull():
                 self.icon_label.setPixmap(pm)
         elif emoji:
@@ -84,56 +85,66 @@ class ConfiguracionPage(QWidget):
         grid = QGridLayout()
         grid.setHorizontalSpacing(18)
         grid.setVerticalSpacing(18)
-
+        icon_sizes = QSize(72, 72)
         # Card: Usuarios
         card_users = OptionCard(
             "Gestión de Usuarios",
             icon=QIcon.fromTheme("user-group"),
-            emoji="👤"
+            emoji="👤",
+            icon_size= icon_sizes
         )
         card_users.clicked_card.connect(self._open_usuarios)
-        grid.addWidget(card_users, 0, 0)
+        
 
         # Card: Configuración general (placeholder para futuro)
         card_general = OptionCard(
             "Configuración General",
             icon=QIcon.fromTheme("settings"),
-            emoji="⚙️"
+            emoji="⚙️",
+            icon_size= icon_sizes
         )
         card_general.clicked_card.connect(self._open_config_general)
-        grid.addWidget(card_general, 0, 1)
+        
 
         # NUEVA Card: Configuración ARCA / AFIP
         card_arca = OptionCard(
             "Configuración ARCA / AFIP",
             icon=QIcon.fromTheme("network-server"),
-            emoji="🧾"
+            emoji="🧾",
+            icon_size= icon_sizes
         )
         card_arca.clicked_card.connect(self._open_config_arca)
-        grid.addWidget(card_arca, 1, 0)
+        
 
                 # NUEVA Card: Importación de Datos
         card_importacion = OptionCard(
             "Importación de Datos",
             icon=QIcon.fromTheme("document-import"),
-            emoji="📥"
+            emoji="📥",
+            icon_size= icon_sizes
+
         )
         card_importacion.clicked_card.connect(self._open_importacion_datos)
-        grid.addWidget(card_importacion, 1, 1)
+        
 
         # NUEVA Card: Buscar actualizaciones
         card_updates = OptionCard(
             "Buscar actualizaciones",
-            icon=QIcon.fromTheme("system-software-update"),
-            emoji="🔄"
+            icon=QIcon.fromTheme("software-update-available"),
+            emoji="🚀",
+            icon_size= icon_sizes
         )
         card_updates.clicked_card.connect(self._check_updates)
-        grid.addWidget(card_updates, 0, 3)
+
+        grid.addWidget(card_users, 0, 0)
+        grid.addWidget(card_general, 0, 1)
+        grid.addWidget(card_updates, 0, 2)
+        grid.addWidget(card_arca, 1, 0)
+        grid.addWidget(card_importacion, 1, 1)
         
+        for col in range(4):
+            grid.setColumnStretch(col, 1)
 
-
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
 
         # Contenedor horizontal para alinear el grid a la izquierda
         hbox = QHBoxLayout()
@@ -147,7 +158,7 @@ class ConfiguracionPage(QWidget):
 
         # QSS corto para títulos de la página
         self.setStyleSheet("""
-        QLabel#CfgH1 { font-size: 22px; font-weight: 800; color: #0F172A; margin-bottom: 2px; }
+        QLabel#CfgH1 { font-size: 1.9em; font-weight: 800; color: #0F172A; margin-bottom: 2px; }
         QLabel#CfgMuted { color: #6B7280; margin-bottom: 8px; }
         """)
 
@@ -157,7 +168,7 @@ class ConfiguracionPage(QWidget):
             from app.ui.pages.usuarios_page import UsuariosPage
             page = UsuariosPage(parent=self, main_window=self.main_window)
         except Exception as e:
-            popUp.critical(self, "Error", f"No pude abrir Usuarios.\n\n{e}")
+            popUp.toast(self, "Error", f"No pude abrir Usuarios.\n\n{e}")
             return
         if self._try_navigate_in_main(page, object_name="UsuariosPage"):
             return
@@ -168,13 +179,13 @@ class ConfiguracionPage(QWidget):
             from app.ui.pages.configuracion_general_page import ConfiguracionGeneralPage
             page = ConfiguracionGeneralPage(parent=self, main_window=self.main_window)
         except Exception as e:
-            popUp.critical(self, "Error", f"No pude abrir Configuración General.\n\n{e}")
+            popUp.toast(self, "Error", f"No pude abrir Configuración General.\n\n{e}")
             return
-    
+
         if self._try_navigate_in_main(page, object_name="ConfiguracionGeneralPage"):
             return
         self.open_page_requested.emit(page)
-    
+
 
     def _open_config_arca(self):
         """
@@ -185,7 +196,7 @@ class ConfiguracionPage(QWidget):
             from app.ui.pages.configuracion_arca_page import ConfiguracionArcaPage
             page = ConfiguracionArcaPage(parent=self, main_window=self.main_window)
         except Exception as e:
-            popUp.critical(self, f"No pude abrir la Configuración de ARCA.\n\n{e}")
+            popUp.toast(self, f"No pude abrir la Configuración de ARCA.\n\n{e}")
             return
 
         if self._try_navigate_in_main(page, object_name="ConfiguracionArcaPage"):
@@ -197,7 +208,7 @@ class ConfiguracionPage(QWidget):
             from app.ui.pages.importacion_datos_page import ImportacionDatosPage
             page = ImportacionDatosPage(parent=self, main_window=self.main_window)
         except Exception as e:
-            popUp.critical(self, f"No pude abrir Importación de Datos.\n\n{e}")
+            popUp.toast(self, f"No pude abrir Importación de Datos.\n\n{e}")
             return
 
         if self._try_navigate_in_main(page, object_name="ImportacionDatosPage"):

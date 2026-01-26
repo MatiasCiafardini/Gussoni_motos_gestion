@@ -8,7 +8,7 @@ from typing import Optional
 
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt
-
+import app.ui.utils.paths as paths
 from app.ui.utils.resources import resource_path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
@@ -122,32 +122,25 @@ class LoginDialog(QDialog):
     # Internal helpers
     # ------------------------------------------------------------------
     def _load_logo(self) -> None:
-        assets_dir = resource_path("app/assets")
-        print("ASSETS DIR:", assets_dir)
-        print("ASSETS EXISTS:", assets_dir.exists())
-        candidates = ["logo.png", "logo.jpg", "logo.jpeg"]
-        pixmap: Optional[QPixmap] = None
+        if paths.LOGO_GUSSONI.exists():
+            pixmap = QPixmap(str(paths.LOGO_GUSSONI))
 
-        for name in candidates:
-            path = assets_dir / name
-            if path.exists():
-                pixmap = QPixmap(str(path))
-                if not pixmap.isNull():
-                    pixmap = pixmap.scaled(
-                        160,
-                        160,
-                        Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation,
-                    )
-                    break
+            if not pixmap.isNull():
+                pixmap = pixmap.scaled(
+                    160,
+                    160,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+                self.logo_label.setPixmap(pixmap)
+                return
 
-        if pixmap and not pixmap.isNull():
-            self.logo_label.setPixmap(pixmap)
-        else:
-            self.logo_label.setText("Tu logo aquí")
-            self.logo_label.setStyleSheet(
-                "color: #6c757d; font-size: 16px; font-weight: 500;"
-            )
+        # Fallback visual
+        self.logo_label.setText("Tu logo aquí")
+        self.logo_label.setStyleSheet(
+            "color: #6c757d; font-size: 1.2em; font-weight: 500;"
+        )
+
 
     def _clear_error(self) -> None:
         if self.error_label.isVisible():

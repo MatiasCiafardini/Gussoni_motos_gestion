@@ -12,13 +12,14 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon, QDesktopServices
 import app.ui.app_message as popUp
 from sqlalchemy import text
-
+from app.domain.facturas_validaciones import validar_factura
+from app.ui.utils.table_utils import setup_compact_table
 from app.data.database import SessionLocal
 from app.services.facturas_service import FacturasService
 from app.services.clientes_service import ClientesService
 from app.services.vehiculos_service import VehiculosService
 from app.services.comprobantes_service import ComprobantesService
-from app.ui.notify import NotifyPopup
+import app.ui.app_message as popUp
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 from PySide6.QtGui import QColor
 
@@ -183,8 +184,9 @@ class VehiculoSelectorCombo(QComboBox):
         try:
             rows, _ = self._svc.search(filtros, page=1, page_size=20)
         except Exception as ex:
-            NotifyPopup(f"Error al buscar vehículos: {ex}", "error", self).show_centered()
+            popUp.toast(self, f"Error al buscar vehículos: {ex}", kind="error")
             rows = []
+
 
         self._results = rows or []
 
@@ -263,8 +265,6 @@ class FacturasConsultarPage(QWidget):
         self._tipo: Optional[str] = None
         self._estado_id: Optional[int] = None
         self._factura: Optional[Dict[str, Any]] = None  # cache cabecera
-
-        print("hola")
         # baja/anulada (para bloquear acciones)
         self._baja: bool = False
         self._can_edit_current: bool = False
@@ -313,7 +313,7 @@ class FacturasConsultarPage(QWidget):
         main.setSpacing(6)
 
         title = QLabel("Consulta de factura")
-        title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        title.setStyleSheet("font-size: 1.4em; font-weight: 600;")
         main.addWidget(title)
 
 
@@ -515,7 +515,7 @@ class FacturasConsultarPage(QWidget):
         r += 1
         gridv.addWidget(QLabel("Anticipo"), r, 0)
         gridv.addWidget(self.in_anticipo, r, 1)
-        gridv.addWidget(QLabel("Interés (%)"), r, 2)
+        gridv.addWidget(QLabel("Importe de cuota"), r, 2)
         gridv.addWidget(self.in_importe_cuota, r, 3)
         gridv.addWidget(QLabel("Cuotas"), r, 4)
         gridv.addWidget(self.in_cant_cuotas, r, 5)
@@ -549,7 +549,13 @@ class FacturasConsultarPage(QWidget):
         self.tbl_detalle.setAlternatingRowColors(True)
         self.tbl_detalle.verticalHeader().setVisible(False)
         self.tbl_detalle.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.tbl_detalle.setMinimumHeight(250)
+        self.tbl_detalle.setMinimumHeight(200)
+        # 🔧 Setup estándar (escala de fuentes / padding / filas)
+        setup_compact_table(self.tbl_detalle)
+
+        # 🔠 Forzar font global (zoom)
+        self.tbl_detalle.setFont(QApplication.font())
+        self.tbl_detalle.horizontalHeader().setFont(QApplication.font())
 
         self.tbl_detalle.setHorizontalHeaderLabels(
             ["Vehículo", "Cant.", "P. Unitario", "IVA %", "Neto", "IVA", "Total"]
@@ -557,14 +563,11 @@ class FacturasConsultarPage(QWidget):
         header = self.tbl_detalle.horizontalHeader()
         for col in range(7):
             header.setSectionResizeMode(col, QHeaderView.Interactive)
+        header = self.tbl_detalle.horizontalHeader()
+        header.setSectionResizeMode(self.COL_VEHICULO, QHeaderView.Stretch)
 
-        self.tbl_detalle.setColumnWidth(self.COL_VEHICULO, 320)
-        self.tbl_detalle.setColumnWidth(self.COL_CANT, 100)
-        self.tbl_detalle.setColumnWidth(self.COL_PUNIT, 140)
-        self.tbl_detalle.setColumnWidth(self.COL_IVA_PCT, 90)
-        self.tbl_detalle.setColumnWidth(self.COL_NETO, 130)
-        self.tbl_detalle.setColumnWidth(self.COL_IVA, 130)
-        self.tbl_detalle.setColumnWidth(self.COL_TOTAL, 130)
+        for col in range(1, 7):
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
 
         sec3_l.addWidget(self.tbl_detalle)
 
@@ -631,6 +634,13 @@ class FacturasConsultarPage(QWidget):
         secc_l.addWidget(lblc)
 
         self.tbl_cuotas = QTableWidget(0, 5, self)
+        # 🔧 Setup estándar
+        setup_compact_table(self.tbl_cuotas)
+
+        # 🔠 Forzar font global
+        self.tbl_cuotas.setFont(QApplication.font())
+        self.tbl_cuotas.horizontalHeader().setFont(QApplication.font())
+
         self.tbl_cuotas.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_cuotas.setSelectionMode(QAbstractItemView.NoSelection)
         self.tbl_cuotas.verticalHeader().setVisible(False)
@@ -759,11 +769,12 @@ class FacturasConsultarPage(QWidget):
 
             ok = QDesktopServices.openUrl(QUrl.fromLocalFile(path))
             if not ok:
-                NotifyPopup(
-                    f"Se generó el PDF pero no se pudo abrir automáticamente:\n{path}",
-                    "warning",
+                popUp.toast(
                     self,
-                ).show_centered()
+                    "El PDF se generó pero no se pudo abrir automáticamente.",
+                    kind="warning",
+                )
+
         except Exception as ex:
             try:
                 self.setCursor(Qt.ArrowCursor)
@@ -773,11 +784,12 @@ class FacturasConsultarPage(QWidget):
                 self.btn_pdf.setEnabled(True)
             except Exception:
                 pass
-            NotifyPopup(
-                f"Error al generar el comprobante PDF:\n{ex}",
-                "error",
+            popUp.toast(
                 self,
-            ).show_centered()
+                "Error al generar el comprobante PDF.",
+                kind="error",
+            )
+
 
     def _make_readonly(self, le: QLineEdit, *, align_right: bool = False) -> None:
         le.setReadOnly(True)
@@ -986,7 +998,12 @@ class FacturasConsultarPage(QWidget):
         try:
             factura = self._svc_facturas.get(self._factura_id)
             if not factura:
-                popUp.critical(self, "Error", f"No se encontró la factura ID {self._factura_id}.")
+                popUp.toast(
+                    self,
+                    f"No se encontró la factura ID {self._factura_id}.",
+                    kind="error",
+                )
+
                 return
 
             self._factura = factura
@@ -1132,7 +1149,7 @@ class FacturasConsultarPage(QWidget):
                     self.in_precio_real.setText(_format_money(row_venta["precio_total"] or 0))
                     self.in_forma_pago.setText(row_venta.get("forma_pago") or "")
                     self.in_anticipo.setText(_format_money(row_venta.get("anticipo") or 0))
-                    self.in_importe_cuota.setText(str(row_venta.get("importe_cuota") or 0))
+                    self.in_importe_cuota.setText(_format_money(row_venta.get("importe_cuota") or 0))
                     self.in_cant_cuotas.setText(str(row_venta.get("cantidad_cuotas") or 0))
 
                     plan_id = row_venta.get("plan_id")
@@ -1262,6 +1279,7 @@ class FacturasConsultarPage(QWidget):
         if self._edit_mode:
             cb = VehiculoSelectorCombo(self._svc_vehiculos)
             cb.setObjectName("VehiculoCombo")
+            cb.setFont(QApplication.font())
 
             if vehiculo_id:
                 try:
@@ -1284,31 +1302,37 @@ class FacturasConsultarPage(QWidget):
 
         it_cant = QTableWidgetItem(_format_money(cantidad))
         it_cant.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_cant.setFont(QApplication.font())
         self._set_item_editable(it_cant, self._edit_mode)
         self.tbl_detalle.setItem(row, self.COL_CANT, it_cant)
 
         it_pu = QTableWidgetItem(_format_money(precio_unitario))
         it_pu.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_pu.setFont(QApplication.font())
         self._set_item_editable(it_pu, self._edit_mode)
         self.tbl_detalle.setItem(row, self.COL_PUNIT, it_pu)
 
         it_iva_pct = QTableWidgetItem(_format_money(alicuota_iva))
         it_iva_pct.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_iva_pct.setFont(QApplication.font())
         self._set_item_editable(it_iva_pct, self._edit_mode)
         self.tbl_detalle.setItem(row, self.COL_IVA_PCT, it_iva_pct)
 
         it_neto = QTableWidgetItem(_format_money(importe_neto))
         it_neto.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_neto.setFont(QApplication.font())
         self._set_item_editable(it_neto, False)
         self.tbl_detalle.setItem(row, self.COL_NETO, it_neto)
 
         it_iva = QTableWidgetItem(_format_money(importe_iva))
         it_iva.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_iva.setFont(QApplication.font())
         self._set_item_editable(it_iva, False)
         self.tbl_detalle.setItem(row, self.COL_IVA, it_iva)
 
         it_total = QTableWidgetItem(_format_money(importe_total))
         it_total.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        it_total.setFont(QApplication.font())
         self._set_item_editable(it_total, False)
         self.tbl_detalle.setItem(row, self.COL_TOTAL, it_total)
 
@@ -1490,11 +1514,12 @@ class FacturasConsultarPage(QWidget):
 
     def _on_modificar(self) -> None:
         if not self._can_edit_current:
-            NotifyPopup(
-                "Esta factura no se puede modificar (está autorizada/anulada/baja).",
-                "warning",
+            popUp.toast(
                 self,
-            ).show_centered()
+                "Esta factura no se puede modificar porque ya está autorizada o anulada.",
+                kind="warning",
+            )
+
             return
 
         self._snapshot_cabecera = {
@@ -1530,6 +1555,18 @@ class FacturasConsultarPage(QWidget):
             "total": _parse_decimal(self.in_total.text()),
             "observaciones": self.in_observaciones.toPlainText().strip(),
         }
+
+        ok, errs = validar_factura(
+            cabecera=cabecera,
+            items=items,
+            es_nota_credito=False,   # en edición NO generamos NC
+        )
+
+        if not ok:
+            msg = "\n".join(f"• {e}" for e in errs)
+            popUp.toast(self, msg, kind="warning")
+            return
+
 
         items: List[Dict[str, Any]] = []
         for r in range(self.tbl_detalle.rowCount()):
@@ -1651,12 +1688,22 @@ class FacturasConsultarPage(QWidget):
             db.commit()
         except Exception as ex:
             db.rollback()
-            NotifyPopup(f"Error al guardar cambios de la factura:\n{ex}", "error", self).show_centered()
+            popUp.toast(
+                self,
+                "Error al guardar los cambios de la factura.",
+                kind="error",
+            )
+
             return
         finally:
             db.close()
 
-        NotifyPopup("Cambios guardados correctamente.", "success", self).show_centered()
+        popUp.toast(
+            self,
+            "Cambios guardados correctamente.",
+            kind="success",
+        )
+
         self._load_data()
 
     # ---------------- Popup info ----------------
@@ -1717,7 +1764,7 @@ class FacturasConsultarPage(QWidget):
         card_l.setSpacing(10)
 
         title = QLabel("Información de la factura")
-        title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        title.setStyleSheet("font-size: 1.2em; font-weight: 600;")
         card_l.addWidget(title)
 
         subtitle = QLabel("Usá los botones de copiar para pegar rápido en otros sistemas.")
@@ -1757,7 +1804,12 @@ class FacturasConsultarPage(QWidget):
             def make_handler(val=value, lab=label):
                 def _h():
                     QApplication.clipboard().setText(val)
-                    NotifyPopup.info(self, f"Copiado: {lab}")
+                    popUp.toast(
+                        self,
+                        f"Copiado: {lab}",
+                        kind="success",
+                    )
+
                 return _h
 
             btn_copy.clicked.connect(make_handler())
@@ -1871,11 +1923,12 @@ class FacturasConsultarPage(QWidget):
     def _on_generar_nc(self) -> None:
         generar_nc = getattr(self._svc_facturas, "generar_nota_credito", None)
         if not callable(generar_nc):
-            NotifyPopup(
-                "Aún no está implementada la generación de notas de crédito en el servicio.",
-                "warning",
+            popUp.toast(
                 self,
-            ).show_centered()
+                "La generación de notas de crédito aún no está disponible.",
+                kind="warning",
+            )
+
             return
 
         tipo = self._tipo or ""
@@ -1901,7 +1954,12 @@ class FacturasConsultarPage(QWidget):
             self.setCursor(old_cursor)
             self.btn_nc.setEnabled(True)
             msg = f"Error al generar la nota de crédito: {ex}"
-            NotifyPopup(msg, "error", self).show_centered()
+            popUp.toast(
+                self,
+                "Error al generar la nota de crédito.",
+                kind="error",
+            )
+
             self._registrar_error_arca_en_observaciones(msg)
             return
 
@@ -1909,7 +1967,12 @@ class FacturasConsultarPage(QWidget):
 
         if not isinstance(result, dict):
             msg = "La respuesta del servicio de notas de crédito no es válida."
-            NotifyPopup(msg, "error", self).show_centered()
+            popUp.toast(
+                self,
+                "La respuesta del servicio de notas de crédito no es válida.",
+                kind="error",
+            )
+
             self._registrar_error_arca_en_observaciones(msg)
             self._update_nc_button_state()
             return
@@ -1931,7 +1994,12 @@ class FacturasConsultarPage(QWidget):
             )
             if msg:
                 detalle += "\n\n" + msg
-            NotifyPopup(detalle, "success", self).show_centered()
+            popUp.info(
+                self,
+                "Nota de crédito generada",
+                detalle,
+            )
+
             self._load_data()
             return
 
@@ -1943,7 +2011,12 @@ class FacturasConsultarPage(QWidget):
 
         if result.get("rechazada"):
             full_msg = "La nota de crédito fue rechazada por ARCA.\n" + msg
-            NotifyPopup(full_msg, "error", self).show_centered()
+            popUp.toast(
+                self,
+                "La nota de crédito fue rechazada por ARCA.",
+                kind="error",
+            )
+
             self._registrar_error_arca_en_observaciones(full_msg)
             self._load_data()
             return
@@ -1955,13 +2028,23 @@ class FacturasConsultarPage(QWidget):
 
         if estado_error_com is not None and estado_nc_id == estado_error_com:
             full_msg = "Error de comunicación con ARCA al generar la nota de crédito.\n" + msg
-            NotifyPopup(full_msg, "error", self).show_centered()
+            popUp.toast(
+                self,
+                "Error de comunicación con ARCA al generar la nota de crédito.",
+                kind="error",
+            )
+
             self._registrar_error_arca_en_observaciones(full_msg)
             self._load_data()
             return
 
         full_msg = "No se pudo generar la nota de crédito.\n" + msg
-        NotifyPopup(full_msg, "error", self).show_centered()
+        popUp.toast(
+            self,
+            "No se pudo generar la nota de crédito.",
+            kind="error",
+        )
+
         self._registrar_error_arca_en_observaciones(full_msg)
         self._load_data()
 

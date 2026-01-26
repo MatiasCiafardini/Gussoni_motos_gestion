@@ -10,7 +10,9 @@ def setup_compact_table(table: QTableWidget):
     scale = settings.value("ui/font_scale", 1.0, float)
 
     table.setWordWrap(False)
+    effective_scale = scale * 0.9 if scale > 1.1 else scale
 
     vh = table.verticalHeader()
     vh.setSectionResizeMode(QHeaderView.Fixed)
-    vh.setDefaultSectionSize(int(32 * (scale * 0.9)))
+    
+    vh.setDefaultSectionSize(int(32 * effective_scale))

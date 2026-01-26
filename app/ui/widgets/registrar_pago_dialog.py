@@ -353,7 +353,7 @@ class RegistrarPagoDialog(QDialog):
                 observaciones=self.in_obs.toPlainText().strip() or None
             )
         except Exception as ex:
-            popUp.critical(self, "Pagos", str(ex))
+            popUp.toast(self, "Pagos", str(ex))
             return
     
         self.accept()

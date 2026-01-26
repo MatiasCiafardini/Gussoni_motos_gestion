@@ -14,10 +14,10 @@ try:
     from app.services.usuarios_service import UsuariosService
 except Exception:
     UsuariosService = None  # fallback abajo
+from app.domain.usuarios_validaciones import validar_usuario
 
 from app.core.security import hash_password
-
-from app.ui.notify import NotifyPopup
+import app.ui.app_message as popUp
 
 
 class UsuariosAgregarPage(QWidget):
@@ -150,7 +150,12 @@ class UsuariosAgregarPage(QWidget):
             if self.service:
                 roles = self.service.get_roles()
         except Exception as e:
-            NotifyPopup(f"No se pudieron cargar roles: {e}", "error", self).show_centered()
+            popUp.toast(
+                self,
+                "No se pudieron cargar roles. Se usarán valores por defecto.",
+                kind="warning",
+                msec=3000,
+            )
             roles = [{"id": 1, "nombre": "Administrador"}, {"id": 2, "nombre": "Vendedor"}]
         for r in roles:
             rid = r.get("id")
@@ -161,11 +166,17 @@ class UsuariosAgregarPage(QWidget):
     # -------------------- Guardar --------------------
     def _on_guardar(self, abrir_detalle: bool):
         data = self._collect_data()
-        ok, errs = self._validate(data)
+        ok, errs = validar_usuario(data, modo="alta")
+
         if not ok:
             msg = "\n".join(f"• {v}" for v in errs.values())
-            NotifyPopup(msg, "warning", self).show_centered()
+            popUp.toast(
+                self,
+                msg,
+                kind="warning",
+            )
             return
+
 
         # Insertar usando el service si está disponible (ideal: el service hashea)
         try:
@@ -186,20 +197,40 @@ class UsuariosAgregarPage(QWidget):
                 }
                 new_id = int(repo.insert(to_db))
         except Exception as ex:
-            NotifyPopup(f"Error al guardar: {ex}", "error", self).show_centered()
+            popUp.error(
+                self,
+                "Error al guardar usuario",
+                str(ex),
+            )
             return
 
+
         if new_id is None:
-            NotifyPopup("No se pudo obtener el ID del usuario creado.", "warning", self).show_centered()
+            popUp.toast(
+                self,
+                "No se pudo obtener el ID del usuario creado.",
+                kind="error",
+            )
             return
+
 
         self._dirty = False
         if abrir_detalle:
-            NotifyPopup("Usuario guardado correctamente.\nAbriendo detalle…", "success", self).show_centered()
+            popUp.toast(
+                self,
+                "Usuario guardado correctamente.\nAbriendo detalle…",
+                kind="success",
+            )
             self.go_to_detalle.emit(int(new_id))
+
         else:
-            NotifyPopup("Usuario guardado correctamente.", "success", self).show_centered()
+            popUp.toast(
+                self,
+                "Usuario guardado correctamente.",
+                kind="success",
+            )
             self._limpiar_formulario()
+
             self._dirty = False
 
     # -------------------- Volver --------------------
@@ -235,15 +266,6 @@ class UsuariosAgregarPage(QWidget):
             "observaciones": self.in_observaciones.toPlainText().strip() or None,
         }
 
-    def _validate(self, d: Dict[str, Any]) -> Tuple[bool, Dict[str, str]]:
-        errs: Dict[str, str] = {}
-        if not d["nombre"]: errs["nombre"] = "El nombre es obligatorio."
-        if not d["usuario"]: errs["usuario"] = "El usuario es obligatorio."
-        if not d["rol_id"]: errs["rol_id"] = "Seleccioná un rol."
-        if d["estado_id"] not in (0, 1): errs["estado_id"] = "Seleccioná el estado."
-        if not d["password"] or len(d["password"]) < 4: errs["password"] = "La contraseña debe tener al menos 4 caracteres."
-        if d["password"] != d["password2"]: errs["password2"] = "Las contraseñas no coinciden."
-        return (len(errs) == 0, errs)
 
     def _coerce_int(self, v: Any) -> Optional[int]:
         if v is None: return None

@@ -13,7 +13,6 @@ class ArcaEnv:
     CERT_DIR = BASE_DIR / "app/certificados"
 
     if IS_PROD:
-        print("prod")
         CERT = CERT_DIR / "prod.crt"
         KEY = CERT_DIR / "prod.key"
 

@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QDate, Signal, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox,
     QTextEdit, QPushButton, QSizePolicy, QListView, QFrame,
-    QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView,
+    QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView, QScrollArea, QAbstractScrollArea,
     QMainWindow
 )
 import app.ui.app_message as popUp
@@ -13,7 +13,9 @@ from app.services.facturas_service import FacturasService
 from app.services.clientes_service import ClientesService
 from app.services.vehiculos_service import VehiculosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
-from app.ui.notify import NotifyPopup
+import app.ui.app_message as popUp
+from app.domain.facturas_validaciones import validar_factura
+
 from PySide6.QtCore import Qt, QDate
 from app.data.database import SessionLocal
 from sqlalchemy import text
@@ -148,7 +150,7 @@ class VehiculoSelectorCombo(QComboBox):
         try:
             rows, _ = self._svc.search(filtros, page=1, page_size=20)
         except Exception as ex:
-            NotifyPopup(f"Error al buscar vehículos: {ex}", "error", self).show_centered()
+            popUp.toast(self, f"Error al buscar vehículos: {ex}", kind="error")
             rows = []
 
         self._results = rows or []
@@ -223,12 +225,26 @@ class FacturasAgregarPage(QWidget):
 
     # ---------------- UI ----------------
     def _build_ui(self) -> None:
-        main = QVBoxLayout(self)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        container = QWidget()
+        main = QVBoxLayout(container)
+        main.setContentsMargins(12, 12, 12, 12)
+        main.setSpacing(6)
+
+        scroll.setWidget(container)
+        root.addWidget(scroll)
+
         main.setContentsMargins(12, 12, 12, 12)
         main.setSpacing(6)
 
         title = QLabel("Nueva factura")
-        title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        title.setStyleSheet("font-size: 1.4em; font-weight: 600;")
         main.addWidget(title)
 
         # --- Sección 1: Datos factura ---
@@ -284,7 +300,13 @@ class FacturasAgregarPage(QWidget):
         )
         # Para que se vea como campo “con recuadro” como los demás
         self.in_observaciones.setFrameStyle(QFrame.StyledPanel | QFrame.Plain)
-        self.in_observaciones.setFixedHeight(70)
+        self.in_observaciones.setMinimumHeight(48)   # más chico
+        self.in_observaciones.setMaximumHeight(90)
+        self.in_observaciones.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Minimum
+        )
+
 
         row = 0
         # Fila 1: Tipo / Punto de venta / Número
@@ -472,7 +494,13 @@ class FacturasAgregarPage(QWidget):
         self.tbl_detalle.setAlternatingRowColors(True)
         self.tbl_detalle.verticalHeader().setVisible(False)
         self.tbl_detalle.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.tbl_detalle.setMinimumHeight(250)
+        self.tbl_detalle.setSizeAdjustPolicy(
+            QAbstractScrollArea.AdjustToContents
+        )
+        self.tbl_detalle.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.tbl_detalle.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.tbl_detalle.setMinimumHeight(200)
+
 
         self.tbl_detalle.setHorizontalHeaderLabels(
             ["Vehículo", "Cant.", "P. Unitario", "IVA %", "Neto", "IVA", "Total"]
@@ -583,22 +611,22 @@ class FacturasAgregarPage(QWidget):
         btns.setSpacing(8)
 
         self.btn_volver = QPushButton("Volver")
-        self.btn_guardar = QPushButton("Enviar")
-        self.btn_guardar_ver = QPushButton("Enviar y consultar")
+        #self.btn_guardar = QPushButton("Enviar")
+        self.btn_guardar_ver = QPushButton("Enviar")
 
-        self.btn_guardar.setObjectName("BtnPrimary")
+        #self.btn_guardar.setObjectName("BtnPrimary")
         self.btn_guardar_ver.setObjectName("BtnPrimary")
 
         btns.addStretch(1)
         btns.addWidget(self.btn_volver)
         btns.addSpacing(8)
-        btns.addWidget(self.btn_guardar)
+        #btns.addWidget(self.btn_guardar)
         btns.addWidget(self.btn_guardar_ver)
         btns.addStretch(1)
         main.addLayout(btns)
 
         self.btn_volver.clicked.connect(self._on_volver)
-        self.btn_guardar.clicked.connect(lambda: self._on_guardar(False))
+        #self.btn_guardar.clicked.connect(lambda: self._on_guardar(False))
         self.btn_guardar_ver.clicked.connect(lambda: self._on_guardar(True))
 
     # --- layout: lógica de ancho responsive con mínimo para Vehículo ---
@@ -723,9 +751,10 @@ class FacturasAgregarPage(QWidget):
         try:
             rows, _total = self._svc_facturas.search(filtros, page=1, page_size=500)
         except Exception as ex:
-            NotifyPopup(f"Error al cargar comprobantes del cliente: {ex}", "error", self).show_centered()
+            popUp.toast(self, f"Error al cargar comprobantes del cliente: {ex}", kind="error")
             self.cb_comprobante.blockSignals(False)
             return
+
 
         # Nos quedamos solo con FA/FB/FC (facturas, no NC/ND)
         rows_ok = [r for r in rows if str(r.get("tipo") or "").upper() in ("FA", "FB", "FC")]
@@ -944,8 +973,9 @@ class FacturasAgregarPage(QWidget):
         try:
             rows, _ = self._svc_clientes.search(filtros, page=1, page_size=20)
         except Exception as ex:
-            NotifyPopup(f"Error al buscar clientes: {ex}", "error", self).show_centered()
+            popUp.toast(self, f"Error al buscar clientes: {ex}", kind="error")
             rows = []
+
 
         self._cliente_results = rows or []
         current_text = self.cb_cliente.lineEdit().text()
@@ -1037,7 +1067,7 @@ class FacturasAgregarPage(QWidget):
 
         in_pu = MoneySpinBox()
         in_pu.setAlignment(Qt.AlignRight)
-        in_pu.valueChanged.connect(lambda r=row: self._on_detalle_valor_editado(r))
+        in_pu.valueChanged.connect(lambda _value, r=row: self._on_detalle_valor_editado(r))
         self.tbl_detalle.setCellWidget(row, 2, in_pu)
 
         in_iva = QLineEdit("21")
@@ -1204,6 +1234,7 @@ class FacturasAgregarPage(QWidget):
             "forma_pago_id": self.cb_forma_pago.currentData(),
             "anticipo": self.in_anticipo.value(),
             "cantidad_cuotas": int(self.in_cantidad_cuotas.text() or 0),
+            "importe_cuota": self.in_importe_cuota.value(),
 
         }
 
@@ -1248,33 +1279,6 @@ class FacturasAgregarPage(QWidget):
 
         return cabecera, items
 
-    def _validate(self, cabecera: Dict[str, Any], items: List[Dict[str, Any]]) -> Tuple[bool, List[str]]:
-        errs: List[str] = []
-        if not cabecera.get("tipo"):
-            errs.append("Seleccioná el tipo de comprobante.")
-        if not cabecera.get("pto_vta"):
-            errs.append("Seleccioná el punto de venta.")
-        if not cabecera.get("fecha_emision"):
-            errs.append("Ingresá la fecha de emisión.")
-        if not cabecera.get("cliente_id"):
-            errs.append("Seleccioná un cliente.")
-        if not cabecera.get("condicion_iva_receptor_id"):
-            errs.append("Seleccioná la condición frente al IVA del receptor.")
-        if not self._es_nota_credito():
-            # Para facturas normales, se exige detalle
-            if not items:
-                errs.append("Agregá al menos un vehículo en el detalle.")
-            for it in items:
-                if not it.get("vehiculo_id"):
-                    errs.append("Hay filas de detalle sin vehículo seleccionado.")
-                    break
-        else:
-            # Para NC, se valida aparte: comprobante seleccionado
-            comp_id = self.cb_comprobante.currentData()
-            if comp_id in (None, "", 0, "0"):
-                errs.append("Seleccioná el comprobante a asociar a la Nota de Crédito.")
-        return (len(errs) == 0), errs
-
     def _on_guardar(self, abrir_detalle: bool) -> None:
         """
         Guarda:
@@ -1287,11 +1291,20 @@ class FacturasAgregarPage(QWidget):
 
         # ----- Flujo normal de factura -----
         cabecera, items = self._collect_data()
-        ok, errs = self._validate(cabecera, items)
+
+        ok, errs = validar_factura(
+            cabecera=cabecera,
+            items=items,
+            es_nota_credito=self._es_nota_credito(),
+            comprobante_nc_id=self.cb_comprobante.currentData(),
+        )
+
         if not ok:
             msg = "\n".join(f"• {e}" for e in errs)
-            NotifyPopup(msg, "warning", self).show_centered()
+            popUp.toast(self, msg, kind="warning")
             return
+
+
 
         create_full = getattr(self._svc_facturas, "create_factura_completa", None)
         if not callable(create_full):
@@ -1309,11 +1322,13 @@ class FacturasAgregarPage(QWidget):
         try:
             new_id = create_full(cabecera, items)
         except Exception as ex:
-            NotifyPopup(f"Error al guardar la factura: {ex}", "error", self).show_centered()
+            popUp.toast(self, f"Error al guardar la factura: {ex}", kind="error")
             return
 
+
         self._dirty = False
-        NotifyPopup("Factura guardada correctamente.", "success", self).show_centered()
+        popUp.toast(self, "Factura guardada correctamente.", kind="success")
+
 
         # 2) Autorizar en ARCA (si existe el método en el service)
         autorizar = getattr(self._svc_facturas, "autorizar_en_arca", None)
@@ -1323,29 +1338,32 @@ class FacturasAgregarPage(QWidget):
                 from pprint import pformat
 
                 # Popup técnico (te sirve mientras estás en homologación)
-                NotifyPopup(
-                    "Resultado de ARCA:\n" + pformat(result),
-                    "info",
+                popUp.info(
                     self,
-                ).show_centered()
+                    "Resultado ARCA",
+                    pformat(result),
+                )
+
 
                 msg = result.get("mensaje") if isinstance(result, dict) else ""
                 estado_id = result.get("estado_id") if isinstance(result, dict) else None
 
                 if isinstance(result, dict) and result.get("aprobada"):
                     # Autorizada ok
-                    NotifyPopup(
-                        "Factura autorizada correctamente en ARCA.\n" + msg,
-                        "success",
+                    popUp.toast(
                         self,
-                    ).show_centered()
+                        "Factura autorizada correctamente en ARCA.",
+                        kind="success",
+                    )
+
                 elif isinstance(result, dict) and result.get("rechazada"):
                     # Rechazada por AFIP/ARCA
-                    NotifyPopup(
-                        "Factura rechazada por ARCA.\n" + msg,
-                        "error",
+                    popUp.toast(
                         self,
-                    ).show_centered()
+                        "Factura rechazada por ARCA.",
+                        kind="error",
+                    )
+
                 else:
                     # Ni aprobada ni rechazada → error de comunicación o quedó en borrador
                     extra = ""
@@ -1362,30 +1380,26 @@ class FacturasAgregarPage(QWidget):
                     except Exception:
                         pass
 
-                    NotifyPopup(
-                        "No se pudo confirmar la autorización en ARCA.\n"
-                        + (msg or "")
-                        + extra,
-                        "warning",
+                    popUp.toast(
                         self,
-                    ).show_centered()
+                        "No se pudo confirmar la autorización en ARCA. La factura quedó guardada.",
+                        kind="warning",
+                    )
+
             except Exception as ex:
                 # Si algo explota acá, la factura igual ya se guardó como borrador.
-                NotifyPopup(
-                    "La factura se guardó localmente, pero se produjo un error al "
-                    f"intentar autorizar en ARCA:\n{ex}\n\n"
-                    "Podés reintentar luego desde la pantalla de facturas "
-                    "con el botón 'Sincronizar con ARCA'.",
-                    "error",
+                popUp.toast(
                     self,
-                ).show_centered()
+                    "La factura se guardó, pero hubo un error al autorizar en ARCA.",
+                    kind="error",
+                )
+
         else:
             # Si por alguna razón el método no está, solo informamos guardar local.
-            NotifyPopup(
+            popUp.toast(self,
                 "La factura se guardó localmente, pero la integración con ARCA no está disponible.",
-                "warning",
-                self,
-            ).show_centered()
+                kind="warning"
+            )
 
         # 3) Navegación según el botón
         if abrir_detalle and isinstance(new_id, int):
@@ -1401,18 +1415,21 @@ class FacturasAgregarPage(QWidget):
         """
         # Validación básica
         if not self._selected_cliente:
-            NotifyPopup("Seleccioná un cliente para la Nota de Crédito.", "warning", self).show_centered()
+            popUp.toast(self, "Seleccioná un cliente para la Nota de Crédito.", kind="warning")
+
             return
 
         comp_id = self.cb_comprobante.currentData()
         if comp_id in (None, "", 0, "0"):
-            NotifyPopup("Seleccioná el comprobante a asociar a la Nota de Crédito.", "warning", self).show_centered()
+            popUp.toast(self, "Seleccioná el comprobante a asociar a la Nota de Crédito.", kind="warning")
+
             return
 
         try:
             comp_id_int = int(comp_id)
         except Exception:
-            NotifyPopup("El comprobante seleccionado no es válido.", "error", self).show_centered()
+            popUp.toast(self, "El comprobante seleccionado no es válido.", kind="error")
+
             return
 
         generar_nc = getattr(self._svc_facturas, "generar_nota_credito", None)
@@ -1430,31 +1447,37 @@ class FacturasAgregarPage(QWidget):
         try:
             res = generar_nc(comp_id_int)
         except Exception as ex:
-            NotifyPopup(f"Error al generar la Nota de Crédito: {ex}", "error", self).show_centered()
+            popUp.toast(self,f"Error al generar la Nota de Crédito: {ex}", kind="error")
             return
 
         from pprint import pformat
-        NotifyPopup("Resultado de generación de NC:\n" + pformat(res), "info", self).show_centered()
+        popUp.info(
+            self,
+            "Resultado generación NC",
+            pformat(res),
+        )
+
 
         msg = res.get("mensaje") if isinstance(res, dict) else ""
         if res.get("aprobada"):
             self._dirty = False
-            NotifyPopup(
-                "Nota de Crédito generada y autorizada correctamente en ARCA.\n" + (msg or ""),
-                "success",
+            popUp.toast(
                 self,
-            ).show_centered()
+                "Nota de Crédito generada y autorizada correctamente.",
+                kind="success",
+            )
+
         elif res.get("rechazada"):
-            NotifyPopup(
-                "Nota de Crédito rechazada por ARCA.\n" + (msg or ""),
-                "error",
+            popUp.toast(
                 self,
-            ).show_centered()
+                "Nota de Crédito rechazada por ARCA.",
+                kind="error",
+            )
+
         else:
-            NotifyPopup(
+            popUp.toast(self,
                 "No se pudo confirmar la autorización de la Nota de Crédito en ARCA.\n" + (msg or ""),
-                "warning",
-                self,
+                kind="warning"
             ).show_centered()
 
         nc_id = res.get("nc_id") if isinstance(res, dict) else None

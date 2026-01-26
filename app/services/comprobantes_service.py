@@ -8,8 +8,14 @@ import base64
 import json
 import os
 from pathlib import Path
+import sys
+import app.ui.utils.paths as paths
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).parent
+else:
+    BASE_DIR = Path(__file__).resolve().parents[1]  # app/
 
-BASE_DIR = Path(__file__).resolve().parents[1]  # app/
+
 
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -48,8 +54,8 @@ class ComprobantesService:
         self._svc = FacturasService()
         self._empresa = empresa or EmpresaConfig()
 
-        self.LOGO_GUSSONI_PATH = str(BASE_DIR / "assets" / "logo.png")
-        self.LOGO_AFIP_PATH   = str(BASE_DIR / "assets" / "logo_arca.jpg")
+        self.LOGO_GUSSONI_PATH = paths.LOGO_GUSSONI
+        self.LOGO_AFIP_PATH   = paths.LOGO_AFIP
 
     def generar_pdf(self, factura_id: int) -> str:
         fac = self._svc.get(int(factura_id))

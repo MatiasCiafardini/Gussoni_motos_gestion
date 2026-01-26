@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (
 from app.services.vehiculos_service import VehiculosService
 from app.services.catalogos_service import CatalogosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
-from app.ui.notify import NotifyPopup
+import app.ui.app_message as popUp
+from app.ui.widgets.money_spinbox import MoneySpinBox
+from app.domain.vehiculos_validaciones import validate_vehiculo
 
 
 # ====================== Carga asíncrona de catálogos ======================
@@ -90,7 +92,11 @@ class VehiculosAgregarPage(QWidget):
         self.in_nro_dnrpa = QLineEdit();       self.in_nro_dnrpa.setPlaceholderText("DNRPA (opcional)")
         self.in_numero_cuadro = QLineEdit();   self.in_numero_cuadro.setPlaceholderText("N° de cuadro")
         self.in_numero_motor = QLineEdit();    self.in_numero_motor.setPlaceholderText("N° de motor")
-        self.in_precio_lista = QLineEdit("0,00"); self.in_precio_lista.setPlaceholderText("Ej: 2.200.000,00")
+        
+        self.in_precio_lista = MoneySpinBox()
+        self.in_precio_lista.setValue(0)
+        self.in_precio_lista.setMinimumHeight(36)
+
 
         self.in_color = QComboBox();        self._setup_combo(self.in_color)
         self.in_estado_stock = QComboBox(); self._setup_combo(self.in_estado_stock)
@@ -158,10 +164,14 @@ class VehiculosAgregarPage(QWidget):
 
         # Cambios → marcar dirty
         for w in (
-            self.in_marca, self.in_modelo, self.in_anio, self.in_numero_cuadro, self.in_numero_motor,
-            self.in_precio_lista, self.in_nro_certificado, self.in_nro_dnrpa
+            self.in_marca, self.in_modelo, self.in_anio,
+            self.in_numero_cuadro, self.in_numero_motor,
+            self.in_nro_certificado, self.in_nro_dnrpa
         ):
             w.textChanged.connect(self._mark_dirty)
+
+        self.in_precio_lista.valueChanged.connect(lambda _v: self._mark_dirty())
+
         for cb in (self.in_color, self.in_estado_stock, self.in_estado_moto, self.in_proveedor):
             cb.currentIndexChanged.connect(self._mark_dirty)
         self.in_observaciones.textChanged.connect(self._mark_dirty)
@@ -186,7 +196,13 @@ class VehiculosAgregarPage(QWidget):
 
         task = _LoadCatalogosTask(self._catalogos)
         task.signals.done.connect(self._fill_catalogos)
-        task.signals.error.connect(lambda msg: NotifyPopup(f"No se pudieron cargar catálogos: {msg}", "error", self).show_centered())
+        task.signals.error.connect(
+            lambda msg: popUp.error(
+                self,
+                "Catálogos",
+                f"No se pudieron cargar catálogos:\n{msg}",
+            )
+        )
         QThreadPool.globalInstance().start(task)
 
     def _fill_catalogos(self, data: dict):
@@ -223,26 +239,40 @@ class VehiculosAgregarPage(QWidget):
     # -------------------- Guardar --------------------
     def _on_guardar(self, abrir_detalle: bool):
         data = self._collect_data()
-        ok, errs = self._validate(data)
+        ok, errs = validate_vehiculo(data)
         if not ok:
             msg = "\n".join(f"• {v}" for v in errs.values())
-            NotifyPopup(msg, "warning", self).show_centered()
+            popUp.warning(
+                self,
+                "Vehículos",
+                msg,
+            )
             return
-
-        data["precio_lista"] = self._parse_money(self.in_precio_lista.text())
-
         try:
             new_id = self.service.create_vehiculo(data)
         except Exception as ex:
-            NotifyPopup(f"Error al guardar: {ex}", "error", self).show_centered()
+            popUp.error(
+                self,
+                "Vehículos",
+                f"Error al guardar el vehículo:\n{ex}",
+            )
             return
 
         self._dirty = False
         if abrir_detalle:
-            NotifyPopup("Vehículo guardado correctamente.\nAbriendo detalle…", "success", self).show_centered()
+            popUp.toast(
+                self,
+                "Vehículo guardado correctamente.\nAbriendo detalle…",
+                kind="success",
+            )
             self.go_to_detalle.emit(int(new_id))
         else:
-            NotifyPopup("Vehículo guardado correctamente.", "success", self).show_centered()
+            popUp.toast(
+                self,
+                "Vehículo guardado correctamente.",
+                kind="success",
+            )
+
             self._limpiar_formulario()
             self._dirty = False
 
@@ -257,7 +287,7 @@ class VehiculosAgregarPage(QWidget):
         campos_texto = [
             self.in_marca.text().strip(), self.in_modelo.text().strip(), self.in_anio.text().strip(),
             self.in_numero_cuadro.text().strip(), self.in_numero_motor.text().strip(),
-            self.in_precio_lista.text().strip(), self.in_nro_certificado.text().strip(),
+            self.in_precio_lista.value() > 0, self.in_nro_certificado.text().strip(),
             self.in_nro_dnrpa.text().strip(), self.in_observaciones.toPlainText().strip()
         ]
         if any(campos_texto):
@@ -280,36 +310,15 @@ class VehiculosAgregarPage(QWidget):
             "proveedor_id": self.in_proveedor.currentData(),
             "nro_certificado": self.in_nro_certificado.text().strip() or None,
             "nro_dnrpa": self.in_nro_dnrpa.text().strip() or None,
-            "precio_lista": self._parse_money(self.in_precio_lista.text()),
+            "precio_lista": self.in_precio_lista.value(),
             "observaciones": self.in_observaciones.toPlainText().strip() or None,
         }
 
-    def _validate(self, d: Dict[str, Any]) -> Tuple[bool, Dict[str, str]]:
-        errs: Dict[str, str] = {}
-        if not d["marca"]: errs["marca"] = "La marca es obligatoria."
-        if not d["modelo"]: errs["modelo"] = "El modelo es obligatorio."
-        if not d["anio"] or not (1900 <= int(d["anio"]) <= 2100): errs["anio"] = "Año inválido."
-        if not d["numero_cuadro"]: errs["numero_cuadro"] = "El N° de cuadro es obligatorio."
-        if not d["numero_motor"]: errs["numero_motor"] = "El N° de motor es obligatorio."
-        if not d["color_id"]: errs["color_id"] = "Seleccioná un color."
-        if not d["estado_stock_id"]: errs["estado_stock_id"] = "Seleccioná el estado de stock."
-        if not d["estado_moto_id"]: errs["estado_moto_id"] = "Seleccioná la condición."
-        precio = self._parse_money(self.in_precio_lista.text())
-        if precio is None or precio <= 0: errs["precio_lista"] = "Precio inválido."
-        return (len(errs) == 0, errs)
+
 
     def _parse_int(self, s: str) -> Optional[int]:
         s = (s or "").strip()
         return int(s) if s.isdigit() else None
-
-    def _parse_money(self, s: str) -> Optional[float]:
-        if not s:
-            return None
-        s = s.strip().replace(".", "").replace(",", ".")
-        try:
-            return float(s)
-        except ValueError:
-            return None
 
     def _limpiar_formulario(self):
         self.in_marca.clear()
@@ -317,7 +326,7 @@ class VehiculosAgregarPage(QWidget):
         self.in_anio.clear()
         self.in_numero_cuadro.clear()
         self.in_numero_motor.clear()
-        self.in_precio_lista.setText("0,00")
+        self.in_precio_lista.setValue(0)
         self.in_nro_certificado.clear()
         self.in_nro_dnrpa.clear()
         self.in_observaciones.clear()

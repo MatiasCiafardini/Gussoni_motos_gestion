@@ -16,7 +16,7 @@ from app.ui.login_dialog import LoginDialog
 from app.shared.paths import ensure_user_dirs
 from app.core.db_state import db_config_completa
 from app.ui.config_dialog import ConfigDialog
-
+import app.ui.utils.paths as paths
 
 class ApplicationController(QObject):
     """Coordinates the login flow and the main window lifecycle."""
@@ -89,8 +89,8 @@ def main():
 
     apply_theme(app, base_font_pt=11, scale=scale)
 
-    icon_path = resource_path("app/assets/logo.ico")
-    app.setWindowIcon(QIcon(str(icon_path)))
+    app.setWindowIcon(QIcon(str(paths.APP_ICON)))
+
 
     controller = ApplicationController(app)
     controller.start()

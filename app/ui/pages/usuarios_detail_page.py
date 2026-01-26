@@ -14,7 +14,8 @@ from app.services.usuarios_service import UsuariosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.widgets.password_dialog import ChangePasswordDialog
 # Nota: La Notificación la dejo comentada, se usa en la de Agregar.
-# from app.ui.notify import NotifyPopup 
+from app.domain.usuarios_validaciones import validar_usuario
+
 
 
 class UsuariosDetailPage(QWidget):
@@ -193,7 +194,7 @@ class UsuariosDetailPage(QWidget):
         self._set_editable(True)
         self._update_buttons()
         # El campo 'usuario' (login) podría ser NO editable para evitar conflictos de integridad.
-        # self.in_usuario.setEnabled(False)
+        #self.in_usuario.setEnabled(False)
 
     def _cancel_edit(self):
         self.edit_mode = False
@@ -213,11 +214,12 @@ class UsuariosDetailPage(QWidget):
         try:
             self.service.change_password(self.Usuario_id, new_password)
         except Exception as ex:
-            popUp.critical(
+            popUp.toast(
                 self,
-                "Usuarios",
                 f"No se pudo actualizar la contraseña.\n\n{ex}",
+                kind="error",
             )
+
             return
 
         popUp.info(
@@ -317,29 +319,11 @@ class UsuariosDetailPage(QWidget):
         # Solo enviar los campos que tienen valor
         return {k: v for k, v in payload.items() if v is not None}
 
-    def _validate(self, d: Dict[str, Any]) -> Dict[str, str]:
-        errs: Dict[str, str] = {}
-        if not d.get("nombre"):
-            errs["nombre"] = "El nombre es obligatorio."
-        if not d.get("usuario"):
-            errs["usuario"] = "El nombre de usuario es obligatorio."
-        if not d.get("rol"):
-            errs["rol"] = "Seleccioná el rol."
-        
-        email = d.get("email")
-        if email and ("@" not in email or "." not in email.split("@")[-1]):
-            errs["email"] = "Email inválido."
-            
-        if d.get("activo") is None:
-            errs["activo"] = "Seleccioná el estado."
-        
-        return errs
 
     def _save(self):
         payload = self._collect_payload()
-        errs = self._validate(payload)
-        
-        if errs:
+        ok, errs = validar_usuario(payload, modo="edicion")
+        if not ok:
             msg = "\n".join(f"• {v}" for v in errs.values())
             popUp.warning(self, "Usuarios", msg)
             return
@@ -349,10 +333,15 @@ class UsuariosDetailPage(QWidget):
             changed = self.service.update(self.Usuario_id, payload)
         except Exception as ex:
             # Aquí puedes añadir lógica para manejar errores específicos de UNIQUE (ej. usuario ya existe)
-            popUp.critical(self, "Usuarios", f"Error al guardar: {ex}")
+            popUp.error(
+                self,
+                "Error al guardar usuario",
+                str(ex),
+            )
+
             return
         
-        popUp.info(self, "Usuarios", "Usuario actualizado exitosamente.")
+        popUp.toast(self, "Usuario actualizado exitosamente.", kind="success")
         
         # Volver a modo lectura y recargar la data
         self.edit_mode = False

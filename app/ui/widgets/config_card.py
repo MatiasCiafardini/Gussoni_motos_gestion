@@ -71,10 +71,10 @@ class ConfigCard(QFrame):
             border-color: #D1D5DB;
         }
         QLabel#CardTitle {
-            color: #0F172A; font-weight: 700; font-size: 16px;
+            color: #0F172A; font-weight: 700; font-size: 1.2em;
         }
         QLabel#CardSubtitle {
-            color: #6B7280; font-size: 13px;
+            color: #6B7280; font-size: 1em;
         }
         """)
 

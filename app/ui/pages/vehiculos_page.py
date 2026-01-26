@@ -12,11 +12,11 @@ from PySide6.QtWidgets import (
 import app.ui.app_message as popUp
 from app.services.vehiculos_service import VehiculosService
 from app.ui.pages.vehiculos_agregar import VehiculosAgregarPage
-from app.ui.widgets.loading_overlay import LoadingOverlay
 from app.ui.utils.loading_decorator import with_loading
 from pathlib import Path
 from app.ui.utils.table_utils import setup_compact_table
 from app.ui.utils.text_utils import tail_ellipsis
+from PySide6.QtWidgets import QApplication
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 class VehiculosPage(QWidget):
@@ -160,8 +160,6 @@ class VehiculosPage(QWidget):
         root.addLayout(pager)
         root.setStretch(1, 1)
 
-        self.loading_overlay = LoadingOverlay(self, text="")
-
         self._column_menu = QMenu(self)
         self._build_column_menu()
 
@@ -203,22 +201,6 @@ class VehiculosPage(QWidget):
 
     def _build_column_menu(self):
         self._column_menu.clear()
-        self._column_menu.setStyleSheet("""
-            QMenu {
-                background-color: #111827;
-                color: #FFFFFF;
-                border: 1px solid #1f2937;
-                padding: 6px;
-            }
-            QMenu::item {
-                padding: 6px 12px;
-                background-color: transparent;
-            }
-            QMenu::item:selected {
-                background-color: #1f2937;
-                color: #FFFFFF;
-            }
-        """)
         togglables = [
             (self.COL_MARCA, "Marca"), (self.COL_MODELO, "Modelo"), (self.COL_ANIO, "Año"),
             (self.COL_CERT, "N° Certificado"), (self.COL_DNRPA, "N° DNRPA"),
@@ -328,7 +310,7 @@ class VehiculosPage(QWidget):
                 }
                 for col, display_text in values.items():
                     item = QTableWidgetItem(display_text if isinstance(display_text, str) else str(display_text))
-                
+
                     # 🔹 Tooltip con valor completo
                     if col == self.COL_CERT:
                         item.setToolTip(cert)
@@ -338,12 +320,12 @@ class VehiculosPage(QWidget):
                         item.setToolTip(cuadro)
                     elif col == self.COL_MOTOR:
                         item.setToolTip(motor)
-                
+
                     if col == self.COL_PRECIO:
                         item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                
+
                     self.table.setItem(row, col, item)
-                
+
                 btn = QPushButton("🔍"); btn.setObjectName("BtnGhost")
                 btn.setToolTip("Consultar"); btn.setCursor(Qt.PointingHandCursor)
                 try: vid = int(id_val)
@@ -369,14 +351,25 @@ class VehiculosPage(QWidget):
         self.in_color.setCurrentIndex(0); self.in_estado.setCurrentIndex(0); self.in_condicion.setCurrentIndex(0)
         self.reload(reset_page=True)
 
+  
+
     def on_columnas_clicked(self):
         self._build_column_menu()
-        self._column_menu.exec(self.btn_columnas.mapToGlobal(self.btn_columnas.rect().bottomLeft()))
+
+        # 👇 CLAVE: forzar font global (ya escalado)
+        self._column_menu.setFont(QApplication.font())
+
+        self._column_menu.exec(
+            self.btn_columnas.mapToGlobal(
+                self.btn_columnas.rect().bottomLeft()
+            )
+        )
+
 
     def _abrir_pantalla_agregar(self):
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
-            popUp.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
+            popUp.toast(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
             return
         if self._vehiculos_agregar_ref is None:
             page = VehiculosAgregarPage(mw)

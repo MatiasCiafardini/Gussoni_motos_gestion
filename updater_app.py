@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 def show_error(msg: str):
     app = QApplication([])
-    QMessageBox.critical(None, "Error de actualización", msg)
+    QMessageBox.toast(None, "Error de actualización", msg)
     sys.exit(1)
 
 

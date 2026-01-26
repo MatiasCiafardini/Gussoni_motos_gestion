@@ -159,7 +159,7 @@ class UsuariosRepository:
     # ---------------------------------------------------------------------
     def get_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         sql = text("""
-            SELECT id, nombre, usuario AS username, rol, email, activo, fecha_creacion
+            SELECT id, nombre, usuario, rol, email, activo, fecha_creacion
             FROM usuarios
             WHERE id = :id
         """)
@@ -170,7 +170,7 @@ class UsuariosRepository:
         sql = text("""
             SELECT id,
                    nombre,
-                   usuario AS username,
+                   usuario,
                    rol,
                    email,
                    activo,

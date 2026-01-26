@@ -14,12 +14,12 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox, QTextEdit,
     QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem
 )
+from app.domain.clientes_validaciones import validar_cliente
 
 from app.services.clientes_service import ClientesService
 from app.services.catalogos_service import CatalogosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
-from app.ui.notify import NotifyPopup
-
+from app.ui import app_message
 
 # ====================== Carga asíncrona de catálogos ======================
 
@@ -217,7 +217,15 @@ class ClientesAgregarPage(QWidget):
 
         task = _LoadCatalogosTask(self._catalogos)
         task.signals.done.connect(self._fill_catalogos)
-        task.signals.error.connect(lambda msg: NotifyPopup(f"No se pudieron cargar catálogos: {msg}", "error", self).show_centered())
+        task.signals.error.connect(
+            lambda msg: app_message.toast(
+                self,
+                f"No se pudieron cargar catálogos: {msg}",
+                kind="error",
+                msec=3000,
+            )
+        )
+
         QThreadPool.globalInstance().start(task)
 
     def _fill_catalogos(self, data: dict):
@@ -251,27 +259,38 @@ class ClientesAgregarPage(QWidget):
     # -------------------- Guardar --------------------
     def _on_guardar(self, abrir_detalle: bool):
         data = self._collect_data()
-        ok, errs = self._validate(data)
+        ok, errs = validar_cliente(data)
+
         if not ok:
             msg = "\n".join(f"• {v}" for v in errs.values())
-            NotifyPopup(msg, "warning", self).show_centered()
+            app_message.toast(
+                self,
+                msg,
+                kind="warning",
+            )
+
             return
 
         try:
             new_id = self.service.create_cliente(data)
         except Exception as ex:
-            NotifyPopup(f"Error al guardar: {ex}", "error", self).show_centered()
+            app_message.error(
+                self,
+                "Error al guardar cliente",
+                str(ex),
+            )
+
             return
 
         self._dirty = False
         if abrir_detalle:
-            NotifyPopup("Cliente guardado correctamente.\nAbriendo detalle…", "success", self).show_centered()
+            app_message.toast(self,"Cliente guardado correctamente.\nAbriendo detalle…", kind="success")
             try:
                 self.go_to_detalle.emit(int(new_id))
             except Exception:
                 pass
         else:
-            NotifyPopup("Cliente guardado correctamente.", "success", self).show_centered()
+            app_message.toast(self,"Cliente guardado correctamente.", kind="success")
             self._limpiar_formulario()
             self._dirty = False
 
@@ -309,21 +328,6 @@ class ClientesAgregarPage(QWidget):
             "observaciones": self.in_observaciones.toPlainText().strip() or None,
         }
 
-    def _validate(self, d: Dict[str, Any]) -> Tuple[bool, Dict[str, str]]:
-        errs: Dict[str, str] = {}
-        if not d["nombre"]:
-            errs["nombre"] = "El nombre es obligatorio."
-        if not d["tipo_doc"]:
-            errs["tipo_doc"] = "Seleccioná el tipo de documento."
-        if not d["nro_doc"]:
-            errs["nro_doc"] = "Ingresá el número de documento."
-        elif not d["nro_doc"].isdigit():
-            errs["nro_doc"] = "El N° de documento debe contener sólo números."
-        if d.get("email") and ("@" not in d["email"] or "." not in d["email"].split("@")[-1]):
-            errs["email"] = "Email inválido."
-        if d.get("estado_id") is None:
-            errs["estado_id"] = "Seleccioná el estado."
-        return (len(errs) == 0, errs)
 
     def _only_digits(self, s: str) -> Optional[str]:
         s = (s or "").strip()

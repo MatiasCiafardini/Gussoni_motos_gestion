@@ -8,7 +8,7 @@ class _Spinner(QWidget):
     Spinner circular animado (sin GIF) — gira constantemente.
     Dibujado con QPainter.
     """
-    def __init__(self, parent=None, radius: int = 12, line_width: int = 3, speed_ms: int = 0):
+    def __init__(self, parent=None, radius: int = 12, line_width: int = 3, speed_ms: int = 16):
         super().__init__(parent)
         self._angle = 0.0
         self._radius = radius
@@ -52,7 +52,6 @@ class LoadingOverlay(QWidget):
 
     def __init__(self, parent=None, text: str = "Procesando..."):
         super().__init__(parent)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setWindowFlags(Qt.SubWindow)
         self.setVisible(False)

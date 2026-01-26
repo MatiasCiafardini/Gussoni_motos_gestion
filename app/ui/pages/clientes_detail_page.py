@@ -13,6 +13,9 @@ from PySide6.QtWidgets import (
 
 import app.ui.app_message as popUp
 from app.ui.widgets.registrar_pago_dialog import RegistrarPagoDialog
+from app.domain.clientes_validaciones import validar_cliente
+from app.ui.utils.table_utils import setup_compact_table
+from PySide6.QtWidgets import QAbstractItemView
 
 from app.services.clientes_service import ClientesService
 from app.services.ventas_service import VentasService
@@ -128,16 +131,33 @@ class ClientesDetailPage(QWidget):
         ventas_layout.addWidget(lbl_ventas)
 
         self.tbl_ventas = QTableWidget(0, 6)
-        self.tbl_ventas.setObjectName("TableView")
+        self.tbl_ventas.setObjectName("DataTable")
+
         self.tbl_ventas.setHorizontalHeaderLabels([
             "Fecha", "Descripción", "Precio", "Forma de pago", "Estado", "Acciones"
         ])
-        self.tbl_ventas.verticalHeader().setVisible(False)
+
+        self.tbl_ventas.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_ventas.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tbl_ventas.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tbl_ventas.setAlternatingRowColors(True)
-        self.tbl_ventas.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.tbl_ventas.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tbl_ventas.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.tbl_ventas.setMinimumHeight(220)
+        self.tbl_ventas.verticalHeader().setVisible(False)
+        self.tbl_ventas.setSortingEnabled(False)
+
+        # 🔑 clave para que crezca bien
+        self.tbl_ventas.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Expanding
+        )
+
+        # 👇 mismo helper que el resto del sistema
+        setup_compact_table(self.tbl_ventas)
+
+        header = self.tbl_ventas.horizontalHeader()
+        header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+
 
         ventas_layout.addWidget(self.tbl_ventas)
 
@@ -255,16 +275,21 @@ class ClientesDetailPage(QWidget):
                 lambda _, fid=v["factura_id"]: self._ver_factura(fid)
             )
 
-            b_pago = QPushButton()
-            b_pago.setIcon(QIcon(str(ASSETS_DIR / "pago.svg")))
-            b_pago.setToolTip("Registrar pago")
-            b_pago.setObjectName("IconButton")
-            b_pago.clicked.connect(
-                lambda _, vid=v["id"]: self._registrar_pago(vid)
-            )
+            estado = (v.get("estado_financiero") or "").lower()
 
             lay.addWidget(b_factura)
-            lay.addWidget(b_pago)
+
+            # 👉 solo permitir pagar si está pendiente
+            if estado in ("pendiente pago", "pendiente"):
+                b_pago = QPushButton()
+                b_pago.setIcon(QIcon(str(ASSETS_DIR / "pago.svg")))
+                b_pago.setToolTip("Registrar pago")
+                b_pago.setObjectName("IconButton")
+                b_pago.clicked.connect(
+                    lambda _, vid=v["id"]: self._registrar_pago(vid)
+                )
+                lay.addWidget(b_pago)
+
 
             self.tbl_ventas.setCellWidget(row, 5, btns)
 
@@ -356,11 +381,14 @@ class ClientesDetailPage(QWidget):
             "observaciones": self.in_observ.toPlainText().strip() or None,
         }
 
-
+        ok, errs = validar_cliente(payload)
+        if not ok:
+            popUp.toast(self, "\n".join(f"• {v}" for v in errs.values()), kind="warning")
+            return
         try:
             self.service.update(self.cliente_id, payload)
         except Exception as ex:
-            popUp.critical(self, "Clientes", str(ex))
+            popUp.toast(self, str(ex), kind="error")
             return
 
         self.edit_mode = False

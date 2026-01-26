@@ -1,18 +1,16 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional
-from decimal import Decimal, InvalidOperation
-import re
-
-from PySide6.QtCore import Qt, Signal, QLocale
-from PySide6.QtGui import QIntValidator, QDoubleValidator
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QTextEdit, QComboBox, QPushButton,
     QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy
 )
-
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIntValidator
 from app.services.vehiculos_service import VehiculosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
-
+from app.ui.widgets.money_spinbox import MoneySpinBox
+import app.ui.app_message as popUp
+from app.domain.vehiculos_validaciones import validate_vehiculo
 
 class VehiculoDetailPage(QWidget):
     """
@@ -33,9 +31,6 @@ class VehiculoDetailPage(QWidget):
         self.data: Dict[str, Any] = {}
         self.edit_mode = False
 
-        # -------- Locale AR para decimales (coma) --------
-        self._locale = QLocale(QLocale.Spanish, QLocale.Argentina)
-
         # ---------- Controles ----------
         # Línea 0
         self.in_marca = QLineEdit();            self.in_marca.setPlaceholderText("Marca")
@@ -47,11 +42,10 @@ class VehiculoDetailPage(QWidget):
         self.in_nro_cert = QLineEdit();         self.in_nro_cert.setPlaceholderText("N° Certificado")
         self.in_nro_dnrpa = QLineEdit();        self.in_nro_dnrpa.setPlaceholderText("N° DNRPA")
 
-        self.in_precio = QLineEdit();           self.in_precio.setPlaceholderText("Precio lista (ARS)")
-        self._price_validator = QDoubleValidator(0.0, 1_000_000_000.0, 2, self)
-        self._price_validator.setNotation(QDoubleValidator.StandardNotation)
-        self._price_validator.setLocale(self._locale)  # acepta 1.600,00 / 1600,00
-        self.in_precio.setValidator(self._price_validator)
+        self.in_precio = MoneySpinBox()
+        self.in_precio.setMinimumHeight(36)
+        self.in_precio.valueChanged.connect(self._mark_edited)
+
 
         # Línea 2
         self.in_cuadro = QLineEdit();           self.in_cuadro.setPlaceholderText("N° de cuadro")
@@ -248,14 +242,8 @@ class VehiculoDetailPage(QWidget):
         self.in_nro_cert.setText(str(d.get("nro_certificado", "") or ""))
         self.in_nro_dnrpa.setText(str(d.get("nro_dnrpa", "") or ""))
 
-        precio_val = d.get("precio_lista")
-        if precio_val is None:
-            self.in_precio.setText("")
-        else:
-            try:
-                self.in_precio.setText(self._locale.toString(float(precio_val), 'f', 2))
-            except Exception:
-                self.in_precio.setText(str(precio_val))
+        self.in_precio.setValue(float(d.get("precio_lista") or 0))
+
 
         self.in_cuadro.setText(str(d.get("numero_cuadro", "") or ""))
         self.in_motor.setText(str(d.get("numero_motor", "") or ""))
@@ -287,33 +275,11 @@ class VehiculoDetailPage(QWidget):
             self._cancel_edit()
         self.navigate_back.emit()
 
-    # ---------------------- Save ----------------------
-    def _parse_price(self, text: str) -> Optional[Decimal]:
-        s = (text or "").strip()
-        if not s:
-            return None
-        val, ok = self._locale.toDouble(s)
-        if ok:
-            try:
-                return Decimal(str(round(val, 2)))
-            except Exception:
-                pass
-        norm = s.replace(" ", "")
-        if "," in norm and "." in norm:
-            norm = norm.replace(".", "").replace(",", ".")
-        elif "," in norm and "." not in norm:
-            norm = norm.replace(",", ".")
-        norm = re.sub(r"[^0-9.]", "", norm)
-        if not norm:
-            return None
-        try:
-            return Decimal(norm)
-        except InvalidOperation:
-            return None
 
     def _collect_payload(self) -> Dict[str, Any]:
         anio = self.in_anio.text().strip()
-        precio_val = self._parse_price(self.in_precio.text())
+        precio = self.in_precio.value()
+        
 
         payload: Dict[str, Any] = {
             "marca": self.in_marca.text().strip() or None,
@@ -323,23 +289,42 @@ class VehiculoDetailPage(QWidget):
             "nro_dnrpa": self.in_nro_dnrpa.text().strip() or None,
             "numero_cuadro": self.in_cuadro.text().strip() or None,
             "numero_motor": self.in_motor.text().strip() or None,
-            "precio_lista": float(precio_val) if precio_val is not None else None,
+            "precio_lista": precio if precio > 0 else None,
             "proveedor_id": self.in_proveedor.currentData(),
             "color_id": self.in_color.currentData(),
             "estado_stock_id": self.in_estado_stock.currentData(),
             "estado_moto_id": self.in_condicion.currentData(),
             "observaciones": self.in_observ.toPlainText().strip() or None,
         }
-        return {k: v for k, v in payload.items() if v is not None}
+        return payload
+
+    def _mark_edited(self, *_):
+        self.edit_mode = True
 
     def _save(self):
+        payload = self._collect_payload()
+
+        # Mezclamos datos originales + cambios del usuario
+        final_data = {**self.data, **payload}
+
+        ok, errs = validate_vehiculo(final_data)
+        if not ok:
+            msg = "\n".join(f"• {v}" for v in errs.values())
+            popUp.warning(self, "Vehículo", msg)
+            return
+
         try:
-            payload = self._collect_payload()
-            changed = self.service.update(self.vehiculo_id, payload)
-        except Exception:
-            raise
-        finally:
-            self.edit_mode = False
-            self._set_editable(False)
-            self._load_data()      # recargar por si hay normalización desde DB
-            self._update_buttons() # restaurar botones
+            self.service.update(self.vehiculo_id, payload)
+        except Exception as ex:
+            popUp.error(
+                self,
+                "Vehículo",
+                f"Error al guardar el vehículo:\n{ex}",
+            )
+            return
+
+        self.edit_mode = False
+        self._set_editable(False)
+        self._load_data()
+        self._update_buttons()
+

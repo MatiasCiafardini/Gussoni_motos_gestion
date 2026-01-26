@@ -44,23 +44,23 @@ def confirm(
 # ----------------- Nuevo: aviso tipo "toast" -----------------
 
 
-def critical(
+def toast(
     parent: Optional[QWidget],
     text: str,
     *,
-    msec: int = 2000,
+    kind: str = "info",   # info | success | warning | error
+    msec: int = 3000,
+    pos: str = "middle",
 ) -> None:
     """
-    Aviso corto de validación / warning:
-    - No es modal.
-    - No tiene botones.
-    - Se cierra solo luego de `msec` ms (por defecto 2 segundos).
+    Aviso corto no modal (toast).
+    - No bloquea la app
+    - No tiene botones
+    - Se cierra solo
 
-    Ejemplo:
-        app_message.warning_toast(self, "Seleccioná un punto de venta.")
+    kind: info | success | warning | error
     """
-    popup = NotifyPopup(text, "warning", parent)
-    popup.show_centered()
+    popup = NotifyPopup(text, kind, parent)
+    popup.show_centered(msec=msec, pos=pos)
 
-    # Auto-cierre luego de msec ms
     QTimer.singleShot(msec, popup.close)

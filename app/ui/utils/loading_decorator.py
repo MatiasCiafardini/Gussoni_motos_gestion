@@ -1,27 +1,30 @@
 from functools import wraps
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMainWindow
 
 def with_loading(text: str = "Procesando..."):
-    """
-    Decorador para métodos de UI que tengan self.loading_overlay definido.
-    Muestra el overlay mientras se ejecuta la función decorada y lo oculta al finalizar.
-    Uso:
-        @with_loading("Buscando...")
-        def reload(self): ...
-    """
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            overlay = getattr(self, "loading_overlay", None)
-            if overlay:
-                overlay.lbl_text.setText(text)
-                overlay.show_overlay()
+
+            mw = getattr(self, "main_window", None)
+
+            # fallback: obtener el MainWindow real
+            if mw is None:
+                w = self.window()
+                if isinstance(w, QMainWindow) and hasattr(w, "loading"):
+                    mw = w
+
+            if mw and hasattr(mw, "loading"):
+                mw.loading.lbl_text.setText(text)
+                mw.loading.show_overlay()
                 QApplication.processEvents()
+
             try:
                 return func(self, *args, **kwargs)
             finally:
-                if overlay:
-                    overlay.hide_overlay()
+                if mw and hasattr(mw, "loading"):
+                    mw.loading.hide_overlay()
                     QApplication.processEvents()
+
         return wrapper
     return decorator

@@ -77,7 +77,6 @@ class ArcaWSAAClient:
     def __init__(self, config: Optional[ArcaConfig] = None) -> None:
         self._config = config or ArcaConfig()
         self._cached_auth: Optional[ArcaAuthData] = None
-        print(self._config.mode)
         suffix = "prod" if self._config.mode == "PRODUCCION" else "homo"
         self.TA_PATH = Path(settings.APP_DATA_DIR) / f"arca_ta_{suffix}.xml"
 

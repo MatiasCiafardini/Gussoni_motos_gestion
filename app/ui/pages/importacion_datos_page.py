@@ -83,7 +83,7 @@ class ImportacionDatosPage(QWidget):
         # ---------------- QSS local ----------------
         self.setStyleSheet("""
         QLabel#CfgH1 {
-            font-size: 22px;
+            font-size: 1.8em;
             font-weight: 800;
             color: #0F172A;
             margin-bottom: 2px;
@@ -121,7 +121,7 @@ class ImportacionDatosPage(QWidget):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"No se pudieron cargar las tablas de importación.\n\n{e}"
             )
@@ -145,7 +145,7 @@ class ImportacionDatosPage(QWidget):
         try:
             data = self.service.generar_plantilla(tabla)
         except Exception as e:
-            popUp.critical(self, str(e))
+            popUp.toast(self, str(e))
             return
 
         path, _ = QFileDialog.getSaveFileName(
@@ -163,13 +163,13 @@ class ImportacionDatosPage(QWidget):
                 f.write(data)
 
             # Toast de éxito (no molesta)
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"Plantilla Excel de '{tabla}' descargada correctamente."
             )
 
         except Exception as e:
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"No se pudo guardar el archivo.\n\n{e}"
             )
@@ -193,7 +193,7 @@ class ImportacionDatosPage(QWidget):
             with open(path, "rb") as f:
                 file_bytes = f.read()
         except Exception as e:
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"No se pudo leer el archivo.\n\n{e}"
             )
@@ -202,7 +202,7 @@ class ImportacionDatosPage(QWidget):
         try:
             result = self.service.importar_xlsx(tabla, file_bytes)
         except Exception as e:
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"Ocurrió un error inesperado.\n\n{e}"
             )
@@ -211,7 +211,7 @@ class ImportacionDatosPage(QWidget):
         # ---------------- Resultado ----------------
         if result.get("success"):
             # Éxito → toast corto
-            popUp.critical(
+            popUp.toast(
                 self,
                 f"Importación exitosa.\nRegistros importados: {result.get('insertados', 0)}"
             )

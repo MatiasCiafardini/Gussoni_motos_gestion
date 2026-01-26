@@ -58,8 +58,6 @@ def check_for_update():
     remote = r.json()
     
     remote_version = normalize(remote.get("version"))
-    print("LOCAL :", repr(local_version))
-    print("REMOTE:", repr(remote_version))
     if Version(remote_version) > Version(local_version):
         return remote
 

@@ -16,8 +16,7 @@ try:
 except Exception:
     ClientesAgregarPage = None  # fallback si aún no existe
 from app.ui.utils.table_utils import setup_compact_table
-
-from app.ui.widgets.loading_overlay import LoadingOverlay
+from PySide6.QtWidgets import QApplication
 from app.ui.utils.loading_decorator import with_loading
 
 
@@ -150,7 +149,6 @@ class ClientesPage(QWidget):
         root.addLayout(pager)
         root.setStretch(1, 1)
 
-        self.loading_overlay = LoadingOverlay(self, text="")
 
         self._column_menu = QMenu(self)
         self._build_column_menu()
@@ -205,16 +203,6 @@ class ClientesPage(QWidget):
 
     def _build_column_menu(self):
         self._column_menu.clear()
-        self._column_menu.setStyleSheet("""
-            QMenu {
-                background-color: #111827;
-                color: #FFFFFF;
-                border: 1px solid #1f2937;
-                padding: 6px;
-            }
-            QMenu::item { padding: 6px 12px; background-color: transparent; }
-            QMenu::item:selected { background-color: #1f2937; color: #FFFFFF; }
-        """)
         togglables = [
             (self.COL_TIPO_DOC, "Tipo doc"), (self.COL_NRO_DOC, "N° doc"),
             (self.COL_NOMBRE, "Nombre"), (self.COL_APELLIDO, "Apellido"),
@@ -338,12 +326,20 @@ class ClientesPage(QWidget):
 
     def on_columnas_clicked(self):
         self._build_column_menu()
-        self._column_menu.exec(self.btn_columnas.mapToGlobal(self.btn_columnas.rect().bottomLeft()))
+
+        # 👇 CLAVE: forzar font global (ya escalado)
+        self._column_menu.setFont(QApplication.font())
+
+        self._column_menu.exec(
+            self.btn_columnas.mapToGlobal(
+                self.btn_columnas.rect().bottomLeft()
+            )
+        )
 
     def _abrir_pantalla_agregar(self):
         mw = getattr(self, "main_window", None) or self.window()
         if not isinstance(mw, QMainWindow):
-            popUp.critical(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
+            popUp.toast(self, "Error", "No pude abrir la pantalla de alta (MainWindow no disponible).")
             return
 
         if ClientesAgregarPage is None:

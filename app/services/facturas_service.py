@@ -381,13 +381,9 @@ class FacturasService:
             try:
                 # Auth ARCA
                 auth: ArcaAuthData = self._wsaa.get_auth()
-                print(">>>   [AFIP] TA OK, vence:", auth.expires_at)
 
                 cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo)
-                print(
-                    f">>>   [AFIP] Llamando FECompUltimoAutorizado(cbte_tipo={cbte_tipo}, "
-                    f"pto_vta={pto_vta})"
-                )
+
 
                 ultimo_afip_raw = fe_ult(
                     auth=auth,
@@ -395,7 +391,6 @@ class FacturasService:
                     pto_vta=pto_vta,
                 )
                 ws_llamado_ok = True
-                print(">>>   [AFIP] Respuesta FECompUltimoAutorizado RAW =", ultimo_afip_raw)
 
                 # Puede venir int o dict, lo tratamos defensivo
                 if isinstance(ultimo_afip_raw, dict):
@@ -403,14 +398,12 @@ class FacturasService:
                         if key in ultimo_afip_raw and ultimo_afip_raw[key] is not None:
                             try:
                                 ultimo_afip = int(ultimo_afip_raw[key])
-                                print(">>>   [AFIP] ultimo_afip (dict)", key, "=", ultimo_afip)
                                 break
                             except Exception as e:
                                 print(">>>   [AFIP] ERROR parseando", key, ":", repr(e))
                 else:
                     try:
                         ultimo_afip = int(ultimo_afip_raw or 0)
-                        print(">>>   [AFIP] ultimo_afip (directo) =", ultimo_afip)
                     except Exception as e:
                         print(">>>   [AFIP] ERROR parseando ultimo_afip_raw directo:", repr(e))
                         ultimo_afip = None
@@ -427,19 +420,12 @@ class FacturasService:
             if ultimo_afip is None:
                 ultimo_afip = 0
             proximo = ultimo_afip + 1
-            print(
-                f">>>   [AFIP] ultimo_afip={ultimo_afip} => próximo a usar desde WS="
-                f"{proximo}"
-            )
             return proximo
-
-        print(">>>   [LOCAL] No se pudo usar AFIP (WS falló), voy a BD...")
 
         # 2) Fallback: lo que tengas en BD
         proximo_local = 1
         try:
             proximo_local = repo.get_next_numero(tipo, pto_vta)  # normalmente last_local + 1
-            print(">>>   [LOCAL] repo.get_next_numero(tipo, pto_vta) devolvió =", proximo_local)
         except Exception as e:
             print(">>>   [LOCAL] ERROR en repo.get_next_numero:", repr(e))
             proximo_local = 1
@@ -447,7 +433,6 @@ class FacturasService:
         if not proximo_local or proximo_local <= 0:
             proximo_local = 1
 
-        print(">>>   [LOCAL] Usando BD: próximo =", proximo_local)
         return proximo_local
 
     # -------------------- Search / Read --------------------
@@ -501,7 +486,8 @@ class FacturasService:
             if cuotas:
                 partes.append(f"{int(cuotas)} cuotas")
             if importe_cuota:
-                partes.append(f"{float(importe_cuota):g}% importe_cuota")
+                partes.append(f"de ${float(importe_cuota):,.2f} c/u")
+
     
             return " – ".join(partes)
     
@@ -685,7 +671,6 @@ class FacturasService:
         - Si hay rechazo o error (respuesta rara / error de comunicación),
           se agrega el detalle a 'observaciones' para poder revisarlo.
         """
-        print("hola autorizar arca")
         db = SessionLocal()
         factura = None  # para poder usarlo en el except
         try:
@@ -772,17 +757,13 @@ class FacturasService:
                     ">>> [autorizar_en_arca][DEBUG] Error consultando FECompUltimoAutorizado:",
                     repr(e),
                 )
-
-            print("1")
             # 2) Leer detalle
             items = self._get_detalle_factura(db, factura_id)
             if not items:
                 raise ValueError("La factura no tiene ítems en el detalle.")
-            print("2")
 
             # 3) Obtener credenciales (token + sign)
             auth: ArcaAuthData = self._wsaa.get_auth()
-            print("3 - auth obtenido, vence:", auth.expires_at)
 
             # Debug rápido
             print("Auth:", auth)
@@ -792,16 +773,13 @@ class FacturasService:
             # 4) Llamar a WSFE para solicitar CAE
             from pprint import pformat
             try:
-                print("4 - llamando a WSFE.solicitar_cae...")
                 wsfe_result: ArcaWSFEResult = self._wsfe.solicitar_cae(
                     auth=auth,
                     factura=factura,
                     items=items,
                 )
-                print("5 - WSFE respondió:", wsfe_result)
             except Exception as e:
                 import traceback
-                print("ERROR al llamar a WSFE.solicitar_cae:", repr(e))
                 traceback.print_exc()
                 db.rollback()
 
@@ -814,7 +792,6 @@ class FacturasService:
                     )
                     db.commit()
                 except Exception as ex2:
-                    print("ERROR al guardar observaciones de error ARCA:", repr(ex2))
                     db.rollback()
 
                 # Devolvemos algo entendible para la UI; NO cambiamos estado

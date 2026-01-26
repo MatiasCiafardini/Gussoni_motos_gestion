@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 import os
 import subprocess
+from app.ui.widgets.loading_overlay import LoadingOverlay
+from PySide6.QtWidgets import QTableView
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
@@ -122,10 +124,6 @@ try:
     UsuariosAgregarPage = _UsuariosAgregarPage
 except Exception:
     UsuariosAgregarPage = None
-
-# NotifyPopup propio
-from app.ui.notify import NotifyPopup
-
 # ==== Warmup de catálogos ====
 from app.services.catalogos_service import CatalogosService
 from app.core.catalog_cache import CatalogCache
@@ -157,6 +155,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self, *, current_user: Optional[dict] = None, on_logout: Optional[Callable[[], None]] = None):
         super().__init__()
+
+
         self.setWindowTitle("Gestión de Motos")
         self.resize(1100, 720)
         # IMPORTANTE: fijamos un mínimo razonable para romper el min gigante de los hijos
@@ -165,15 +165,25 @@ class MainWindow(QMainWindow):
 
         self.current_user = current_user
         self._on_logout_callback = on_logout
-
-        central = QWidget(self)
+        self.central = QWidget(self)
         # Permitimos que el central no imponga un mínimo enorme
-        central.setMinimumSize(0, 0)
-        self.setCentralWidget(central)
+        self.central.setMinimumSize(0, 0)
+        self.setCentralWidget(self.central)
+        # 👇 ACÁ
+        self.loading = LoadingOverlay(self.central, text="Cargando…")
+        self.loading.hide_overlay()
+        root_v = QVBoxLayout(self.central)
+        root_v.setContentsMargins(0, 0, 0, 0)
+        root_v.setSpacing(0)
 
-        root = QHBoxLayout(central)
+        
+        # Layout horizontal real (sidebar + contenido)
+        root = QHBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
+        
+        root_v.addLayout(root, 1)
+        
 
         # =============== Sidebar ===============
         sidebar = QFrame(self)
@@ -270,6 +280,7 @@ class MainWindow(QMainWindow):
         self._apply_base_qss()
         self._preload_catalogos_async()
         QTimer.singleShot(0, self.showMaximized)
+        QTimer.singleShot(0, self._refresh_tables_fonts)
 
 
     # ---------------------------------------------------------------------
@@ -283,11 +294,9 @@ class MainWindow(QMainWindow):
 
     def _on_catalog_warmup_done(self, _data: dict):
         self._catalog_warmup_fail_ts = None
-        print("[Warmup] Catálogos precargados")
 
     def _on_catalog_warmup_error(self, msg: str):
         self._catalog_warmup_fail_ts = time.monotonic()
-        print(f"[Warmup] Falló: {msg}")
 
     def _ensure_catalogs_ready(self, *, force: bool = False):
         cache = CatalogCache.get()
@@ -307,6 +316,14 @@ class MainWindow(QMainWindow):
 
     def _route_requires_catalogs(self, route: str) -> bool:
         return route.startswith("vehiculos")
+    def show_loading(self, text: str = "Cargando…"):
+        self.loading.lbl_text.setText(text)
+        self.loading.show_overlay()
+        QApplication.processEvents()
+
+
+    def hide_loading(self):
+        self.loading.hide_overlay()
 
     # ---------------------------------------------------------------------
     # Integración de páginas
@@ -354,7 +371,6 @@ class MainWindow(QMainWindow):
             if hasattr(page, "open_detail"):
                 # AHORA: abrir pantalla de consulta de factura
                 page.open_detail.connect(
-                    print("aca llega"),
                     lambda fid: self.open_page("facturas_consultar", factura_id=int(fid))
                 )
         except Exception:
@@ -392,12 +408,9 @@ class MainWindow(QMainWindow):
 
     def open_cliente_detail(self, cliente_id: int):
         self._ensure_catalogs_ready()
-        print("mainwindow cliente")
         if not ClientesDetailPage:
-            print("aca tira el error")
             self.notify("La página de detalle de cliente no está disponible.", "error")
             return
-        print("mainwindow cliente pasa")
     
         detail = ClientesDetailPage(cliente_id)
     
@@ -436,7 +449,6 @@ class MainWindow(QMainWindow):
     # buscador de actualizaciones
     # ---------------------------------------------------------------------
     def check_updates_ui(self):
-        print("Esta es la version 1.0.2 funciona todo perfecto.")
         try:
             update = check_for_update()
             if not update:
@@ -508,6 +520,7 @@ class MainWindow(QMainWindow):
     # Router
     # ---------------------------------------------------------------------
     def open_page(self, name: str, *args, **kwargs):
+        self.show_loading("Cargando…")
         if self._ensure_catalogs_ready and self._route_requires_catalogs(name):
             self._ensure_catalogs_ready()
 
@@ -543,11 +556,15 @@ class MainWindow(QMainWindow):
         if name == "usuarios":
             if UsuariosPage:
                 page = UsuariosPage(parent=self, main_window=self)
+
                 try:
                     if hasattr(page, "open_add_user_requested"):
-                        page.open_add_user_requested.connect(lambda: self.open_page("usuarios_agregar"))
+                        page.open_add_user_requested.connect(
+                            lambda: self.open_page("usuarios_agregar")
+                        )
                 except Exception:
                     pass
+
                 try:
                     if hasattr(page, "open_user_detail_requested"):
                         page.open_user_detail_requested.connect(
@@ -555,10 +572,13 @@ class MainWindow(QMainWindow):
                         )
                 except Exception:
                     pass
-                self.stack.setCurrentWidget(self._mount(page))
+
+                self.navigate_to(page)  # 👈 CLAVE
             else:
                 self.notify("La página de usuarios no está disponible.", "error")
             return
+
+
 
         if name == "usuarios_detalle":
             uid = kwargs.get("usuario_id") or (args[0] if args else None)
@@ -600,15 +620,18 @@ class MainWindow(QMainWindow):
             return
         # NUEVO: consulta de factura
         if name == "facturas_consultar":
-            print("hasta aca 4")
-            print(FacturasConsultarPage)
-            
+
+            # 🔒 FIX: si ya estoy viendo una factura, no volver a abrirla
+            current = self.stack.currentWidget()
+            if isinstance(current, FacturasConsultarPage):
+                return
+
             fid = kwargs.get("factura_id") or (args[0] if args else None)
             if not fid:
                 self.notify("Falta factura_id para abrir la consulta.", "error")
                 return
+
             if not FacturasConsultarPage:
-                print("hasta aca 4")
                 self.notify("La página de consulta de factura no está disponible.", "error")
                 return
             try:
@@ -656,9 +679,22 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self._mount(page_widget))
 
     def navigate_to(self, widget: QWidget):
-        self._page_history.append(self.stack.currentWidget())
+        current = self.stack.currentWidget()
+
+        # 🔒 FIX CLAVE: no apilar si ya estamos en la MISMA PÁGINA
+        if current is not None and current is widget:
+            return
+
+        # 🔒 FIX EXTRA: no duplicar por clase (caso facturas_consultar)
+        if current is not None and type(current) is type(widget):
+            return
+
+        self._page_history.append(current)
         self.stack.addWidget(widget)
         self.stack.setCurrentWidget(widget)
+        QTimer.singleShot(0, self.loading.hide_overlay)
+
+
 
     def navigate_back(self):
         if not self._page_history:
@@ -668,17 +704,19 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(prev)
         current.setParent(None)
         current.deleteLater()
+        QTimer.singleShot(0, self.loading.hide_overlay)
 
     def show_fixed_page(self, page: QWidget):
         if page is self.page_vehiculos:
             self._ensure_catalogs_ready()
         while self._page_history:
             current = self.stack.currentWidget()
-            prev = self._page_history.pop()
-            self.stack.setCurrentWidget(prev)
+            self._page_history.pop()
             current.setParent(None)
             current.deleteLater()
+
         self.stack.setCurrentWidget(page)
+        QTimer.singleShot(0, self.loading.hide_overlay)
 
     # ---------------------------------------------------------------------
     # Toast & Notify
@@ -696,9 +734,9 @@ class MainWindow(QMainWindow):
         self._toast_timer.start(msec)
 
     def notify(self, text: str, tipo: str = "info"):
-        popup = NotifyPopup(text, tipo, parent=self)
-        popup.adjustSize()
-        popup.show_centered()
+        from app.ui import app_message
+        app_message.toast(self, text, kind=tipo)
+
 
     # ---------------------------------------------------------------------
     # Helpers
@@ -728,7 +766,7 @@ class MainWindow(QMainWindow):
         #SideTitle { color: #E8EAED; font-weight: 700; margin: 6px 0 8px 0; }
         #SideButton {
           color: #E8EAED; background: #2A3040; border: 1px solid #3A4050;
-          border-radius: 10px; padding: 10px 14px; text-align: left; font-size: 14px;
+          border-radius: 10px; padding: 10px 14px; text-align: left; font-size: 1em;
         }
         #SideButton:hover { background: #343B4D; }
         #SideButton:checked { background: #6C5CE7; border-color: #6C5CE7; color: white; }
@@ -736,8 +774,36 @@ class MainWindow(QMainWindow):
         #Toast {
           background: rgba(15, 23, 42, 0.92); color: white;
           padding: 8px 12px; border-radius: 8px; font-weight: 600;
-        }
+        }                  
         """)
+    def _refresh_tables_fonts(self):
+        """
+        Fuerza a QTableView y QHeaderView a recalcular
+        fontMetrics usando el font global ya escalado.
+        """
+        app_font = QApplication.font()
+
+        for table in self.findChildren(QTableView):
+            # 👉 forzar font en la tabla
+            table.setFont(app_font)
+
+            header_h = table.horizontalHeader()
+            header_v = table.verticalHeader()
+
+            # 👉 forzar font en headers (CLAVE)
+            header_h.setFont(app_font)
+            header_v.setFont(app_font)
+
+            # 👉 resetear tamaños cacheados
+            header_h.setDefaultSectionSize(header_h.defaultSectionSize())
+            header_v.setDefaultSectionSize(header_v.defaultSectionSize())
+
+            table.resizeRowsToContents()
+            table.resizeColumnsToContents()
+
+            header_h.repaint()
+            header_v.repaint()
+
 
     def _mount(self, widget: QWidget) -> QWidget:
         idx = self.stack.indexOf(widget)

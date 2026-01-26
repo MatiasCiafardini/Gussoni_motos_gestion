@@ -106,7 +106,7 @@ class ConfiguracionArcaPage(QWidget):
         # Estilos locales
         self.setStyleSheet("""
         QLabel#CfgArcaH1 {
-            font-size: 20px;
+            font-size: 1.8em;
             font-weight: 800;
             color: #0F172A;
             margin-bottom: 4px;
@@ -121,7 +121,7 @@ class ConfiguracionArcaPage(QWidget):
             border-radius: 6px;
             background-color: #0f172a;
             color: #e5e7eb;
-            font-size: 13px;
+            font-size: 1em;
         }
         """)
 
@@ -142,7 +142,7 @@ class ConfiguracionArcaPage(QWidget):
         try:
             tipos = self.service.get_tipos_comprobante()
         except Exception as e:
-            popUp.critical(
+            popUp.toast(
                 self,
                 "Error",
                 f"No pude cargar los tipos de comprobante.\n\n{e}",
@@ -178,7 +178,7 @@ class ConfiguracionArcaPage(QWidget):
         try:
             pvs = self.service.get_puntos_venta()
         except Exception as e:
-            popUp.critical(
+            popUp.toast(
                 self,
                 "Error",
                 f"No pude cargar los puntos de venta.\n\n{e}",
@@ -222,7 +222,7 @@ class ConfiguracionArcaPage(QWidget):
                 pto_vta=pto_vta,
             )
         except Exception as e:
-            popUp.critical(
+            popUp.toast(
                 self,
                 "Error",
                 f"Ocurrió un error al consultar el próximo número.\n\n{e}",
