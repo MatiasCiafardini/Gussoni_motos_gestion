@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QSizePolicy, QApplication, QMessageBox
 )
 from PySide6.QtCore import Qt, QTimer, QThreadPool, QRunnable, QObject, Signal
-
+import ctypes
 # -------- Páginas actuales del proyecto (con fallback a placeholders) --------
 try:
     from app.ui.pages.dashboard_page import DashboardPage  # tu dashboard real
@@ -496,15 +496,21 @@ class MainWindow(QMainWindow):
             if not updater_exe.exists():
                 raise RuntimeError("No se encontró updater.exe")
 
-            subprocess.Popen([
-                str(updater_exe),
-                str(current_exe),
-                str(dest),
-                update["version"]
-            ])
+            params = f'"{current_exe}" "{dest}" "{update["version"]}"'
 
-            # cerrar la app
-            QApplication.quit()
+            ctypes.windll.shell32.ShellExecuteW(
+                None,
+                "runas",                    # 👈 pide elevación (UAC)
+                str(updater_exe),
+                params,
+                None,
+                1
+            )
+
+            # salir fuerte para liberar el exe
+            os._exit(0)
+
+
 
         except Exception as e:
             QMessageBox.warning(

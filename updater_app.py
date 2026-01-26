@@ -91,7 +91,18 @@ def main():
     time.sleep(2)
 
     try:
-        shutil.copy2(new_exe, current_exe)
+        backup_exe = current_exe.with_suffix(".old")
+
+        # eliminar backup previo si existe
+        if backup_exe.exists():
+            backup_exe.unlink()
+
+        # renombrar exe actual (libera el lock)
+        current_exe.rename(backup_exe)
+
+        # mover el nuevo exe al lugar correcto
+        shutil.move(new_exe, current_exe)
+
         progress.setValue(70)
         status.setText("Actualizando versión…")
 

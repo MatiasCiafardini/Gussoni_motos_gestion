@@ -35,15 +35,21 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "Crear icono en el escritorio"; GroupDescription: "Accesos directos"
 
 [Files]
-; ===== APP COMPILADA (dist plano) =====
-Source: "dist\*"; \
+; ===== APP PRINCIPAL =====
+Source: "dist\GussoniApp.exe"; \
     DestDir: "{app}"; \
-    Flags: recursesubdirs createallsubdirs ignoreversion
+    Flags: ignoreversion
 
-; ===== ASSETS (fuera de dist) =====
+; ===== UPDATER =====
+Source: "dist\updater.exe"; \
+    DestDir: "{app}"; \
+    Flags: ignoreversion
+
+; ===== ASSETS =====
 Source: "app\assets\*"; \
     DestDir: "{app}\assets"; \
     Flags: recursesubdirs createallsubdirs
+
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
