@@ -77,7 +77,6 @@ class LoginDialog(QDialog):
         self.user_input.setObjectName("LoginUserInput")
         self.user_input.returnPressed.connect(lambda: self.password_input.setFocus())
         form_layout.addWidget(self.user_input)
-        self.user_input.setText("mati")
 
         self.password_input = QLineEdit(card)
         self.password_input.setPlaceholderText("Contraseña")
@@ -85,7 +84,6 @@ class LoginDialog(QDialog):
         self.password_input.setObjectName("LoginPasswordInput")
         self.password_input.returnPressed.connect(self._attempt_login)
         form_layout.addWidget(self.password_input)
-        self.password_input.setText("1234")
 
         self.error_label = QLabel("", card)
         self.error_label.setObjectName("LoginError")

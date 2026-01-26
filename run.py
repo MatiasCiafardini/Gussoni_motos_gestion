@@ -1,14 +1,23 @@
-from app.ui.main import main
-from app.core.updater import check_for_update
+import sys
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QTimer
 
-try:
-    update = check_for_update()
-    if update:
-        print("Hay una actualización disponible:", update["version"])
-    else:
-        print("La aplicación está actualizada")
-except Exception as e:
-    print("Error al buscar actualizaciones:", e)
+from app.ui.splash import SplashScreen
+from app.ui.main import start_app as start_main_app
+
+
 if __name__ == "__main__":
-    main()
+    app = QApplication(sys.argv)
 
+    splash = SplashScreen()
+    splash.show()
+
+    def run_startup():
+        splash.run_tasks()
+        splash.finish(None)
+        start_main_app(app)
+
+    # 🔥 CLAVE: correr después de que arranca el event loop
+    QTimer.singleShot(2000, run_startup)
+
+    sys.exit(app.exec())

@@ -3,17 +3,16 @@ import sys
 from pathlib import Path
 
 
-def is_frozen() -> bool:
-    return getattr(sys, "frozen", False)
+def base_dir() -> Path:
+    # PyInstaller (exe)
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+
+    # Desarrollo normal
+    return Path(__file__).resolve().parents[2]
 
 
-if is_frozen():
-    # 👉 Ejecutable (exe / instalado)
-    BASE_DIR = Path(sys.executable).parent
-else:
-    # 👉 Desarrollo (repo)
-    BASE_DIR = Path(__file__).resolve().parents[2]  # app/
-
+BASE_DIR = base_dir()
 
 # Rutas principales
 ASSETS_DIR = BASE_DIR / "assets"

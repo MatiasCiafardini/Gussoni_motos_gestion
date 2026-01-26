@@ -15,6 +15,7 @@ CAT_KEYS = [
     "condicion_iva_receptor",
     "puntos_venta",
     "condicion_iva_receptor",
+    "estados_factura",
 ]
 
 
@@ -43,6 +44,14 @@ class CatalogosService:
                     SELECT id, nombre
                     FROM estados
                     WHERE tipo = 'vehiculos'
+                    ORDER BY nombre
+                """)
+            ).mappings().all()
+            estados_factura = s.execute(
+                text("""
+                    SELECT id, nombre
+                    FROM estados
+                    WHERE tipo = 'facturas'
                     ORDER BY nombre
                 """)
             ).mappings().all()
@@ -96,6 +105,8 @@ class CatalogosService:
         cache.set("tipos_comprobante", tipos_comprobante)
         cache.set("condicion_iva_receptor", condicion_iva_receptor)
         cache.set("puntos_venta", puntos_venta)
+        cache.set("estados_factura", estados_factura)
+
 
         cache.mark_loaded()
 
@@ -132,3 +143,8 @@ class CatalogosService:
     # -------------------------------------------------
     def invalidate(self, *keys: str):
         CatalogCache.get().invalidate(*keys if keys else [])
+    def get_estados_factura(self):
+        return (
+            CatalogCache.get().get_value("estados_factura")
+            or self.warmup_all()["estados_factura"]
+        )

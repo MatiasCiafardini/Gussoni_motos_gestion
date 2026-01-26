@@ -22,6 +22,7 @@ from app.services.comprobantes_service import ComprobantesService
 import app.ui.app_message as popUp
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 from PySide6.QtGui import QColor
+from app.services.catalogos_service import CatalogosService
 
 # -------------------- Ventana popup movible --------------------
 from datetime import date
@@ -150,6 +151,7 @@ class VehiculoSelectorCombo(QComboBox):
         le = self.lineEdit()
         le.setPlaceholderText("Buscar vehículo...")
         le.setClearButtonEnabled(True)
+        
 
         self._svc = vehiculos_service
         self._timer = QTimer(self)
@@ -200,6 +202,7 @@ class VehiculoSelectorCombo(QComboBox):
         self.lineEdit().setText(current_text)
         if self.count() > 0:
             self.showPopup()
+    
 
     def _on_index_changed(self, index: int) -> None:
         if index < 0:
@@ -252,7 +255,7 @@ class FacturasConsultarPage(QWidget):
 
         super().__init__(parent)
         self.setObjectName("FacturasConsultarPage")
-
+        self._catalogos = CatalogosService()
         self._factura_id = int(factura_id)
         self._svc_facturas = FacturasService()
         self._svc_clientes = ClientesService()
@@ -697,7 +700,15 @@ class FacturasConsultarPage(QWidget):
         container.setMinimumWidth(self.width())
 
         self._set_edit_mode(False)
+    def _get_estado_nombre_from_catalogo(self, estado_id: Optional[int]) -> str:
+        if not estado_id:
+            return ""
 
+        estados = self._catalogos.get_estados_factura()
+        for e in estados:
+            if e.get("id") == estado_id:
+                return e.get("nombre", "")
+        return ""
     def _resolve_estado_cuota(
         self,
         estado_db: str,
@@ -1026,7 +1037,18 @@ class FacturasConsultarPage(QWidget):
             numero = factura.get("numero") or ""
             fecha = factura.get("fecha_emision") or factura.get("fecha") or ""
             moneda = factura.get("moneda") or "ARS"
-            estado = factura.get("estado_nombre") or factura.get("estado") or ""
+            estado_id = factura.get("estado_id")
+
+            try:
+                estado_id = int(estado_id) if estado_id is not None else None
+            except Exception:
+                estado_id = None
+
+            self._estado_id = estado_id  # se usa después para reglas
+
+            estado_nombre = self._get_estado_nombre_from_catalogo(estado_id)
+            self.in_estado.setText(estado_nombre)
+
             cae = factura.get("cae") or ""
             vto_cae = factura.get("vto_cae") or ""
             cond_iva_raw = factura.get("condicion_iva_receptor_id") or factura.get("condicion_iva_receptor")
@@ -1064,7 +1086,6 @@ class FacturasConsultarPage(QWidget):
             self.in_fecha_emision.setText(str(fecha))
             self.in_moneda.setText(str(moneda))
             self._select_condicion_iva_from_raw(cond_iva_raw)
-            self.in_estado.setText(str(estado))
             self.in_cae.setText(str(cae))
             self.in_cae_vto.setText(str(vto_cae))
             self.in_observaciones.setPlainText(str(obs))
@@ -1719,7 +1740,7 @@ class FacturasConsultarPage(QWidget):
         total = _format_money(float(self._factura.get("total") or 0.0))
         cae = str(self._factura.get("cae") or "")
         vto_cae = str(self._factura.get("vto_cae") or "")
-        cliente = str(self._factura.get("cliente") or "")
+        cliente = str(self._factura.get("cliente") or "") 
 
         fields = [
             ("Tipo", str(tipo)),

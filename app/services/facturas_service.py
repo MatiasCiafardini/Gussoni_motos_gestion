@@ -1133,6 +1133,8 @@ class FacturasService:
                 "cbte_asoc_tipo": tipo_orig,
                 "cbte_asoc_pto_vta": int(pto_vta),
                 "cbte_asoc_numero": factura_original.get("numero"),
+                "factura_origen_id": factura_id, 
+
             }
 
             nc_id = repo.insert_factura(cabecera_nc)

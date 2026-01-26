@@ -4,24 +4,82 @@ import shutil
 import subprocess
 import json
 from pathlib import Path
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QMessageBox, QProgressBar 
+from PySide6.QtCore import Qt, QTimer
+
 
 
 def show_error(msg: str):
-    app = QApplication([])
     QMessageBox.toast(None, "Error de actualización", msg)
     sys.exit(1)
 
+def create_updater_window():
+    window = QWidget()
+    window.setWindowTitle("Gussoni App")
+    window.setFixedSize(380, 160)
+    window.setWindowFlags(
+        Qt.Window |
+        Qt.CustomizeWindowHint |
+        Qt.WindowMinimizeButtonHint
+    )
+
+    layout = QVBoxLayout(window)
+
+    title = QLabel("Actualizando Gussoni App")
+    title.setAlignment(Qt.AlignCenter)
+    title.setStyleSheet("font-size: 15px; font-weight: bold;")
+
+    status = QLabel("Preparando actualización…")
+    status.setAlignment(Qt.AlignCenter)
+
+    progress = QProgressBar()
+    progress.setRange(0, 100)
+    progress.setValue(0)
+    progress.setTextVisible(True)
+
+    layout.addWidget(title)
+    layout.addWidget(status)
+    layout.addWidget(progress)
+
+    window.show()
+
+    return window, status, progress
+def start_fake_progress(progress: QProgressBar, status: QLabel):
+    steps = [
+        (10, "Preparando actualización…"),
+        (30, "Cerrando aplicación anterior…"),
+        (60, "Reemplazando archivos…"),
+        (85, "Actualizando versión…"),
+        (100, "Finalizando…"),
+    ]
+
+    step_index = 0
+
+    def advance():
+        nonlocal step_index
+        if step_index >= len(steps):
+            return
+
+        value, text = steps[step_index]
+        progress.setValue(value)
+        status.setText(text)
+        step_index += 1
+
+    timer = QTimer()
+    timer.timeout.connect(advance)
+    timer.start(600)  # cada 600 ms
+
 
 def main():
-    """
-    Args esperados:
-    1 = path exe actual
-    2 = path exe nuevo
-    3 = nueva versión
-    """
+    app = QApplication(sys.argv)
+
     if len(sys.argv) < 4:
-        show_error("Parámetros de actualización inválidos.")
+        QMessageBox.critical(None, "Error", "Parámetros inválidos")
+        sys.exit(1)
+
+    window, status, progress = create_updater_window()
+    start_fake_progress(progress, status)
+    app.processEvents()
 
     current_exe = Path(sys.argv[1])
     new_exe = Path(sys.argv[2])
@@ -30,31 +88,29 @@ def main():
     appdata = Path.home() / "AppData" / "Local" / "GussoniApp"
     version_file = appdata / "version.json"
 
-    # 1. Esperar que la app principal se cierre
     time.sleep(2)
 
-    # 2. Reemplazar exe
     try:
         shutil.copy2(new_exe, current_exe)
-    except Exception as e:
-        show_error(f"No se pudo reemplazar la aplicación:\n{e}")
+        progress.setValue(70)
+        status.setText("Actualizando versión…")
 
-    # 3. Escribir version.json
-    try:
         version_file.write_text(
             json.dumps({"version": new_version}, indent=2),
             encoding="utf-8"
         )
-    except Exception as e:
-        show_error(f"No se pudo actualizar la versión:\n{e}")
 
-    # 4. Relanzar app
-    try:
+        progress.setValue(100)
+        status.setText("Reiniciando aplicación…")
+
         subprocess.Popen([str(current_exe)], close_fds=True)
     except Exception as e:
-        show_error(f"No se pudo reiniciar la aplicación:\n{e}")
+        QMessageBox.critical(None, "Error de actualización", str(e))
+        sys.exit(1)
 
     sys.exit(0)
+
+
 
 
 if __name__ == "__main__":
