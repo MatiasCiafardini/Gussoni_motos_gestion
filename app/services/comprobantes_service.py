@@ -64,7 +64,7 @@ class ComprobantesService:
 
         items = self._svc.get_detalle(int(factura_id)) or []
 
-        out_dir = Path.home() / "Documents" / "Gussoni" / "Comprobantes"
+        out_dir = Path.home() / "Downloads"
         out_dir.mkdir(parents=True, exist_ok=True)
 
         tipo = (fac.get("tipo") or "").upper() or "FB"

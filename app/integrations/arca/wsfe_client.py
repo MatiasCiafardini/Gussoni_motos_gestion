@@ -93,6 +93,75 @@ class ArcaWSFEClient:
         soap_xml = self._build_fe_cae_solicitar_request(auth, factura, items)
         response_xml = self._call_wsfe(soap_xml)
         return self._parse_fe_cae_solicitar_response(response_xml)
+    def fe_comp_consultar(
+        self,
+        auth,
+        cbte_tipo: int,
+        pto_vta: int,
+        cbte_nro: int,
+    ) -> Dict[str, Any]:
+        """
+        Consulta un comprobante ya autorizado en AFIP (FECompConsultar).
+        Devuelve un dict normalizado.
+        """
+
+        soap = f"""<?xml version="1.0" encoding="utf-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                    xmlns:ar="http://ar.gov.afip.dif.FEV1/">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <ar:FECompConsultar>
+            <ar:Auth>
+                <ar:Token>{self._escape(auth.token)}</ar:Token>
+                <ar:Sign>{self._escape(auth.sign)}</ar:Sign>
+                <ar:Cuit>{self._escape(str(auth.cuit))}</ar:Cuit>
+            </ar:Auth>
+            <ar:FeCompConsReq>
+                <ar:CbteTipo>{int(cbte_tipo)}</ar:CbteTipo>
+                <ar:PtoVta>{int(pto_vta)}</ar:PtoVta>
+                <ar:CbteNro>{int(cbte_nro)}</ar:CbteNro>
+            </ar:FeCompConsReq>
+        </ar:FECompConsultar>
+    </soapenv:Body>
+    </soapenv:Envelope>
+    """
+
+        response_xml = self._call_wsfe_action(soap, "FECompConsultar")
+
+        try:
+            root = ET.fromstring(response_xml)
+        except ET.ParseError as ex:
+            raise RuntimeError(
+                f"Respuesta FECompConsultar no es XML válido: {ex}. "
+                f"Respuesta cruda: {response_xml[:500]}"
+            ) from ex
+
+        ns = {
+            "soapenv": "http://schemas.xmlsoap.org/soap/envelope/",
+            "ar": "http://ar.gov.afip.dif.FEV1/",
+        }
+
+        result = root.find(".//ar:FECompConsultarResult", ns)
+        if result is None:
+            for elem in root.iter():
+                if elem.tag.endswith("FECompConsultarResult"):
+                    result = elem
+                    break
+
+        if result is None:
+            raise RuntimeError("No se encontró FECompConsultarResult en la respuesta de WSFE.")
+
+        return {
+            "resultado": self._find_text_anywhere(result, "Resultado"),
+            "cae": self._find_text_anywhere(result, "CodAutorizacion"),
+            "fecha_cae": self._find_text_anywhere(result, "FchProceso"),
+            "vto_cae": self._find_text_anywhere(result, "FchVto"),
+            "imp_total": self._find_text_anywhere(result, "ImpTotal"),
+            "errores": self._collect_errors(result),
+            "observaciones": self._collect_observaciones(result),
+            "raw_xml": response_xml,
+        }
+
 
     def fe_comp_ultimo_autorizado(
         self,

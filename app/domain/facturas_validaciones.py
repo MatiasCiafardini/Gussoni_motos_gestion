@@ -31,7 +31,7 @@ def validar_factura(
 
     if not cabecera.get("condicion_iva_receptor_id"):
         errores.append("Seleccioná la condición frente al IVA del receptor.")
-
+    print(es_nota_credito)
     # ---------- Nota de Crédito ----------
     if es_nota_credito:
         if comprobante_nc_id in (None, "", 0, "0"):
@@ -51,13 +51,25 @@ def validar_factura(
             break
 
         cantidad = it.get("cantidad") or 0
-        if cantidad <= 0:
-            errores.append(f"Fila {idx}: la cantidad debe ser mayor a 0.")
-            break
-
         precio = it.get("precio_unitario") or 0
-        if precio <= 0:
-            errores.append(f"Fila {idx}: el precio unitario debe ser mayor a 0.")
-            break
+        total = it.get("importe_total") or 0
+
+        if es_nota_credito:
+            # En NC el total debe ser negativo
+            if total >= 0:
+                errores.append(
+                    f"Fila {idx}: el importe total debe ser negativo en una Nota de Crédito."
+                )
+                break
+        else:
+            # Factura normal
+            if cantidad <= 0:
+                errores.append(f"Fila {idx}: la cantidad debe ser mayor a 0.")
+                break
+
+            if precio <= 0:
+                errores.append(f"Fila {idx}: el precio unitario debe ser mayor a 0.")
+                break
+
 
     return (len(errores) == 0), errores

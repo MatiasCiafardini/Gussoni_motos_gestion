@@ -23,6 +23,9 @@ import app.ui.app_message as popUp
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 from PySide6.QtGui import QColor
 from app.services.catalogos_service import CatalogosService
+from PySide6.QtWidgets import QListView, QAbstractItemView
+from PySide6.QtGui import QStandardItemModel, QStandardItem
+from PySide6.QtCore import Qt, QTimer, QRect, QEvent
 
 # -------------------- Ventana popup movible --------------------
 from datetime import date
@@ -137,86 +140,166 @@ def _style_section_label(lbl: QLabel) -> None:
 
 
 class VehiculoSelectorCombo(QComboBox):
-    """
-    QComboBox editable que busca vehículos dinámicamente.
-    """
     vehiculo_selected = Signal(dict)
 
-    def __init__(self, vehiculos_service: VehiculosService, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, vehiculos_service: VehiculosService, parent=None) -> None:
         super().__init__(parent)
+
         _setup_combo(self)
         self.setEditable(True)
         self.setInsertPolicy(QComboBox.NoInsert)
 
+        self._svc = vehiculos_service
+        self._results: List[Dict[str, Any]] = []
+        self._selected: Optional[Dict[str, Any]] = None
+
         le = self.lineEdit()
         le.setPlaceholderText("Buscar vehículo...")
         le.setClearButtonEnabled(True)
-        
 
-        self._svc = vehiculos_service
+        # 👇 LISTA FLOTANTE QUE NO ROBA FOCO
+        self._popup = QListView()
+        # --- Estilo visual del popup ---
+        font = self.font()
+        self._popup.setFont(font)
+
+        # Altura de fila basada en font (no hardcode)
+        fm = self._popup.fontMetrics()
+        row_h = max(24, fm.height() + 8)
+        self._popup.setStyleSheet(f"""
+        QListView {{
+            background: #ffffff;
+            border: 1px solid #cfcfcf;
+            border-radius: 6px;
+            padding: 4px;
+            outline: 0;
+        }}
+
+        QListView::item {{
+            padding: 6px 8px;
+            min-height: {row_h}px;
+        }}
+
+        QListView::item:selected {{
+            background: #6c63ff;
+            color: white;
+        }}
+
+        QListView::item:hover {{
+            background: #e8e7ff;
+        }}
+        """)
+
+        self._popup.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
+        self._popup.setFocusPolicy(Qt.NoFocus)
+        self._popup.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self._popup.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._popup.setSelectionMode(QAbstractItemView.SingleSelection)
+
+        self._model = QStandardItemModel(self._popup)
+        self._popup.setModel(self._model)
+
+        self._popup.clicked.connect(self._on_popup_clicked)
+
+        # Cerrar lista si se hace click afuera
+        self.installEventFilter(self)
+        le.installEventFilter(self)
+
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(150)
         self._timer.timeout.connect(self._do_search)
 
-        self._results: List[Dict[str, Any]] = []
-        self._selected: Optional[Dict[str, Any]] = None
-
-        le.textEdited.connect(self._on_text_edited)
-        self.currentIndexChanged.connect(self._on_index_changed)
+        le.textChanged.connect(self._on_text_changed)
 
     @property
     def selected_vehiculo(self) -> Optional[Dict[str, Any]]:
         return self._selected
 
-    def _on_text_edited(self, _text: str) -> None:
-        self._selected = None
-        self._timer.start()
-
-    def _do_search(self) -> None:
-        textq = (self.lineEdit().text() or "").strip()
-        if len(textq) < 4:
-            self._results = []
-            self.blockSignals(True)
-            self.clear()
-            self.blockSignals(False)
+    # ---- búsqueda ----
+    def _on_text_changed(self, _text: str) -> None:
+    # 🔒 Si ya hay un vehículo seleccionado, NO disparamos búsqueda
+        if self._selected is not None:
             return
 
-        filtros = {"q": textq, "page": 1, "page_size": 20}
+        # Solo invalidamos si el usuario borra manualmente
+        if not _text.strip():
+            self._selected = None
+
+        self._timer.start()
+
+
+
+    def _do_search(self) -> None:
+        le = self.lineEdit()
+        text = (le.text() or "").strip()
+
+        if len(text) < 4:
+            self._results = []
+            self._model.clear()
+            self._popup.hide()
+            return
+
+        filtros = {
+            "q": text,
+            "page": 1,
+            "page_size": 20,
+        }
+
         try:
             rows, _ = self._svc.search(filtros, page=1, page_size=20)
         except Exception as ex:
             popUp.toast(self, f"Error al buscar vehículos: {ex}", kind="error")
             rows = []
 
-
         self._results = rows or []
 
-        current_text = self.lineEdit().text()
-        self.blockSignals(True)
-        self.clear()
+        self._model.clear()
         for v in self._results:
-            self.addItem(_vehiculo_label(v), v)
-        self.setCurrentIndex(-1)
-        self.blockSignals(False)
-        self.lineEdit().setText(current_text)
-        if self.count() > 0:
-            self.showPopup()
-    
+            item = QStandardItem(_vehiculo_label(v))
+            item.setData(v, Qt.UserRole)
+            self._model.appendRow(item)
 
-    def _on_index_changed(self, index: int) -> None:
-        if index < 0:
-            self._selected = None
+        if self._model.rowCount() > 0:
+            self._show_popup()
+        else:
+            self._popup.hide()
+
+    def _show_popup(self) -> None:
+        le = self.lineEdit()
+        pos = le.mapToGlobal(le.rect().bottomLeft())
+        w = le.width()
+        h = min(220, self._popup.sizeHintForRow(0) * self._model.rowCount() + 6)
+
+        self._popup.setGeometry(QRect(pos.x(), pos.y(), w, h))
+        self._popup.show()
+        self._popup.raise_()
+
+    def _on_popup_clicked(self, index) -> None:
+        item = self._model.itemFromIndex(index)
+        if not item:
             return
-        data = self.itemData(index)
+
+        data = item.data(Qt.UserRole)
         if not isinstance(data, dict):
-            self._selected = None
             return
+
         self._selected = data
+        self.lineEdit().setText(_vehiculo_label(data))
+        self._popup.hide()
         self.vehiculo_selected.emit(data)
 
+    # ---- cerrar popup correctamente ----
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() in (QEvent.FocusOut, QEvent.MouseButtonPress):
+            if self._popup.isVisible():
+                self._popup.hide()
+        return super().eventFilter(obj, event)
 
-# -------------------- Pantalla principal --------------------
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._popup.hide()
+
 
 
 class FacturasConsultarPage(QWidget):
@@ -1038,6 +1121,8 @@ class FacturasConsultarPage(QWidget):
             fecha = factura.get("fecha_emision") or factura.get("fecha") or ""
             moneda = factura.get("moneda") or "ARS"
             estado_id = factura.get("estado_id")
+            self._factura_origen_id = factura.get("factura_origen_id")
+
 
             try:
                 estado_id = int(estado_id) if estado_id is not None else None
@@ -1127,6 +1212,7 @@ class FacturasConsultarPage(QWidget):
                 text(
                     """
                     SELECT
+                        item_tipo,
                         vehiculo_id,
                         descripcion,
                         cantidad,
@@ -1138,6 +1224,7 @@ class FacturasConsultarPage(QWidget):
                     FROM facturas_detalle
                     WHERE factura_id = :fid
                     ORDER BY id ASC
+
                     """
                 ),
                 {"fid": self._factura_id},
@@ -1265,6 +1352,7 @@ class FacturasConsultarPage(QWidget):
         self.tbl_detalle.setRowCount(0)
         for r in rows or []:
             self._append_detalle_row(
+                item_tipo=r.get("item_tipo"),
                 vehiculo_id=r.get("vehiculo_id"),
                 descripcion=r.get("descripcion") or "",
                 cantidad=float(r.get("cantidad") or 0.0),
@@ -1285,6 +1373,7 @@ class FacturasConsultarPage(QWidget):
     def _append_detalle_row(
         self,
         *,
+        item_tipo: Optional[str],
         vehiculo_id: Optional[int],
         descripcion: str,
         cantidad: float,
@@ -1297,29 +1386,70 @@ class FacturasConsultarPage(QWidget):
         row = self.tbl_detalle.rowCount()
         self.tbl_detalle.insertRow(row)
 
-        if self._edit_mode:
-            cb = VehiculoSelectorCombo(self._svc_vehiculos)
-            cb.setObjectName("VehiculoCombo")
-            cb.setFont(QApplication.font())
+        selector = VehiculoSelectorCombo(self._svc_vehiculos, self)
 
+        selector.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        vehiculo_data = None
+        
+        if item_tipo == "VEHICULO":
             if vehiculo_id:
                 try:
-                    v = self._svc_vehiculos.get_by_id(int(vehiculo_id))
+                    v = self._svc_vehiculos.get(int(vehiculo_id))
                 except Exception:
                     v = None
-                if v:
-                    cb.blockSignals(True)
-                    cb.clear()
-                    cb.addItem(_vehiculo_label(v), v)
-                    cb.setCurrentIndex(0)
-                    cb.blockSignals(False)
 
-            cb.vehiculo_selected.connect(lambda _v, rr=row: self._on_detalle_changed(rr))
-            self.tbl_detalle.setCellWidget(row, self.COL_VEHICULO, cb)
-        else:
-            item = QTableWidgetItem(str(descripcion))
-            self._set_item_editable(item, False)
-            self.tbl_detalle.setItem(row, self.COL_VEHICULO, item)
+                if isinstance(v, dict):
+                    vehiculo_data = {
+                        "id": v.get("id"),
+                        "marca": v.get("marca"),
+                        "modelo": v.get("modelo"),
+                        "anio": v.get("anio"),
+                        "numero_motor": v.get("numero_motor"),
+                        "numero_cuadro": v.get("numero_cuadro"),
+                    }
+
+
+        if vehiculo_data:
+            label = _vehiculo_label(vehiculo_data)
+
+            selector.blockSignals(True)
+
+            selector._selected = vehiculo_data
+            selector.clear()
+            selector.addItem(label, vehiculo_data)
+            selector.setCurrentIndex(0)
+
+            le = selector.lineEdit()
+            if le:
+                # 🔒 Forzamos el texto DESPUÉS del render
+                QTimer.singleShot(
+                    0,
+                    lambda l=le, txt=label: (
+                        l.blockSignals(True),
+                        l.setText(txt),
+                        l.setCursorPosition(0),
+                        l.blockSignals(False)
+                    )
+                )
+
+            selector.blockSignals(False)
+
+
+        selector.setEnabled(self._edit_mode)
+
+        selector.vehiculo_selected.connect(
+            lambda _v, rr=row: self._on_detalle_changed(rr)
+        )
+
+        self.tbl_detalle.setCellWidget(row, self.COL_VEHICULO, selector)
+
+        # altura igual a Agregar
+        h = max(selector.sizeHint().height(), 32)
+        self.tbl_detalle.setRowHeight(row, h + 4)
+
+
+
 
         it_cant = QTableWidgetItem(_format_money(cantidad))
         it_cant.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -1356,6 +1486,7 @@ class FacturasConsultarPage(QWidget):
         it_total.setFont(QApplication.font())
         self._set_item_editable(it_total, False)
         self.tbl_detalle.setItem(row, self.COL_TOTAL, it_total)
+
 
     def _add_detalle_row(self) -> None:
         if not self._edit_mode:
@@ -1499,8 +1630,9 @@ class FacturasConsultarPage(QWidget):
 
         self._apply_edit_visibility()
 
-        if self._factura is not None:
+        if self._factura is not None and enabled:
             self._reload_detail_for_mode()
+
 
         self._update_nc_button_state()
 
@@ -1511,6 +1643,7 @@ class FacturasConsultarPage(QWidget):
                 text(
                     """
                     SELECT
+                        item_tipo,
                         vehiculo_id,
                         descripcion,
                         cantidad,
@@ -1522,6 +1655,7 @@ class FacturasConsultarPage(QWidget):
                     FROM facturas_detalle
                     WHERE factura_id = :fid
                     ORDER BY id ASC
+
                     """
                 ),
                 {"fid": self._factura_id},
@@ -1577,17 +1711,6 @@ class FacturasConsultarPage(QWidget):
             "observaciones": self.in_observaciones.toPlainText().strip(),
         }
 
-        ok, errs = validar_factura(
-            cabecera=cabecera,
-            items=items,
-            es_nota_credito=False,   # en edición NO generamos NC
-        )
-
-        if not ok:
-            msg = "\n".join(f"• {e}" for e in errs)
-            popUp.toast(self, msg, kind="warning")
-            return
-
 
         items: List[Dict[str, Any]] = []
         for r in range(self.tbl_detalle.rowCount()):
@@ -1623,6 +1746,21 @@ class FacturasConsultarPage(QWidget):
                     "importe_total": importe_total,
                 }
             )
+        tipo = (cabecera.get("tipo") or "").upper()
+        es_nc = tipo.startswith("NC")
+
+        ok, errs = validar_factura(
+            cabecera=cabecera,
+            items=items,
+            es_nota_credito=es_nc,
+            comprobante_nc_id=self._factura_origen_id,
+        )
+
+
+        if not ok:
+            msg = "\n".join(f"• {e}" for e in errs)
+            popUp.toast(self, msg, kind="warning")
+            return
 
         db = SessionLocal()
         try:
@@ -1742,17 +1880,70 @@ class FacturasConsultarPage(QWidget):
         vto_cae = str(self._factura.get("vto_cae") or "")
         cliente = str(self._factura.get("cliente") or "") 
 
+        # --- Datos del cliente ---
+        nombre = str(self._factura.get("cliente_nombre") or "")
+        apellido = str(self._factura.get("cliente_apellido") or "")
+
+        telefono = str(self._factura.get("cliente_telefono") or "")
+        email = str(self._factura.get("cliente_email") or "")
+
+        tipo_doc_raw = (self._factura.get("cliente_tipo_doc") or "").strip().upper()
+        nro_doc = str(self._factura.get("cliente_nro_doc") or "")
+
+        TIPO_DOC_MAP = {
+            "DNI": "DNI",
+            "CUIT": "CUIT",
+            "CUIL": "CUIL",
+            "PAS": "Pasaporte",
+        }
+
+        tipo_doc_label = TIPO_DOC_MAP.get(tipo_doc_raw, tipo_doc_raw or "Documento")
+
+        # --- Sacar DNRPA + chasis desde el vehículo de la factura ---
+        dnrpa = ""
+        chasis = ""
+
+        db = SessionLocal()
+        try:
+            row = db.execute(
+                text(
+                    """
+                    SELECT
+                        v.nro_dnrpa,
+                        v.numero_cuadro
+                    FROM facturas_detalle fd
+                    LEFT JOIN vehiculos v ON v.id = fd.vehiculo_id
+                    WHERE fd.factura_id = :fid
+                    AND fd.item_tipo = 'VEHICULO'
+                    ORDER BY fd.id ASC
+                    LIMIT 1
+                    """
+                ),
+                {"fid": self._factura_id},
+            ).mappings().first()
+
+            if row:
+                dnrpa = str(row.get("nro_dnrpa") or "")
+                chasis = str(row.get("numero_cuadro") or "")
+        finally:
+            db.close()
+
+        ultimos_7_chasis = chasis[-7:] if len(chasis) >= 7 else chasis
+
+
         fields = [
-            ("Tipo", str(tipo)),
-            ("Punto de venta", str(pto)),
-            ("Número", str(nro)),
-            ("Comprobante", f"{str(pto).zfill(4)}-{str(nro).zfill(8)}"),
-            ("Fecha", str(fecha)),
-            ("Cliente", cliente),
-            ("Total", total),
-            ("CAE", cae),
-            ("Vto CAE", vto_cae),
+            ("Nombre", nombre),
+            ("Apellido", apellido),
+            ("Teléfono", telefono),
+            ("Email", email),
+            (tipo_doc_label, nro_doc),
+            ("DNRPA", dnrpa),
+            ("Chasis (últimos 7)", ultimos_7_chasis),
         ]
+
+        # 🧹 Opcional: no mostrar filas vacías
+        fields = [(l, v) for (l, v) in fields if str(v).strip() != ""]
+
 
         dlg = MovableDialog(self)
         dlg.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)

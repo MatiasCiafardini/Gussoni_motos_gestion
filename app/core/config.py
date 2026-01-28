@@ -45,7 +45,7 @@ class Settings:
 
     # =============== ARCA =================
     # ÚNICA bandera de entorno
-    ARCA_ENV: str = _str(_arca.get("environment"), "PRODUCCION").upper()
+    ARCA_ENV: str = _str(_arca.get("environment"), "HOMOLOGACION").upper()
 
     # --- Producción ---
     ARCA_PROD_CUIT: str = _str(_arca.get("cuit"))

@@ -4,7 +4,7 @@ from typing import Optional, Any, Dict, List
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QGridLayout, QComboBox, QPushButton,
-    QHBoxLayout, QListView, QSizePolicy, QFrame, QMainWindow
+    QHBoxLayout, QListView, QSizePolicy, QFrame, QMainWindow, QLineEdit
 )
 import app.ui.app_message as popUp
 from app.services.facturas_service import FacturasService
@@ -91,8 +91,6 @@ class ConfiguracionArcaPage(QWidget):
         self.lbl_result.setWordWrap(True)
         root.addWidget(self.lbl_result)
 
-        root.addStretch(1)
-
         # Loading overlay
         self.loading_overlay = LoadingOverlay(self, text="")
 
@@ -124,6 +122,52 @@ class ConfiguracionArcaPage(QWidget):
             font-size: 1em;
         }
         """)
+        # ================== Consulta de comprobante existente ==================
+
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.HLine)
+        sep2.setFrameShadow(QFrame.Sunken)
+        root.addWidget(sep2)
+
+        lbl_cbte = QLabel("Consultar comprobante existente en ARCA")
+        lbl_cbte.setStyleSheet("font-weight: 600; margin-top: 6px;")
+        root.addWidget(lbl_cbte)
+
+        cbte_row = QHBoxLayout()
+        cbte_row.setSpacing(10)
+
+        # Número de comprobante (solo últimos dígitos)
+        self.txt_cbte_numero = QLineEdit()
+        self.txt_cbte_numero.setPlaceholderText("Ej: 15")
+        self.txt_cbte_numero.setMaximumWidth(140)
+
+        cbte_row.addWidget(QLabel("Número"))
+        cbte_row.addWidget(self.txt_cbte_numero)
+
+        self.btn_consultar_cbte = QPushButton("Consultar comprobante en ARCA")
+        self.btn_consultar_cbte.setObjectName("BtnSecondary")
+        self.btn_consultar_cbte.setCursor(Qt.PointingHandCursor)
+
+        cbte_row.addWidget(self.btn_consultar_cbte)
+        cbte_row.addStretch(1)
+
+        root.addLayout(cbte_row)
+
+        self.btn_consultar_cbte.clicked.connect(self.on_consultar_comprobante_clicked)
+        # Panel de resultado del comprobante (igual al de arriba)
+        self.lbl_cbte_result = QLabel("")
+        self.lbl_cbte_result.setObjectName("CfgArcaResult")
+        self.lbl_cbte_result.setWordWrap(True)
+        self.lbl_cbte_result.setVisible(False)  # oculto al inicio
+        root.addWidget(self.lbl_cbte_result)
+        self.txt_cbte_numero.textChanged.connect(
+            lambda _: self.lbl_cbte_result.setVisible(False)
+        )
+        
+        root.addStretch(1)
+
+
+
 
     # ---------- Helpers UI ----------
 
@@ -144,8 +188,7 @@ class ConfiguracionArcaPage(QWidget):
         except Exception as e:
             popUp.toast(
                 self,
-                "Error",
-                f"No pude cargar los tipos de comprobante.\n\n{e}",
+                f"No pude cargar los tipos de comprobante.\n\n{e}", kind='error'
             )
             return
 
@@ -170,6 +213,64 @@ class ConfiguracionArcaPage(QWidget):
             )
             label = f"{codigo} – {descripcion}".strip(" –")
             self.cb_tipo.addItem(label, codigo)
+    @with_loading("Consultando comprobante en ARCA / AFIP...")
+    def on_consultar_comprobante_clicked(self) -> None:
+        tipo = self.cb_tipo.currentData()
+        pto_vta = self.cb_pto_vta.currentData()
+
+        if not tipo or not pto_vta:
+            popUp.warning(
+                self,
+                "Faltan datos",
+                "Seleccioná el tipo de comprobante y el punto de venta.",
+            )
+            return
+
+        try:
+            numero = int(self.txt_cbte_numero.text().strip())
+            if numero <= 0:
+                raise ValueError
+        except Exception:
+            popUp.warning(
+                self,
+                "Dato inválido",
+                "Ingresá solo los últimos dígitos del comprobante (ej: 15).",
+            )
+            return
+
+        try:
+            data = self.service.consultar_comprobante_arca(
+                tipo=str(tipo),
+                pto_vta=int(pto_vta),
+                numero=numero,
+            )
+        except Exception as e:
+            popUp.toast(
+                self,
+                f"No se pudo consultar el comprobante.\n\n{e}", kind="error"
+            )
+            return
+
+        texto = (
+            f"Estado: {data.get('estado')}\n"
+            f"CAE: {data.get('cae')}\n"
+            f"Vto CAE: {data.get('vto_cae')}\n"
+            f"Total: {data.get('importe_total')}\n"
+        )
+
+        popUp.toast(self, "Comprobante encontrado", kind="success")
+        texto = (
+            f"Tipo: {tipo} | Punto de venta: {str(pto_vta).zfill(4)} | Número: {numero}\n"
+            f"Estado: {data.get('estado')}\n"
+            f"CAE: {data.get('cae')}\n"
+            f"Vto CAE: {data.get('vto_cae')}\n"
+            f"Total: {data.get('importe_total')}\n"
+        )
+
+        self.lbl_cbte_result.setText(texto)
+        self.lbl_cbte_result.setVisible(True)
+
+
 
     def _load_puntos_venta(self) -> None:
         self.cb_pto_vta.clear()
@@ -180,8 +281,7 @@ class ConfiguracionArcaPage(QWidget):
         except Exception as e:
             popUp.toast(
                 self,
-                "Error",
-                f"No pude cargar los puntos de venta.\n\n{e}",
+                f"No pude cargar los puntos de venta.\n\n{e}", kind="error"
             )
             return
 
@@ -224,8 +324,7 @@ class ConfiguracionArcaPage(QWidget):
         except Exception as e:
             popUp.toast(
                 self,
-                "Error",
-                f"Ocurrió un error al consultar el próximo número.\n\n{e}",
+                f"Ocurrió un error al consultar el próximo número.\n\n{e}", kind="error"
             )
             return
 
@@ -269,10 +368,9 @@ class ConfiguracionArcaPage(QWidget):
 
         # Popup corto para confirmar
         if ws_ok:
-            popUp.info(
+            popUp.toast(
                 self,
-                "Consulta realizada",
-                f"Próximo número sugerido: {proximo}\n\nOrigen: {origen}",
+                f"Próximo número sugerido: {proximo}\n\nOrigen: {origen}", kind="success"
             )
         else:
             popUp.warning(

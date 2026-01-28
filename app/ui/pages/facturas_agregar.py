@@ -93,53 +93,103 @@ def _style_section_label(lbl: QLabel) -> None:
 
 # -------- Combo dinámico de vehículos --------
 
-class VehiculoSelectorCombo(QComboBox):
-    """
-    QComboBox editable que busca vehículos dinámicamente.
-    """
+from PySide6.QtWidgets import QListView, QAbstractItemView
+from PySide6.QtGui import QStandardItemModel, QStandardItem
+from PySide6.QtCore import Qt, QTimer, QRect, QEvent
 
+class VehiculoSelectorCombo(QComboBox):
     vehiculo_selected = Signal(dict)
 
-    def __init__(self, vehiculos_service: VehiculosService, parent: Optional[Widget] = None) -> None:
+    def __init__(self, vehiculos_service: VehiculosService, parent=None) -> None:
         super().__init__(parent)
+
         _setup_combo(self)
         self.setEditable(True)
         self.setInsertPolicy(QComboBox.NoInsert)
 
+        self._svc = vehiculos_service
+        self._results: List[Dict[str, Any]] = []
+        self._selected: Optional[Dict[str, Any]] = None
+
         le = self.lineEdit()
         le.setPlaceholderText("Buscar vehículo...")
         le.setClearButtonEnabled(True)
-        
 
-        self._svc = vehiculos_service
+        # 👇 LISTA FLOTANTE QUE NO ROBA FOCO
+        self._popup = QListView()
+        # --- Estilo visual del popup ---
+        font = self.font()
+        self._popup.setFont(font)
+
+        # Altura de fila basada en font (no hardcode)
+        fm = self._popup.fontMetrics()
+        row_h = max(24, fm.height() + 8)
+        self._popup.setStyleSheet(f"""
+        QListView {{
+            background: #ffffff;
+            border: 1px solid #cfcfcf;
+            border-radius: 6px;
+            padding: 4px;
+            outline: 0;
+        }}
+
+        QListView::item {{
+            padding: 6px 8px;
+            min-height: {row_h}px;
+        }}
+
+        QListView::item:selected {{
+            background: #6c63ff;
+            color: white;
+        }}
+
+        QListView::item:hover {{
+            background: #e8e7ff;
+        }}
+        """)
+
+        self._popup.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
+        self._popup.setFocusPolicy(Qt.NoFocus)
+        self._popup.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self._popup.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self._popup.setSelectionMode(QAbstractItemView.SingleSelection)
+
+        self._model = QStandardItemModel(self._popup)
+        self._popup.setModel(self._model)
+
+        self._popup.clicked.connect(self._on_popup_clicked)
+
+        # Cerrar lista si se hace click afuera
+        self.installEventFilter(self)
+        le.installEventFilter(self)
+
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(150)
         self._timer.timeout.connect(self._do_search)
 
-        self._results: List[Dict[str, Any]] = []
-        self._selected: Optional[Dict[str, Any]] = None
-
-        le.textEdited.connect(self._on_text_edited)
-        self.currentIndexChanged.connect(self._on_index_changed)
-        
+        le.textChanged.connect(self._on_text_changed)
 
     @property
     def selected_vehiculo(self) -> Optional[Dict[str, Any]]:
         return self._selected
 
     # ---- búsqueda ----
-    def _on_text_edited(self, _text: str) -> None:
-        self._selected = None
+    def _on_text_changed(self, _text: str) -> None:
+        # Solo invalidamos si el usuario BORRA el texto
+        if not _text.strip():
+            self._selected = None
         self._timer.start()
 
+
     def _do_search(self) -> None:
-        text = (self.lineEdit().text() or "").strip()
+        le = self.lineEdit()
+        text = (le.text() or "").strip()
+
         if len(text) < 4:
             self._results = []
-            self.blockSignals(True)
-            self.clear()
-            self.blockSignals(False)
+            self._model.clear()
+            self._popup.hide()
             return
 
         filtros = {
@@ -147,6 +197,7 @@ class VehiculoSelectorCombo(QComboBox):
             "page": 1,
             "page_size": 20,
         }
+
         try:
             rows, _ = self._svc.search(filtros, page=1, page_size=20)
         except Exception as ex:
@@ -155,27 +206,52 @@ class VehiculoSelectorCombo(QComboBox):
 
         self._results = rows or []
 
-        current_text = self.lineEdit().text()
-        self.blockSignals(True)
-        self.clear()
+        self._model.clear()
         for v in self._results:
-            self.addItem(_vehiculo_label(v), v)
-        self.setCurrentIndex(-1)
-        self.blockSignals(False)
-        self.lineEdit().setText(current_text)
-        if self.count() > 0:
-            self.showPopup()
+            item = QStandardItem(_vehiculo_label(v))
+            item.setData(v, Qt.UserRole)
+            self._model.appendRow(item)
 
-    def _on_index_changed(self, index: int) -> None:
-        if index < 0:
-            self._selected = None
+        if self._model.rowCount() > 0:
+            self._show_popup()
+        else:
+            self._popup.hide()
+
+    def _show_popup(self) -> None:
+        le = self.lineEdit()
+        pos = le.mapToGlobal(le.rect().bottomLeft())
+        w = le.width()
+        h = min(220, self._popup.sizeHintForRow(0) * self._model.rowCount() + 6)
+
+        self._popup.setGeometry(QRect(pos.x(), pos.y(), w, h))
+        self._popup.show()
+        self._popup.raise_()
+
+    def _on_popup_clicked(self, index) -> None:
+        item = self._model.itemFromIndex(index)
+        if not item:
             return
-        data = self.itemData(index)
+
+        data = item.data(Qt.UserRole)
         if not isinstance(data, dict):
-            self._selected = None
             return
+
         self._selected = data
+        self.lineEdit().setText(_vehiculo_label(data))
+        self._popup.hide()
         self.vehiculo_selected.emit(data)
+
+    # ---- cerrar popup correctamente ----
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() in (QEvent.FocusOut, QEvent.MouseButtonPress):
+            if self._popup.isVisible():
+                self._popup.hide()
+        return super().eventFilter(obj, event)
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self._popup.hide()
+
 
 
 # -------- Página FacturasAgregar --------
@@ -1338,11 +1414,11 @@ class FacturasAgregarPage(QWidget):
                 from pprint import pformat
 
                 # Popup técnico (te sirve mientras estás en homologación)
-                popUp.info(
-                    self,
-                    "Resultado ARCA",
-                    pformat(result),
-                )
+                #popUp.toast(
+                #    self,
+                #    "Resultado ARCA",
+                #    pformat(result),
+                #)
 
 
                 msg = result.get("mensaje") if isinstance(result, dict) else ""

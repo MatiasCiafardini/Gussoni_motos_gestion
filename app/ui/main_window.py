@@ -69,6 +69,14 @@ try:
     ClientesAgregarPage = _ClientesAgregarPage
 except Exception:
     ClientesAgregarPage = None
+# =================== REPORTES ===================
+ReportesPage = None
+try:
+    from app.ui.pages.reportes_page import ReportesPage as _ReportesPage
+    ReportesPage = _ReportesPage
+except Exception as e:
+    print("ERROR importando ReportesPage:", e)
+    ReportesPage = None
 
 # =================== FACTURACIÓN ===================
 FacturacionPage = None
@@ -235,14 +243,18 @@ class MainWindow(QMainWindow):
         self.page_clientes = self._make_clientes_page()
         self.page_vehiculos = self._make_vehiculos_page()
         self.page_facturacion = self._make_facturacion_page()
-
+        
         try:
             from app.ui.pages.proveedores_page import ProveedoresPage
             self.page_proveedores = ProveedoresPage()
         except Exception:
             self.page_proveedores = PlaceholderPage("Proveedores")
 
-        self.page_reportes = PlaceholderPage("Reportes")
+        if ReportesPage:
+            self.page_reportes = ReportesPage()
+        else:
+            self.page_reportes = PlaceholderPage("Reportes")
+
         self.page_config = self._make_configuracion_page()
 
         for p in (
