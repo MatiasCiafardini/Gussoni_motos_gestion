@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
 
 from app.services.vehiculos_service import VehiculosService
 from app.services.catalogos_service import CatalogosService
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 import app.ui.app_message as popUp
 from app.ui.widgets.money_spinbox import MoneySpinBox
 from app.domain.vehiculos_validaciones import validate_vehiculo
@@ -313,7 +312,7 @@ class VehiculosAgregarPage(QWidget):
     # -------------------- Volver --------------------
     def _on_volver(self):
         if self._dirty and self._hay_info_cargada():
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
         self.go_back.emit()
 

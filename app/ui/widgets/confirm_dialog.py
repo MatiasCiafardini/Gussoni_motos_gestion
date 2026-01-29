@@ -111,19 +111,7 @@ class ConfirmDialog(QDialog):
         self._drag_pos: Optional[QPoint] = None
         panel.installEventFilter(self)
 
-    # ------- Helpers estáticos -------
-    @staticmethod
-    def ask_discard(parent: QWidget) -> bool:
-        dlg = ConfirmDialog(
-            title="Descartar cambios",
-            text="Tenés cambios sin guardar.",
-            informative_text="Si volvés ahora, los cambios no se guardarán. ¿Querés volver igual?",
-            confirm_text="Volver y descartar",
-            cancel_text="Seguir editando",
-            icon="⚠️",
-            parent=parent,
-        )
-        return dlg.exec() == QDialog.Accepted
+    
 
     # ------- UX extra: centrar sobre el padre y Esc para cerrar -------
     def showEvent(self, ev):

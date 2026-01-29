@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QLabel, QLineEdit, QComboBox, QTextEdit,
     QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem, QMessageBox
 )
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 
 
 # Servicio real (si existe) o fallback
@@ -236,7 +235,7 @@ class UsuariosAgregarPage(QWidget):
     # -------------------- Volver --------------------
     def _on_volver(self):
         if self._dirty and self._hay_info_cargada():
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
         self.go_back.emit()
 

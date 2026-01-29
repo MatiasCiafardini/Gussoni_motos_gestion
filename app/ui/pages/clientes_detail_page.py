@@ -20,7 +20,6 @@ from app.ui.utils.text_utils import normalize_title
 
 from app.services.clientes_service import ClientesService
 from app.services.ventas_service import VentasService
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 from pathlib import Path
 
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
@@ -379,7 +378,7 @@ class ClientesDetailPage(QWidget):
 
     def _on_back_clicked(self):
         if self.edit_mode:
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
             self._cancel_edit()
         self.navigate_back.emit()

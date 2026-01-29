@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
 import app.ui.app_message as popUp
 # Nota: Asumo que estos servicios manejan la DB
 from app.services.usuarios_service import UsuariosService
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.widgets.password_dialog import ChangePasswordDialog
 # Nota: La Notificación la dejo comentada, se usa en la de Agregar.
 from app.domain.usuarios_validaciones import validar_usuario
@@ -302,7 +301,7 @@ class UsuariosDetailPage(QWidget):
     # ---------------------- Back con confirmación ----------------------
     def _on_back_clicked(self):
         if self.edit_mode:
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
             self._cancel_edit()
         self.navigate_back.emit()

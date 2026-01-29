@@ -12,8 +12,6 @@ import app.ui.app_message as popUp
 from app.services.facturas_service import FacturasService
 from app.services.clientes_service import ClientesService
 from app.services.vehiculos_service import VehiculosService
-from app.ui.widgets.confirm_dialog import ConfirmDialog
-import app.ui.app_message as popUp
 from app.domain.facturas_validaciones import validar_factura
 from app.ui.widgets.cliente_selector_combo import ClienteSelectorCombo
 from app.ui.widgets.vehiculo_selector_combo import VehiculoSelectorCombo
@@ -1320,11 +1318,10 @@ class FacturasAgregarPage(QWidget):
     def _on_volver(self) -> None:
         """
         Maneja el botón Volver.
-        - Si hay cambios, pregunta con ConfirmDialog.
         - Si el usuario acepta, resetea _dirty y navega hacia atrás.
         """
         if self._dirty and self._hay_info_cargada():
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
 
         # Si llegamos acá, no hay cambios o el usuario aceptó descartar.

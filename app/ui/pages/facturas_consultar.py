@@ -19,8 +19,6 @@ from app.services.facturas_service import FacturasService
 from app.services.clientes_service import ClientesService
 from app.services.vehiculos_service import VehiculosService
 from app.services.comprobantes_service import ComprobantesService
-import app.ui.app_message as popUp
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 from PySide6.QtGui import QColor
 from app.services.catalogos_service import CatalogosService
 from PySide6.QtWidgets import QListView, QAbstractItemView
@@ -2214,13 +2212,16 @@ class FacturasConsultarPage(QWidget):
         nro = self.in_numero.text().strip()
         pto = self.in_pto_vta.currentText().strip()
 
-        dlg = ConfirmDialog(
-            "Generar nota de crédito",
-            f"¿Generar una nota de crédito que anule la factura {tipo} {pto}-{nro}?",
-            parent=self,
-        )
-        if dlg.exec() != QDialog.Accepted:
+        if not popUp.confirm(
+            self,
+            title="Generar nota de crédito",
+            text=f"¿Generar una nota de crédito que anule la factura {tipo} {pto}-{nro}?",
+            ok_text="Generar nota de crédito",
+            cancel_text="Cancelar",
+            icon="⚠️",
+        ):
             return
+
 
         self.btn_nc.setEnabled(False)
         old_cursor = self.cursor()

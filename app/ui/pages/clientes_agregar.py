@@ -19,8 +19,7 @@ from app.ui.utils.text_utils import normalize_title
 
 from app.services.clientes_service import ClientesService
 from app.services.catalogos_service import CatalogosService
-from app.ui.widgets.confirm_dialog import ConfirmDialog
-from app.ui import app_message
+import app.ui.app_message as popUp
 
 # ====================== Carga asíncrona de catálogos ======================
 
@@ -237,7 +236,7 @@ class ClientesAgregarPage(QWidget):
         task = _LoadCatalogosTask(self._catalogos)
         task.signals.done.connect(self._fill_catalogos)
         task.signals.error.connect(
-            lambda msg: app_message.toast(
+            lambda msg: popUp.toast(
                 self,
                 f"No se pudieron cargar catálogos: {msg}",
                 kind="error",
@@ -282,7 +281,7 @@ class ClientesAgregarPage(QWidget):
 
         if not ok:
             msg = "\n".join(f"• {v}" for v in errs.values())
-            app_message.toast(
+            popUp.toast(
                 self,
                 msg,
                 kind="warning",
@@ -293,7 +292,7 @@ class ClientesAgregarPage(QWidget):
         try:
             new_id = self.service.create_cliente(data)
         except Exception as ex:
-            app_message.error(
+            popUp.error(
                 self,
                 "Error al guardar cliente",
                 str(ex),
@@ -303,20 +302,20 @@ class ClientesAgregarPage(QWidget):
 
         self._dirty = False
         if abrir_detalle:
-            app_message.toast(self,"Cliente guardado correctamente.\nAbriendo detalle…", kind="success")
+            popUp.toast(self,"Cliente guardado correctamente.\nAbriendo detalle…", kind="success")
             try:
                 self.go_to_detalle.emit(int(new_id))
             except Exception:
                 pass
         else:
-            app_message.toast(self,"Cliente guardado correctamente.", kind="success")
+            popUp.toast(self,"Cliente guardado correctamente.", kind="success")
             self._limpiar_formulario()
             self._dirty = False
 
     # -------------------- Volver --------------------
     def _on_volver(self):
         if self._dirty and self._hay_info_cargada():
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
         self.go_back.emit()
 

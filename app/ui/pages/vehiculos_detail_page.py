@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
 from app.services.vehiculos_service import VehiculosService
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.widgets.money_spinbox import MoneySpinBox
 import app.ui.app_message as popUp
 from app.domain.vehiculos_validaciones import validate_vehiculo
@@ -298,7 +297,7 @@ class VehiculoDetailPage(QWidget):
     # ---------------------- Back con confirmación ----------------------
     def _on_back_clicked(self):
         if self.edit_mode:
-            if not ConfirmDialog.ask_discard(self):
+            if not popUp.ask_discard(self):
                 return
             self._cancel_edit()
         self.navigate_back.emit()

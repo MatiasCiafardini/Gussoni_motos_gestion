@@ -2,9 +2,9 @@
 from __future__ import annotations
 from typing import Optional
 
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QWidget, QDialog
 from PySide6.QtCore import QTimer
-
+from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.widgets.app_message_dialog import AppMessageDialog
 from app.ui.notify import NotifyPopup
 
@@ -25,22 +25,42 @@ def error(parent: Optional[QWidget], title: str, text: str) -> None:
 
 
 def confirm(
-    parent: Optional[Widget],
+    parent: Optional[QWidget],
     title: str,
     text: str,
     *,
     ok_text: str = "Aceptar",
     cancel_text: str = "Cancelar",
+    icon: str = "❓",
+    informative_text: Optional[str] = None,
 ) -> bool:
-    return AppMessageDialog.confirm(
-        parent,
-        title,
-        text,
-        ok_text=ok_text,
+    """
+    Confirmación SIEMPRE con ConfirmDialog (estilo moderno).
+    """
+    dlg = ConfirmDialog(
+        title=title,
+        text=text,
+        informative_text=informative_text,
+        confirm_text=ok_text,
         cancel_text=cancel_text,
+        icon=icon,
+        parent=parent,
     )
+    return dlg.exec() == QDialog.Accepted
 
-
+# ------- Helpers estáticos -------
+    
+def ask_discard(parent: QWidget) -> bool:
+    dlg = ConfirmDialog(
+        title="Descartar cambios",
+        text="Tenés cambios sin guardar.",
+        informative_text="Si volvés ahora, los cambios no se guardarán. ¿Querés volver igual?",
+        confirm_text="Volver y descartar",
+        cancel_text="Seguir editando",
+        icon="⚠️",
+        parent=parent,
+    )
+    return dlg.exec() == QDialog.Accepted
 # ----------------- Nuevo: aviso tipo "toast" -----------------
 
 

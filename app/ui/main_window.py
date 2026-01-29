@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Callable
 import time
-from PySide6.QtWidgets import QMessageBox
 from app.core.updater import check_for_update
 from app.core.downloader import download_file
 from pathlib import Path
@@ -13,8 +12,9 @@ from PySide6.QtWidgets import QTableView
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QSizePolicy, QApplication, QMessageBox
+    QPushButton, QLabel, QSizePolicy, QApplication
 )
+import app.ui.app_message as popUp
 from PySide6.QtCore import Qt, QTimer, QThreadPool, QRunnable, QObject, Signal
 import ctypes
 # -------- Páginas actuales del proyecto (con fallback a placeholders) --------
@@ -22,7 +22,6 @@ try:
     from app.ui.pages.dashboard_page import DashboardPage  # tu dashboard real
 except Exception:
     from app.ui.pages.placeholder_page import PlaceholderPage as DashboardPage
-from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.pages.placeholder_page import PlaceholderPage
 from PySide6.QtWidgets import QDialog
 # =================== VEHÍCULOS ===================
@@ -293,16 +292,6 @@ class MainWindow(QMainWindow):
         self.btn_logout.clicked.connect(self._handle_logout)
         self.logout_requested.connect(self._emit_logout_callback)
 
-        # Toast overlay
-        self._toast = QLabel("", self)
-        self._toast.setObjectName("Toast")
-        self._toast.setVisible(False)
-        self._toast.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self._toast.setAlignment(Qt.AlignCenter)
-        self._toast_timer = QTimer(self)
-        self._toast_timer.setSingleShot(True)
-        self._toast_timer.timeout.connect(lambda: self._toast.setVisible(False))
-
         self._apply_base_qss()
         self._preload_catalogos_async()
         QTimer.singleShot(0, self.showMaximized)
@@ -480,41 +469,36 @@ class MainWindow(QMainWindow):
         try:
             update = check_for_update()
             if not update:
-                QMessageBox.information(
+                popUp.info(
                     self,
                     "Actualizaciones",
-                    "La aplicación ya está actualizada."
+                    "La aplicación ya está actualizada.",
                 )
                 return
 
-            reply = QMessageBox.question(
+            if not popUp.confirm(
                 self,
                 "Actualización disponible",
-                (
-                    f"Hay una nueva versión disponible: {update['version']}\n\n"
-                    f"{update.get('changelog', '')}\n\n"
-                    "¿Deseás actualizar ahora?"
-                ),
-                QMessageBox.Yes | QMessageBox.No
-            )
-
-            if reply != QMessageBox.Yes:
+                f"Hay una nueva versión disponible: {update['version']}\n\n"
+                f"{update.get('changelog', '')}",
+                ok_text="Actualizar ahora",
+                cancel_text="Más tarde",
+                icon="⬆️",
+            ):
                 return
 
             # -------- descargar --------
             updates_dir = Path(os.getenv("LOCALAPPDATA")) / "GussoniApp" / "updates"
             updates_dir.mkdir(parents=True, exist_ok=True)
 
-            filename = Path(update["url"]).name
-            dest = updates_dir / filename
-
+            dest = updates_dir / Path(update["url"]).name
             download_file(update["url"], dest)
 
-            QMessageBox.information(
+            popUp.info(
                 self,
-                "Actualización",
+                "Actualización lista",
                 "La actualización se descargó correctamente.\n"
-                "La aplicación se cerrará para instalar la actualización."
+                "La aplicación se cerrará para instalarla.",
             )
 
             # -------- lanzar updater --------
@@ -528,23 +512,20 @@ class MainWindow(QMainWindow):
 
             ctypes.windll.shell32.ShellExecuteW(
                 None,
-                "runas",                    # 👈 pide elevación (UAC)
+                "runas",
                 str(updater_exe),
                 params,
                 None,
-                1
+                1,
             )
 
-            # salir fuerte para liberar el exe
             os._exit(0)
 
-
-
         except Exception as e:
-            QMessageBox.warning(
+            popUp.error(
                 self,
-                "Error",
-                f"No se pudo actualizar:\n{e}"
+                "Error al actualizar",
+                str(e),
             )
 
 
@@ -767,17 +748,15 @@ class MainWindow(QMainWindow):
             if not update:
                 return  # no molestar si no hay nada
 
-            dlg = ConfirmDialog(
+            if popUp.confirm(
+                self,
                 title="Actualización disponible",
                 text=f"Hay una nueva versión disponible: {update['version']}",
                 informative_text=update.get("changelog"),
-                confirm_text="Actualizar ahora",
+                ok_text="Actualizar ahora",
                 cancel_text="Más tarde",
                 icon="⬆️",
-                parent=self,
-            )
-
-            if dlg.exec() == QDialog.Accepted:
+            ):
                 self.check_updates_ui()
 
         except Exception as e:
@@ -787,18 +766,6 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------
     # Toast & Notify
     # ---------------------------------------------------------------------
-    def resizeEvent(self, ev):
-        super().resizeEvent(ev)
-        w, h = 320, 36
-        x = (self.width() - w) // 2
-        y = self.height() - h - 20
-        self._toast.setGeometry(x, y, w, h)
-
-    def toast(self, text: str, msec: int = 2500):
-        self._toast.setText(text)
-        self._toast.setVisible(True)
-        self._toast_timer.start(msec)
-
     def notify(self, text: str, tipo: str = "info"):
         from app.ui import app_message
         app_message.toast(self, text, kind=tipo)
