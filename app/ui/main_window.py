@@ -22,9 +22,9 @@ try:
     from app.ui.pages.dashboard_page import DashboardPage  # tu dashboard real
 except Exception:
     from app.ui.pages.placeholder_page import PlaceholderPage as DashboardPage
-
+from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.pages.placeholder_page import PlaceholderPage
-
+from PySide6.QtWidgets import QDialog
 # =================== VEHÍCULOS ===================
 VehiculosPage = None
 try:
@@ -307,6 +307,8 @@ class MainWindow(QMainWindow):
         self._preload_catalogos_async()
         QTimer.singleShot(0, self.showMaximized)
         QTimer.singleShot(0, self._refresh_tables_fonts)
+        QTimer.singleShot(1500, self._check_updates_on_startup)
+
 
 
     # ---------------------------------------------------------------------
@@ -458,7 +460,7 @@ class MainWindow(QMainWindow):
     
         self.navigate_to(detail)
     
-
+    
     def open_usuario_detail(self, user_id: int):
         if not UsuariosDetailPage:
             self.notify("La página de detalle de usuario no está disponible.", "error")
@@ -755,6 +757,32 @@ class MainWindow(QMainWindow):
 
         self.stack.setCurrentWidget(page)
         QTimer.singleShot(0, self.loading.hide_overlay)
+    def _check_updates_on_startup(self):
+        """
+        Chequea actualizaciones al iniciar y pregunta si desea instalar.
+        Silencioso si no hay update.
+        """
+        try:
+            update = check_for_update()
+            if not update:
+                return  # no molestar si no hay nada
+
+            dlg = ConfirmDialog(
+                title="Actualización disponible",
+                text=f"Hay una nueva versión disponible: {update['version']}",
+                informative_text=update.get("changelog"),
+                confirm_text="Actualizar ahora",
+                cancel_text="Más tarde",
+                icon="⬆️",
+                parent=self,
+            )
+
+            if dlg.exec() == QDialog.Accepted:
+                self.check_updates_ui()
+
+        except Exception as e:
+            # IMPORTANTE: no romper el arranque por un error de update
+            print("Error chequeando actualizaciones:", e)
 
     # ---------------------------------------------------------------------
     # Toast & Notify

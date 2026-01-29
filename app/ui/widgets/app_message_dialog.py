@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Optional
 
-from PySide6.QtCore import Qt, QPoint
+from PySide6.QtCore import Qt, QPoint, QEvent
+from PySide6.QtGui import QMouseEvent, QColor
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -10,15 +11,26 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFrame,
     QWidget,
+    QGraphicsDropShadowEffect,
 )
 
 
 class AppMessageDialog(QDialog):
     """
-    Diálogo genérico con estilo de tarjeta:
-    - kind: 'info', 'warning', 'error', 'confirm'
-    - Movible arrastrando con el mouse.
+    Diálogo moderno unificado para mensajes:
+    - kind: info | warning | error | confirm
+    - Estilo tarjeta con sombra
+    - Sin marco del SO
+    - Draggable
+    - Botones con estilos globales (BtnPrimary / BtnGhost)
     """
+
+    ICONS = {
+        "info": "ℹ️",
+        "warning": "⚠️",
+        "error": "⛔",
+        "confirm": "❓",
+    }
 
     def __init__(
         self,
@@ -28,143 +40,158 @@ class AppMessageDialog(QDialog):
         kind: str = "info",
         primary_text: str = "Aceptar",
         secondary_text: Optional[str] = None,
-        parent: Optional[Widget] = None,
+        parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
 
         self.setModal(True)
-        self.setObjectName("AppMessageDialog")
+        self.setObjectName("NiceDialog")
+        self.setMinimumWidth(420)
 
-        # Ventana sin marco + fondo transparente
+        # ---- ventana sin marco ----
         self.setWindowFlags(
             Qt.Dialog
             | Qt.FramelessWindowHint
             | Qt.WindowSystemMenuHint
-            | Qt.WindowTitleHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
-        self._drag_offset: Optional[QPoint] = None
+        # ---- panel principal ----
+        panel = QFrame(self)
+        panel.setObjectName("DialogPanel")
 
-        # ---- layout raíz (transparente) ----
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(28)
+        shadow.setOffset(0, 6)
+        shadow.setColor(QColor(0, 0, 0, 110))
+        panel.setGraphicsEffect(shadow)
+
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.addWidget(panel)
 
-        # Usamos el mismo card que en el resto del sistema
-        card = QFrame(self)
-        card.setObjectName("Panel")          # <- MISMO estilo que tus tarjetas
-        card_l = QVBoxLayout(card)
-        card_l.setContentsMargins(24, 20, 24, 20)
-        card_l.setSpacing(10)
+        lay = QVBoxLayout(panel)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(12)
 
-        # ---- encabezado ----
+        # ---- header ----
         header = QHBoxLayout()
         header.setSpacing(10)
 
-        icon_lbl = QLabel()
-        icon_lbl.setObjectName("AppMessageIcon")
+        icon_lbl = QLabel(self.ICONS.get(kind, "ℹ️"), panel)
+        icon_lbl.setObjectName("DialogIcon")
+        icon_lbl.setFixedWidth(28)
+        icon_lbl.setAlignment(Qt.AlignTop)
 
-        if kind == "warning":
-            icon_lbl.setText("⚠️")
-        elif kind == "error":
-            icon_lbl.setText("⛔")
-        elif kind == "confirm":
-            icon_lbl.setText("❓")
-        else:
-            icon_lbl.setText("ℹ️")
-
-        icon_lbl.setFixedWidth(24)
-        icon_lbl.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-
-        title_lbl = QLabel(title)
-        title_lbl.setObjectName("AppMessageTitle")
+        title_lbl = QLabel(title, panel)
+        title_lbl.setObjectName("DialogTitle")
         title_lbl.setWordWrap(True)
 
         header.addWidget(icon_lbl)
         header.addWidget(title_lbl, 1)
-
-        card_l.addLayout(header)
+        lay.addLayout(header)
 
         # ---- texto ----
-        text_lbl = QLabel(text)
-        text_lbl.setObjectName("AppMessageText")
+        text_lbl = QLabel(text, panel)
+        text_lbl.setObjectName("DialogText")
         text_lbl.setWordWrap(True)
-        card_l.addWidget(text_lbl)
+        lay.addWidget(text_lbl)
 
         # ---- botones ----
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
 
-        # Botón principal con mismo estilo que el sistema
-        btn_primary = QPushButton(primary_text)
-        btn_primary.setObjectName("BtnPrimary")   # <- MISMO estilo que botones primarios
-        btn_primary.clicked.connect(lambda: self.done(QDialog.Accepted))
-
         if secondary_text:
-            btn_secondary = QPushButton(secondary_text)
-            btn_secondary.setObjectName("BtnGhost")  # <- MISMO estilo que botón “fantasma”
+            btn_secondary = QPushButton(secondary_text, panel)
+            btn_secondary.setObjectName("BtnGhost")
             btn_secondary.clicked.connect(lambda: self.done(QDialog.Rejected))
             btn_row.addWidget(btn_secondary)
 
+        btn_primary = QPushButton(primary_text, panel)
+        btn_primary.setObjectName("BtnPrimary")
+        btn_primary.clicked.connect(lambda: self.done(QDialog.Accepted))
         btn_row.addWidget(btn_primary)
 
-        card_l.addSpacing(6)
-        card_l.addLayout(btn_row)
+        lay.addSpacing(6)
+        lay.addLayout(btn_row)
 
-        root.addWidget(card)
+        # ---- drag ----
+        self._drag_pos: Optional[QPoint] = None
+        panel.installEventFilter(self)
 
-        # Solo QSS mínimo para el fondo del diálogo
+        # ---- QSS mínimo (el resto viene del global) ----
         self.setStyleSheet(
             """
-            QDialog#AppMessageDialog {
+            QDialog#NiceDialog {
                 background: transparent;
             }
-            QLabel#AppMessageTitle {
+            QLabel#DialogTitle {
                 font-size: 1.2em;
                 font-weight: 600;
             }
-            QLabel#AppMessageText {
+            QLabel#DialogText {
                 font-size: 1em;
+            }
+            QLabel#DialogIcon {
+                font-size: 1.4em;
             }
             """
         )
-        
 
-    # ---------------- Drag para mover ----------------
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._drag_offset = (
-                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            )
-            event.accept()
-        else:
-            super().mousePressEvent(event)
+    # ---------------- Drag ----------------
+    def eventFilter(self, obj, event):
+        if obj.objectName() == "DialogPanel":
+            if event.type() == QEvent.MouseButtonPress and isinstance(event, QMouseEvent):
+                if event.button() == Qt.LeftButton:
+                    self._drag_pos = (
+                        event.globalPosition().toPoint()
+                        - self.frameGeometry().topLeft()
+                    )
+                    return True
 
-    def mouseMoveEvent(self, event):
-        if self._drag_offset is not None and (event.buttons() & Qt.LeftButton):
-            self.move(event.globalPosition().toPoint() - self._drag_offset)
-            event.accept()
-        else:
-            super().mouseMoveEvent(event)
+            elif event.type() == QEvent.MouseMove and isinstance(event, QMouseEvent):
+                if self._drag_pos is not None:
+                    self.move(event.globalPosition().toPoint() - self._drag_pos)
+                    return True
 
-    def mouseReleaseEvent(self, event):
-        self._drag_offset = None
-        super().mouseReleaseEvent(event)
+            elif event.type() == QEvent.MouseButtonRelease:
+                self._drag_pos = None
+                return True
 
-    # ------------ helpers estáticos ---------
+        return super().eventFilter(obj, event)
+
+    # ---------------- helpers estáticos ----------------
     @classmethod
-    def info(cls, parent, title: str, text: str, button_text: str = "OK") -> None:
-        dlg = cls(title, text, kind="info", primary_text=button_text, parent=parent)
+    def info(cls, parent, title: str, text: str, button_text: str = "Aceptar") -> None:
+        dlg = cls(
+            title,
+            text,
+            kind="info",
+            primary_text=button_text,
+            parent=parent,
+        )
         dlg.exec()
 
     @classmethod
-    def warning(cls, parent, title: str, text: str, button_text: str = "OK") -> None:
-        dlg = cls(title, text, kind="warning", primary_text=button_text, parent=parent)
+    def warning(cls, parent, title: str, text: str, button_text: str = "Aceptar") -> None:
+        dlg = cls(
+            title,
+            text,
+            kind="warning",
+            primary_text=button_text,
+            parent=parent,
+        )
         dlg.exec()
 
     @classmethod
-    def error(cls, parent, title: str, text: str, button_text: str = "OK") -> None:
-        dlg = cls(title, text, kind="error", primary_text=button_text, parent=parent)
+    def error(cls, parent, title: str, text: str, button_text: str = "Aceptar") -> None:
+        dlg = cls(
+            title,
+            text,
+            kind="error",
+            primary_text=button_text,
+            parent=parent,
+        )
         dlg.exec()
 
     @classmethod

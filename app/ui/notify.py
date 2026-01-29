@@ -1,62 +1,129 @@
 from __future__ import annotations
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
-from PySide6.QtWidgets import QFrame, QLabel, QHBoxLayout, QWidget
-from PySide6.QtWidgets import QApplication
+
+from PySide6.QtCore import (
+    Qt,
+    QTimer,
+    QPropertyAnimation,
+    QEasingCurve,
+)
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QFrame,
+    QLabel,
+    QHBoxLayout,
+    QWidget,
+    QApplication,
+    QGraphicsDropShadowEffect,
+)
+
 
 class NotifyPopup(QFrame):
     """
     Popup flotante (frameless) con fade-in/out.
     tipo: "info" | "success" | "warning" | "error"
+
+    Diseño:
+    - Colores suaves (no saturados)
+    - Card flotante con sombra
+    - Íconos discretos
+    - No invade el layout
     """
+
+    STYLES = {
+        "info": {
+            "bg": "#3B82F6",   # blue-500 suave
+            "icon": "ℹ️",
+        },
+        "success": {
+            "bg": "#22C55E",   # green-500 suave
+            "icon": "",        # sin icono para success
+        },
+        "warning": {
+            "bg": "#FBBF24",   # amber-400
+            "icon": "⚠️",
+        },
+        "error": {
+            "bg": "#F87171",   # red-400
+            "icon": "⛔",
+        },
+    }
+
     def __init__(self, text: str, tipo: str = "info", parent: QWidget | None = None):
         super().__init__(parent)
+
         self.setFont(QApplication.font())
 
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowStaysOnTopHint
+        )
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        self._bg = {
-            "info":    "#2563EB",
-            "success": "#059669",
-            "warning": "#F59E0B",
-            "error":   "#EF4444",
-        }.get(tipo, "#2563EB")
+        style = self.STYLES.get(tipo, self.STYLES["info"])
 
-        wrap = QFrame(self)
-        wrap.setObjectName("NotifyWrap")
-        lay = QHBoxLayout(wrap)
-        lay.setContentsMargins(14, 10, 14, 10)
-        self._label = QLabel(text)
-        self._label.setWordWrap(True)
-        self._label.setFont(QApplication.font())
-        lay.addWidget(self._label)
+        # ---------------- Card ----------------
+        card = QFrame(self)
+        card.setObjectName("NotifyCard")
 
+        # sombra suave
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 6)
+        shadow.setColor(QColor(0, 0, 0, 90))
+        card.setGraphicsEffect(shadow)
+
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(14, 10, 16, 10)
+        lay.setSpacing(10)
+
+        # icono (solo si existe)
+        if style["icon"]:
+            icon_lbl = QLabel(style["icon"], card)
+            icon_lbl.setObjectName("NotifyIcon")
+            icon_lbl.setAlignment(Qt.AlignTop)
+            lay.addWidget(icon_lbl)
+
+        # texto
+        text_lbl = QLabel(text, card)
+        text_lbl.setObjectName("NotifyText")
+        text_lbl.setWordWrap(True)
+        lay.addWidget(text_lbl, 1)
 
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.addWidget(wrap)
+        root.addWidget(card)
 
+        # ---------------- estilos ----------------
         self.setStyleSheet(f"""
-        #NotifyWrap {{
-            font-size: 1em;
-            background: {self._bg};
+        #NotifyCard {{
+            background: {style["bg"]};
             color: white;
-            border-radius: 10px;
-            font-weight: 600;
+            border-radius: 12px;
+        }}
+        #NotifyIcon {{
+            font-size: 1.15em;
+        }}
+        #NotifyText {{
+            font-size: 0.9em;
+            font-weight: 500;
         }}
         """)
 
+        # ---------------- animaciones ----------------
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._fade_out)
 
         self._anim = QPropertyAnimation(self, b"windowOpacity", self)
-        self._anim.setDuration(220)
+        self._anim.setDuration(200)
         self._anim.setEasingCurve(QEasingCurve.OutCubic)
 
-    def show_centered(self, msec: int = 2200, pos: str = "middle"):
+    # -------------------------------------------------
+
+    def show_centered(self, msec: int = 2400, pos: str = "bottom"):
         """
-        pos: "bottom" (default), "middle", "top"
+        pos: "top" | "middle" | "bottom"
         """
         container = self.parent().window() if self.parent() else self
 
@@ -68,12 +135,13 @@ class NotifyPopup(QFrame):
         ph = container.height()
 
         x = (pw - w) // 2
-        if pos == "middle":
+
+        if pos == "top":
+            y = 32
+        elif pos == "middle":
             y = (ph - h) // 2
-        elif pos == "top":
-            y = 28
         else:  # bottom
-            y = ph - h - 28
+            y = ph - h - 32
 
         global_pos = container.mapToGlobal(container.rect().topLeft())
 
@@ -81,11 +149,12 @@ class NotifyPopup(QFrame):
             global_pos.x() + x,
             global_pos.y() + y,
             w,
-            h
+            h,
         )
 
         self.setWindowOpacity(0.0)
         self.show()
+        self.raise_()
 
         self._anim.stop()
         self._anim.setStartValue(0.0)
@@ -93,7 +162,6 @@ class NotifyPopup(QFrame):
         self._anim.start()
 
         self._timer.start(msec)
-
 
     def _fade_out(self):
         self._anim.stop()
