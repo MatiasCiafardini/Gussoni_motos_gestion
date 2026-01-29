@@ -14,6 +14,7 @@ from app.ui.widgets.confirm_dialog import ConfirmDialog
 import app.ui.app_message as popUp
 from app.ui.widgets.money_spinbox import MoneySpinBox
 from app.domain.vehiculos_validaciones import validate_vehiculo
+from app.ui.utils.text_utils import normalize_title
 
 
 # ====================== Carga asíncrona de catálogos ======================
@@ -105,6 +106,39 @@ class VehiculosAgregarPage(QWidget):
 
         self.in_observaciones = QTextEdit(); self.in_observaciones.setPlaceholderText("Observaciones (opcional)")
         self.in_observaciones.setFixedHeight(70)
+        # Normalizar texto al salir del campo (UX)
+        self.in_marca.editingFinished.connect(
+            lambda: self.in_marca.setText(
+                normalize_title(self.in_marca.text())
+            )
+        )
+
+        self.in_modelo.editingFinished.connect(
+            lambda: self.in_modelo.setText(
+                normalize_title(self.in_modelo.text())
+            )
+        )
+        self.in_numero_motor.editingFinished.connect(
+            lambda: self.in_numero_motor.setText(
+                normalize_title(self.in_numero_motor.text())
+            )
+        )
+        self.in_numero_cuadro.editingFinished.connect(
+            lambda: self.in_numero_cuadro.setText(
+                normalize_title(self.in_numero_cuadro.text())
+            )
+        )
+        self.in_nro_certificado.editingFinished.connect(
+            lambda: self.in_nro_certificado.setText(
+                normalize_title(self.in_nro_certificado.text())
+            )
+        )
+        self.in_nro_dnrpa.editingFinished.connect(
+            lambda: self.in_nro_dnrpa.setText(
+                normalize_title(self.in_nro_dnrpa.text())
+            )
+        )
+
 
         # === Filas (3 columnas) ===
         form.addWidget(QLabel("Marca *"), 0, 0);    form.addWidget(self.in_marca, 0, 1)

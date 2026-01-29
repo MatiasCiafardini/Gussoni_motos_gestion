@@ -16,6 +16,7 @@ from app.ui.widgets.registrar_pago_dialog import RegistrarPagoDialog
 from app.domain.clientes_validaciones import validar_cliente
 from app.ui.utils.table_utils import setup_compact_table
 from PySide6.QtWidgets import QAbstractItemView
+from app.ui.utils.text_utils import normalize_title
 
 from app.services.clientes_service import ClientesService
 from app.services.ventas_service import VentasService
@@ -65,6 +66,24 @@ class ClientesDetailPage(QWidget):
 
         self.in_observ = QTextEdit()
         self.in_observ.setMinimumHeight(80)
+        # Normalizar texto al salir del campo
+        self.in_nombre.editingFinished.connect(
+            lambda: self.in_nombre.setText(
+                normalize_title(self.in_nombre.text())
+            )
+        )
+
+        self.in_apellido.editingFinished.connect(
+            lambda: self.in_apellido.setText(
+                normalize_title(self.in_apellido.text())
+            )
+        )
+
+        self.in_direccion.editingFinished.connect(
+            lambda: self.in_direccion.setText(
+                normalize_title(self.in_direccion.text())
+            )
+        )
 
         # =========================
         # BOTONES

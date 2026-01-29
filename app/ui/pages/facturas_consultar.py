@@ -26,6 +26,7 @@ from app.services.catalogos_service import CatalogosService
 from PySide6.QtWidgets import QListView, QAbstractItemView
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt, QTimer, QRect, QEvent
+from app.ui.documentacion.nota_no_rodamiento import generar_nota_no_rodamiento_pdf
 
 # -------------------- Ventana popup movible --------------------
 from datetime import date
@@ -758,6 +759,8 @@ class FacturasConsultarPage(QWidget):
         self.btn_cancelar_edicion = QPushButton("Cancelar edición")
         self.btn_pdf = QPushButton("Comprobante PDF")
         self.btn_nc = QPushButton("Generar nota de crédito")
+        self.btn_no_rodamiento = QPushButton("Nota no rodamiento")
+        self.btn_no_rodamiento.setObjectName("BtnPrimary")
 
         self.btn_nc.setObjectName("BtnPrimary")
         self.btn_guardar.setObjectName("BtnPrimary")
@@ -769,6 +772,7 @@ class FacturasConsultarPage(QWidget):
         btns.addWidget(self.btn_guardar)
         btns.addWidget(self.btn_cancelar_edicion)
         btns.addWidget(self.btn_pdf)
+        btns.addWidget(self.btn_no_rodamiento)
         btns.addWidget(self.btn_nc)
         btns.addStretch(1)
 
@@ -776,6 +780,8 @@ class FacturasConsultarPage(QWidget):
 
         self.btn_volver.clicked.connect(self._on_volver)
         self.btn_pdf.clicked.connect(self._on_comprobante_pdf)
+        self.btn_no_rodamiento.clicked.connect(self._on_nota_no_rodamiento)
+
         self.btn_nc.clicked.connect(self._on_generar_nc)
         self.btn_modificar.clicked.connect(self._on_modificar)
         self.btn_guardar.clicked.connect(self._on_guardar_cambios)
@@ -848,6 +854,67 @@ class FacturasConsultarPage(QWidget):
                 return False  # ✅ la tabla maneja el scroll
 
         return super().eventFilter(obj, event)
+    def _on_nota_no_rodamiento(self) -> None:
+        if not self._factura:
+            return
+
+        try:
+            self.setCursor(Qt.WaitCursor)
+            QApplication.processEvents()
+
+            # 1️⃣ Cliente
+            cliente = {
+                "id": self._factura.get("cliente_id"),
+                "nombre": self._factura.get("cliente_nombre"),
+                "apellido": self._factura.get("cliente_apellido"),
+                "tipo_doc": self._factura.get("cliente_tipo_doc"),
+                "nro_doc": self._factura.get("cliente_nro_doc"),
+                "direccion": self._factura.get("cliente_direccion"),
+            }
+
+            # 2️⃣ Vehículo (sacamos el primero VEHICULO de la factura)
+            db = SessionLocal()
+            try:
+                row = db.execute(
+                    text("""
+                        SELECT v.*,
+                         c.nombre as color
+                        FROM facturas_detalle fd
+                        JOIN vehiculos v ON v.id = fd.vehiculo_id
+                        JOIN colores c on c.id = v.color_id
+                        WHERE fd.factura_id = :fid
+                        AND fd.item_tipo = 'VEHICULO'
+                        ORDER BY fd.id ASC
+                        LIMIT 1
+                    """),
+                    {"fid": self._factura_id},
+                ).mappings().first()
+            finally:
+                db.close()
+
+            if not row:
+                popUp.toast(
+                    self,
+                    "La factura no tiene un vehículo asociado.",
+                    kind="warning",
+                )
+                return
+
+            vehiculo = dict(row)
+
+            path = generar_nota_no_rodamiento_pdf(cliente, vehiculo)
+
+            # 4️⃣ Abrir
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+        except Exception as ex:
+            popUp.toast(
+                self,
+                f"Error al generar la nota de no rodamiento: {ex}",
+                kind="error",
+            )
+        finally:
+            self.setCursor(Qt.ArrowCursor)
 
     def _on_comprobante_pdf(self) -> None:
         try:

@@ -102,6 +102,14 @@ except Exception as e:
     print("❌ ERROR importando FacturasConsultarPage:", e)
     raise
 
+# =================== DOCUMENTACIÓN ===================
+DocumentacionPage = None
+try:
+    from app.ui.pages.documentacion_page import DocumentacionPage as _DocumentacionPage
+    DocumentacionPage = _DocumentacionPage
+except Exception as e:
+    print("ERROR importando DocumentacionPage:", e)
+    DocumentacionPage = None
 
 # =================== CONFIGURACIÓN ===================
 ConfiguracionPage = None
@@ -210,12 +218,13 @@ class MainWindow(QMainWindow):
         self.btn_clientes     = self._mk_btn("Clientes")
         self.btn_vehiculos    = self._mk_btn("Vehículos")
         self.btn_facturacion  = self._mk_btn("Facturación")
+        self.btn_documentacion= self._mk_btn("Documentación")
         self.btn_proveedores  = self._mk_btn("Proveedores")
         self.btn_reportes     = self._mk_btn("Reportes")
         self.btn_config       = self._mk_btn("Configuración")
 
         for b in (
-            self.btn_inicio, self.btn_clientes, self.btn_vehiculos, self.btn_facturacion,
+            self.btn_inicio, self.btn_clientes, self.btn_vehiculos, self.btn_facturacion,self.btn_documentacion,
             self.btn_proveedores, self.btn_reportes, self.btn_config
         ):
             sbl.addWidget(b)
@@ -243,7 +252,11 @@ class MainWindow(QMainWindow):
         self.page_clientes = self._make_clientes_page()
         self.page_vehiculos = self._make_vehiculos_page()
         self.page_facturacion = self._make_facturacion_page()
-        
+        if DocumentacionPage:
+            self.page_documentacion = DocumentacionPage()
+        else:
+            self.page_documentacion = PlaceholderPage("Documentación")
+
         try:
             from app.ui.pages.proveedores_page import ProveedoresPage
             self.page_proveedores = ProveedoresPage()
@@ -258,7 +271,7 @@ class MainWindow(QMainWindow):
         self.page_config = self._make_configuracion_page()
 
         for p in (
-            self.page_inicio, self.page_clientes, self.page_vehiculos, self.page_facturacion,
+            self.page_inicio, self.page_clientes, self.page_vehiculos, self.page_facturacion,self.page_documentacion,
             self.page_proveedores, self.page_reportes, self.page_config
         ):
             self.stack.addWidget(p)
@@ -271,6 +284,7 @@ class MainWindow(QMainWindow):
         self.btn_clientes.clicked.connect(lambda: self.show_fixed_page(self.page_clientes))
         self.btn_vehiculos.clicked.connect(lambda: self.show_fixed_page(self.page_vehiculos))
         self.btn_facturacion.clicked.connect(lambda: self.show_fixed_page(self.page_facturacion))
+        self.btn_documentacion.clicked.connect(lambda: self.show_fixed_page(self.page_documentacion))
         self.btn_proveedores.clicked.connect(lambda: self.show_fixed_page(self.page_proveedores))
         self.btn_reportes.clicked.connect(lambda: self.show_fixed_page(self.page_reportes))
         self.btn_config.clicked.connect(lambda: self.show_fixed_page(self.page_config))
@@ -569,6 +583,12 @@ class MainWindow(QMainWindow):
             page = ClientesAgregarPage(self)
             self.stack.setCurrentWidget(self._mount(page))
             return
+        
+        # -------- Documentación --------
+        if name == "documentacion":
+            self.show_fixed_page(self.page_documentacion)
+            return
+
 
         # -------- Usuarios --------
         if name == "usuarios":

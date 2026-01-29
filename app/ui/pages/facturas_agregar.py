@@ -15,6 +15,8 @@ from app.services.vehiculos_service import VehiculosService
 from app.ui.widgets.confirm_dialog import ConfirmDialog
 import app.ui.app_message as popUp
 from app.domain.facturas_validaciones import validar_factura
+from app.ui.widgets.cliente_selector_combo import ClienteSelectorCombo
+from app.ui.widgets.vehiculo_selector_combo import VehiculoSelectorCombo
 
 from PySide6.QtCore import Qt, QDate
 from app.data.database import SessionLocal
@@ -97,163 +99,6 @@ from PySide6.QtWidgets import QListView, QAbstractItemView
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt, QTimer, QRect, QEvent
 
-class VehiculoSelectorCombo(QComboBox):
-    vehiculo_selected = Signal(dict)
-
-    def __init__(self, vehiculos_service: VehiculosService, parent=None) -> None:
-        super().__init__(parent)
-
-        _setup_combo(self)
-        self.setEditable(True)
-        self.setInsertPolicy(QComboBox.NoInsert)
-
-        self._svc = vehiculos_service
-        self._results: List[Dict[str, Any]] = []
-        self._selected: Optional[Dict[str, Any]] = None
-
-        le = self.lineEdit()
-        le.setPlaceholderText("Buscar vehículo...")
-        le.setClearButtonEnabled(True)
-
-        # 👇 LISTA FLOTANTE QUE NO ROBA FOCO
-        self._popup = QListView()
-        # --- Estilo visual del popup ---
-        font = self.font()
-        self._popup.setFont(font)
-
-        # Altura de fila basada en font (no hardcode)
-        fm = self._popup.fontMetrics()
-        row_h = max(24, fm.height() + 8)
-        self._popup.setStyleSheet(f"""
-        QListView {{
-            background: #ffffff;
-            border: 1px solid #cfcfcf;
-            border-radius: 6px;
-            padding: 4px;
-            outline: 0;
-        }}
-
-        QListView::item {{
-            padding: 6px 8px;
-            min-height: {row_h}px;
-        }}
-
-        QListView::item:selected {{
-            background: #6c63ff;
-            color: white;
-        }}
-
-        QListView::item:hover {{
-            background: #e8e7ff;
-        }}
-        """)
-
-        self._popup.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
-        self._popup.setFocusPolicy(Qt.NoFocus)
-        self._popup.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._popup.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._popup.setSelectionMode(QAbstractItemView.SingleSelection)
-
-        self._model = QStandardItemModel(self._popup)
-        self._popup.setModel(self._model)
-
-        self._popup.clicked.connect(self._on_popup_clicked)
-
-        # Cerrar lista si se hace click afuera
-        self.installEventFilter(self)
-        le.installEventFilter(self)
-
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.setInterval(150)
-        self._timer.timeout.connect(self._do_search)
-
-        le.textChanged.connect(self._on_text_changed)
-
-    @property
-    def selected_vehiculo(self) -> Optional[Dict[str, Any]]:
-        return self._selected
-
-    # ---- búsqueda ----
-    def _on_text_changed(self, _text: str) -> None:
-        # Solo invalidamos si el usuario BORRA el texto
-        if not _text.strip():
-            self._selected = None
-        self._timer.start()
-
-
-    def _do_search(self) -> None:
-        le = self.lineEdit()
-        text = (le.text() or "").strip()
-
-        if len(text) < 4:
-            self._results = []
-            self._model.clear()
-            self._popup.hide()
-            return
-
-        filtros = {
-            "q": text,
-            "page": 1,
-            "page_size": 20,
-        }
-
-        try:
-            rows, _ = self._svc.search(filtros, page=1, page_size=20)
-        except Exception as ex:
-            popUp.toast(self, f"Error al buscar vehículos: {ex}", kind="error")
-            rows = []
-
-        self._results = rows or []
-
-        self._model.clear()
-        for v in self._results:
-            item = QStandardItem(_vehiculo_label(v))
-            item.setData(v, Qt.UserRole)
-            self._model.appendRow(item)
-
-        if self._model.rowCount() > 0:
-            self._show_popup()
-        else:
-            self._popup.hide()
-
-    def _show_popup(self) -> None:
-        le = self.lineEdit()
-        pos = le.mapToGlobal(le.rect().bottomLeft())
-        w = le.width()
-        h = min(220, self._popup.sizeHintForRow(0) * self._model.rowCount() + 6)
-
-        self._popup.setGeometry(QRect(pos.x(), pos.y(), w, h))
-        self._popup.show()
-        self._popup.raise_()
-
-    def _on_popup_clicked(self, index) -> None:
-        item = self._model.itemFromIndex(index)
-        if not item:
-            return
-
-        data = item.data(Qt.UserRole)
-        if not isinstance(data, dict):
-            return
-
-        self._selected = data
-        self.lineEdit().setText(_vehiculo_label(data))
-        self._popup.hide()
-        self.vehiculo_selected.emit(data)
-
-    # ---- cerrar popup correctamente ----
-    def eventFilter(self, obj, event) -> bool:
-        if event.type() in (QEvent.FocusOut, QEvent.MouseButtonPress):
-            if self._popup.isVisible():
-                self._popup.hide()
-        return super().eventFilter(obj, event)
-
-    def hideEvent(self, event) -> None:
-        super().hideEvent(event)
-        self._popup.hide()
-
-
-
 # -------- Página FacturasAgregar --------
 
 class FacturasAgregarPage(QWidget):
@@ -272,12 +117,6 @@ class FacturasAgregarPage(QWidget):
         self._dirty = False
         self._selected_cliente: Optional[Dict[str, Any]] = None
         self._catalogos = CatalogosService()
-        self._cliente_search_timer = QTimer(self)
-        self._cliente_search_timer.setSingleShot(True)
-        self._cliente_search_timer.setInterval(150)
-        self._cliente_search_timer.timeout.connect(self._do_cliente_search)
-
-        self._cliente_results: List[Dict[str, Any]] = []
 
         # Lista cacheada de condiciones IVA (para poder buscar por código)
         self._cond_iva_receptor_list: List[Dict[str, Any]] = []
@@ -435,22 +274,12 @@ class FacturasAgregarPage(QWidget):
         for col, stretch in enumerate((1, 3, 1, 3, 1, 3)):
             grid2.setColumnStretch(col, stretch)
 
-        # fila 1: buscar cliente + limpiar
-        self.cb_cliente = QComboBox()
-        _setup_combo(self.cb_cliente)
-        self.cb_cliente.setEditable(True)
-        self.cb_cliente.setInsertPolicy(QComboBox.NoInsert)
-        le_cli = self.cb_cliente.lineEdit()
-        le_cli.setPlaceholderText("Escribí nombre, apellido o documento...")
-        le_cli.setClearButtonEnabled(True)
-
-        self.btn_cliente_limpiar = QPushButton("Limpiar")
-        self.btn_cliente_limpiar.setObjectName("BtnPrimary")
+        self.cb_cliente = ClienteSelectorCombo(self._svc_clientes, self)
+        self.cb_cliente.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         row = 0
         grid2.addWidget(QLabel("Buscar cliente"), row, 0)
         grid2.addWidget(self.cb_cliente, row, 1, 1, 1)
-        grid2.addWidget(self.btn_cliente_limpiar, row, 2)
 
         # fila 2: tipo doc + nro doc
         self.in_cliente_tipo_doc = QLineEdit()
@@ -482,10 +311,8 @@ class FacturasAgregarPage(QWidget):
 
         main.addWidget(sec2)
 
-        le_cli.textEdited.connect(self._on_cliente_text_edited)
-        self.cb_cliente.currentIndexChanged.connect(self._on_cliente_selected)
-        self.btn_cliente_limpiar.clicked.connect(self._on_cliente_limpiar)
-
+        self.cb_cliente.cliente_selected.connect(self._on_cliente_seleccionado)
+        self.cb_cliente.cliente_cleared.connect(self._on_cliente_limpiado)
         # --- Sección: Datos de la venta / Forma de pago ---
 
         sec_venta = QFrame(self)
@@ -1023,98 +850,30 @@ class FacturasAgregarPage(QWidget):
         self._actualizar_modo_nc()
 
     # ---------------- Cliente dinámico ----------------
-
-    def _on_cliente_text_edited(self, _text: str) -> None:
-        self._dirty = True
-        self._selected_cliente = None
-        self._clear_cliente_info()
-        self._cliente_search_timer.start()
-        self._actualizar_modo_nc()
-
-    def _do_cliente_search(self) -> None:
-        text = (self.cb_cliente.lineEdit().text() or "").strip()
-        if len(text) < 4:
-            self._cliente_results = []
-            self.cb_cliente.blockSignals(True)
-            self.cb_cliente.clear()
-            self.cb_cliente.blockSignals(False)
-            return
-
-        filtros = {
-            "nombre": text,
-            "page": 1,
-            "page_size": 20,
-        }
-
-        try:
-            rows, _ = self._svc_clientes.search(filtros, page=1, page_size=20)
-        except Exception as ex:
-            popUp.toast(self, f"Error al buscar clientes: {ex}", kind="error")
-            rows = []
-
-
-        self._cliente_results = rows or []
-        current_text = self.cb_cliente.lineEdit().text()
-
-        self.cb_cliente.blockSignals(True)
-        self.cb_cliente.clear()
-        for c in self._cliente_results:
-            self.cb_cliente.addItem(_cliente_label(c), c)
-        self.cb_cliente.setCurrentIndex(-1)
-        self.cb_cliente.blockSignals(False)
-
-        self.cb_cliente.lineEdit().setText(current_text)
-
-        if self.cb_cliente.count() > 0:
-            self.cb_cliente.showPopup()
-
-    def _on_cliente_selected(self, index: int) -> None:
-        if index < 0:
-            self._selected_cliente = None
-            self._clear_cliente_info()
-            self._actualizar_modo_nc()
-            return
-        data = self.cb_cliente.itemData(index)
-        if not isinstance(data, dict):
-            self._selected_cliente = None
-            self._clear_cliente_info()
-            self._actualizar_modo_nc()
-            return
-        self._set_selected_cliente(data)
-
-    def _set_selected_cliente(self, data: Dict[str, Any]) -> None:
+    def _on_cliente_seleccionado(self, data: Dict[str, Any]) -> None:
         self._dirty = True
         self._selected_cliente = data
-        tipo_doc = data.get("tipo_doc") or ""
-        nro_doc = data.get("nro_doc") or ""
-        self.in_cliente_tipo_doc.setText(tipo_doc)
-        self.in_cliente_nro_doc.setText(nro_doc)
+
+        self.in_cliente_tipo_doc.setText(data.get("tipo_doc") or "")
+        self.in_cliente_nro_doc.setText(data.get("nro_doc") or "")
         self.in_cliente_email.setText(data.get("email") or "")
         self.in_cliente_telefono.setText(data.get("telefono") or "")
         self.in_cliente_direccion.setText(data.get("direccion") or "")
 
-        # YA NO tocamos la condición IVA automáticamente,
-        # dejamos la que está seleccionada.
-        # Solo actualizamos modo NC (para mostrar comprobantes)
         self._actualizar_modo_nc()
+    def _on_cliente_limpiado(self) -> None:
+        self._dirty = True
+        self._selected_cliente = None
 
-    def _clear_cliente_info(self) -> None:
         self.in_cliente_tipo_doc.clear()
         self.in_cliente_nro_doc.clear()
         self.in_cliente_email.clear()
         self.in_cliente_telefono.clear()
         self.in_cliente_direccion.clear()
 
-    def _on_cliente_limpiar(self) -> None:
-        self._dirty = True
-        self._selected_cliente = None
-        self._cliente_results = []
-        self.cb_cliente.blockSignals(True)
-        self.cb_cliente.clear()
-        self.cb_cliente.blockSignals(False)
-        self.cb_cliente.lineEdit().clear()
-        self._clear_cliente_info()
         self._actualizar_modo_nc()
+        self.cb_cliente.setFocus()
+
 
     # ---------------- Detalle ----------------
 
@@ -1128,10 +887,10 @@ class FacturasAgregarPage(QWidget):
             lambda data, r=row: self._on_vehiculo_en_fila_seleccionado(r, data)
         )
         self.tbl_detalle.setCellWidget(row, 0, selector)
-
-        selector.lineEdit().textChanged.connect(
-            lambda text, r=row: self._on_vehiculo_text_changed_en_fila(r, text)
+        selector.vehiculo_cleared.connect(
+            lambda r=row: self._clear_detalle_row(r)
         )
+
 
         h = max(selector.sizeHint().height(), 32)
         self.tbl_detalle.setRowHeight(row, h + 4)
@@ -1184,13 +943,6 @@ class FacturasAgregarPage(QWidget):
         self._dirty = True
         self._recalcular_fila(row)
 
-    def _on_vehiculo_text_changed_en_fila(self, row: int, text: str) -> None:
-        if row < 0 or row >= self.tbl_detalle.rowCount():
-            return
-        if text.strip():
-            return
-        self._dirty = True
-        self._clear_detalle_row(row)
 
     def _on_detalle_valor_editado(self, row: int) -> None:
         if row < 0 or row >= self.tbl_detalle.rowCount():

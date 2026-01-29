@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton, QHBoxLayout, QSizePolicy, QListView, QFrame, QSpacerItem
 )
 from app.domain.clientes_validaciones import validar_cliente
+from app.ui.utils.text_utils import normalize_title
 
 from app.services.clientes_service import ClientesService
 from app.services.catalogos_service import CatalogosService
@@ -95,6 +96,7 @@ class ClientesAgregarPage(QWidget):
 
         self.in_tipo_doc = QComboBox();   self._setup_combo(self.in_tipo_doc)
         self.in_nro_doc = QLineEdit()
+        
 
         # ----- Validadores dinámicos según tipo de documento -----
         self._validator_dni = QRegularExpressionValidator(
@@ -119,7 +121,24 @@ class ClientesAgregarPage(QWidget):
 
         self.in_observaciones = QTextEdit(); self.in_observaciones.setPlaceholderText("Observaciones (opcional)")
         self.in_observaciones.setFixedHeight(70)
+        # Normalizar texto al salir del campo
+        self.in_nombre.editingFinished.connect(
+            lambda: self.in_nombre.setText(
+                normalize_title(self.in_nombre.text())
+            )
+        )
 
+        self.in_apellido.editingFinished.connect(
+            lambda: self.in_apellido.setText(
+                normalize_title(self.in_apellido.text())
+            )
+        )
+
+        self.in_direccion.editingFinished.connect(
+            lambda: self.in_direccion.setText(
+                normalize_title(self.in_direccion.text())
+            )
+        )
         # === Filas (3 columnas) ===
         form.addWidget(QLabel("Nombre *"), 0, 0);       form.addWidget(self.in_nombre, 0, 1)
         form.addWidget(QLabel("Apellido"), 0, 2);       form.addWidget(self.in_apellido, 0, 3)

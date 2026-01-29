@@ -11,6 +11,7 @@ from app.ui.widgets.confirm_dialog import ConfirmDialog
 from app.ui.widgets.money_spinbox import MoneySpinBox
 import app.ui.app_message as popUp
 from app.domain.vehiculos_validaciones import validate_vehiculo
+from app.ui.utils.text_utils import normalize_title
 
 class VehiculoDetailPage(QWidget):
     """
@@ -64,6 +65,33 @@ class VehiculoDetailPage(QWidget):
         self.in_observ = QTextEdit()
         self.in_observ.setPlaceholderText("Observaciones")
         self.in_observ.setMinimumHeight(80)
+        # Normalizar texto al salir del campo (UX)
+        self.in_marca.editingFinished.connect(
+            lambda: self.in_marca.setText(
+                normalize_title(self.in_marca.text())
+            )
+        )
+
+        self.in_modelo.editingFinished.connect(
+            lambda: self.in_modelo.setText(
+                normalize_title(self.in_modelo.text())
+            )
+        )
+        self.in_numero_cuadro.editingFinished.connect(
+            lambda: self.in_numero_cuadro.setText(
+                normalize_title(self.in_numero_cuadro.text())
+            )
+        )
+        self.in_nro_certificado.editingFinished.connect(
+            lambda: self.in_nro_certificado.setText(
+                normalize_title(self.in_nro_certificado.text())
+            )
+        )
+        self.in_nro_dnrpa.editingFinished.connect(
+            lambda: self.in_nro_dnrpa.setText(
+                normalize_title(self.in_nro_dnrpa.text())
+            )
+        )
 
         # ---------- Botonera del pie (centrada) ----------
         self.btn_edit = QPushButton("Editar");      self.btn_edit.setObjectName("BtnPrimary")
