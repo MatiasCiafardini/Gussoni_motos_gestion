@@ -241,7 +241,7 @@ class ConfiguracionPage(QWidget):
             return
 
         if hasattr(self.main_window, "check_updates_ui"):
-            self.main_window.check_updates_ui()
+            self.main_window.check_updates_ui(interactive=True)
         else:
             popUp.warning(
                 self,

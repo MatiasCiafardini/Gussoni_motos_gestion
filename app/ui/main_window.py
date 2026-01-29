@@ -465,27 +465,28 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------
     # buscador de actualizaciones
     # ---------------------------------------------------------------------
-    def check_updates_ui(self):
+    def check_updates_ui(self, *, interactive: bool = True):
         try:
             update = check_for_update()
             if not update:
-                popUp.info(
+                if interactive:
+                    popUp.info(
+                        self,
+                        "Actualizaciones",
+                        "La aplicación ya está actualizada.",
+                    )
+                    return
+            if interactive:
+                if not popUp.confirm(
                     self,
-                    "Actualizaciones",
-                    "La aplicación ya está actualizada.",
-                )
-                return
-
-            if not popUp.confirm(
-                self,
-                "Actualización disponible",
-                f"Hay una nueva versión disponible: {update['version']}\n\n"
-                f"{update.get('changelog', '')}",
-                ok_text="Actualizar ahora",
-                cancel_text="Más tarde",
-                icon="⬆️",
-            ):
-                return
+                    "Actualización disponible",
+                    f"Hay una nueva versión disponible: {update['version']}\n\n"
+                    f"{update.get('changelog', '')}",
+                    ok_text="Actualizar ahora",
+                    cancel_text="Más tarde",
+                    icon="⬆️",
+                ):
+                    return
 
             # -------- descargar --------
             updates_dir = Path(os.getenv("LOCALAPPDATA")) / "GussoniApp" / "updates"
@@ -757,7 +758,7 @@ class MainWindow(QMainWindow):
                 cancel_text="Más tarde",
                 icon="⬆️",
             ):
-                self.check_updates_ui()
+                self.check_updates_ui(interactive=False)
 
         except Exception as e:
             # IMPORTANTE: no romper el arranque por un error de update

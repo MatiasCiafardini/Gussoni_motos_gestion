@@ -41,7 +41,7 @@ class ApplicationController(QObject):
 
     def _show_login(self) -> None:
         from app.ui.login_dialog import LoginDialog  # lazy import
-
+        print("esto es el show_login")
         dialog = LoginDialog()
         result = dialog.exec()
 
@@ -95,7 +95,7 @@ def start_app(app):
     ensure_user_dirs()
 
     setup_logging(settings.APP_NAME)
-
+    print("hasta aca llega")
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
         "gussoni.app"
     )
