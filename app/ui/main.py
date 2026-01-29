@@ -21,8 +21,6 @@ from typing import Optional, Dict, Any
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QDialog
 
-from app.core.db_state import db_config_completa
-
 
 class ApplicationController(QObject):
     """Coordinates the login flow and the main window lifecycle."""
@@ -34,9 +32,13 @@ class ApplicationController(QObject):
         self._current_user: Optional[Dict[str, Any]] = None
 
     def start(self) -> None:
-        if not db_config_completa():
+        print("ANTES db_config_completa")
+        ok = db_config_completa()
+        print("DESPUES db_config_completa:", ok)
+        if not ok:
             self._show_config()
         else:
+            print("esto es el showlogin de nuevo")
             self._show_login()
 
     def _show_login(self) -> None:

@@ -4,13 +4,13 @@ import shutil
 import subprocess
 import json
 from pathlib import Path
-from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QMessageBox, QProgressBar 
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QProgressBar 
 from PySide6.QtCore import Qt, QTimer
-
+import app.ui.app_message as popUp
 
 
 def show_error(msg: str):
-    QMessageBox.toast(None, "Error de actualización", msg)
+    popUp.toast(None, "Error de actualización", kind="error")
     sys.exit(1)
 
 def create_updater_window():
@@ -74,7 +74,7 @@ def main():
     app = QApplication(sys.argv)
 
     if len(sys.argv) < 4:
-        QMessageBox.critical(None, "Error", "Parámetros inválidos")
+        popUp.critical(None, "Error", "Parámetros inválidos")
         sys.exit(1)
 
     window, status, progress = create_updater_window()
@@ -116,7 +116,7 @@ def main():
 
         subprocess.Popen([str(current_exe)], close_fds=True)
     except Exception as e:
-        QMessageBox.critical(None, "Error de actualización", str(e))
+        popUp.critical(None, "Error de actualización", str(e))
         sys.exit(1)
 
     sys.exit(0)
