@@ -61,25 +61,25 @@ class ComprobantesService:
         fac = self._svc.get(int(factura_id))
         if not fac:
             raise ValueError(f"No se encontró la factura ID {factura_id}.")
-
+        print("aca entra 3")
         items = self._svc.get_detalle(int(factura_id)) or []
 
         out_dir = Path.home() / "Downloads"
         out_dir.mkdir(parents=True, exist_ok=True)
-
+        print("aca entra 4")
         tipo = (fac.get("tipo") or "").upper() or "FB"
         pv = self._to_int(fac.get("punto_venta") or fac.get("pto_vta") or self._empresa.punto_venta_default) or 0
         nro = self._to_int(fac.get("numero") or 0) or 0
-
+        print("aca entra 5")
         filename = f"{tipo}_{str(pv).zfill(5)}-{str(nro).zfill(8)}.pdf"
         pdf_path = out_dir / filename
-
+        print("aca entra 6")
         c = canvas.Canvas(str(pdf_path), pagesize=A4)
         c.setTitle(filename)
-
+        print("aca entra 7")
         estado_id = self._to_int(fac.get("estado_id"))
         cae = str(fac.get("cae") or "").strip()
-
+        print("aca entra 8")
         try:
             est_aut = self._svc.ESTADO_AUTORIZADA
         except Exception:
@@ -92,7 +92,7 @@ class ComprobantesService:
 
         letra = self._letra_from_tipo(tipo)
         cod_afip = self._cod_afip_from_tipo(tipo)
-
+        print("aca entra 9")
         for i, page_items in enumerate(pages or [[]], start=1):
             self._draw_page(
                 c=c,
@@ -105,9 +105,10 @@ class ComprobantesService:
                 letra=letra,
                 cod_afip=cod_afip,
             )
+            print("aca nuevamente llega")
             if i < total_pages:
                 c.showPage()
-
+        print("aca entra 10")
         c.save()
         return str(pdf_path)
 
@@ -131,26 +132,27 @@ class ComprobantesService:
         c.rect(M, M, W - 2 * M, H - 2 * M, stroke=1, fill=0)
 
         y_top = H - M
-
+        print("header 1")
         # Banda ORIGINAL
         self._draw_top_band(c, M, y_top)
         y_top -= self.TOP_BAND_H
-
+        print("header 2")
         # Header principal
         self._draw_header(c, fac, M, y_top, self.HEADER_H, page, total_pages, letra, cod_afip)
         y = y_top - self.HEADER_H
 
-
+        print("cliente 1")
         self._draw_cliente(c, fac, M, y, self.CLIENTE_H)
         y -= self.CLIENTE_H
-
+        print("tabla 1")
         self._draw_table(c, page_items, M, y, self.TABLE_H)
         y -= self.TABLE_H
-
+        print("resumen 1")
         self._draw_resumen(c, fac, all_items, M, y, self.RESUMEN_H)
         y -= self.RESUMEN_H
-
+        print("footer 1")
         self._draw_footer(c, fac, all_items, M, y, self.FOOTER_H, autorizado, page, total_pages)
+        print("footer 2")
 
 
     def _draw_top_band(self, c: canvas.Canvas, M: float, y_top: float) -> None:
@@ -617,24 +619,55 @@ class ComprobantesService:
 
         c.setLineWidth(0.6)
 
+        # Totales (no rompen aunque falten items)
         neto, iva21, total = self._calc_totals_iva21(fac, items)
 
+        # Datos fiscales (defensivo)
         cae = str(fac.get("cae") or "").strip()
         vto = self._fmt_fecha(fac.get("vto_cae") or "")
 
-        if autorizado:
+        # ----------------------------------
+        # Lógica REAL de QR / autorización
+        # ----------------------------------
+        estado_id = self._to_int(fac.get("estado_id"))
+        try:
+            est_aut = self._svc.ESTADO_AUTORIZADA
+        except Exception:
+            est_aut = None
+
+        estado_autorizado = (est_aut is None or estado_id == est_aut)
+        tiene_cae = bool(cae)
+
+        puede_mostrar_qr = estado_autorizado and tiene_cae
+
+        # ----------------------------------
+        # Posiciones base (SIEMPRE definidas)
+        # ----------------------------------
+        qr_size = 24 * mm
+        qr_x = x + 4 * mm
+        qr_y = y + 0 * mm
+
+        ax = qr_x + qr_size + 6 * mm  # eje para logo + texto
+
+        # ----------------------------------
+        # QR o placeholder
+        # ----------------------------------
+        if puede_mostrar_qr:
             payload = self._build_qr_payload(fac)
-            qr_size = 24 * mm  # un poco más chico para que respire
-
-            qr_x = x + 4 * mm
-            qr_y = y + 0 * mm
-
             self._draw_qr(c, payload, qr_x, qr_y, qr_size)
         else:
-            c.rect(x + 3 * mm, y + 3 * mm, 18 * mm, 18 * mm, stroke=1, fill=0)
+            c.rect(
+                qr_x + 1 * mm,
+                qr_y + 1 * mm,
+                18 * mm,
+                18 * mm,
+                stroke=1,
+                fill=0,
+            )
 
-        ax = qr_x + qr_size + 6 * mm
-
+        # ----------------------------------
+        # Logo AFIP / ARCA
+        # ----------------------------------
         self._draw_logo_if_exists(
             c,
             self.LOGO_AFIP_PATH,
@@ -643,12 +676,17 @@ class ComprobantesService:
             18 * mm,
             9 * mm
         )
-        # Texto DEBAJO del logo ARCA
+
+        # Texto debajo del logo
         text_x = ax
-        text_y = y + 10 * mm  # arranca justo debajo del logo
+        text_y = y + 10 * mm
 
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(text_x, text_y, "Comprobante Autorizado")
+        c.drawString(
+            text_x,
+            text_y,
+            "Comprobante Autorizado" if puede_mostrar_qr else "Comprobante no autorizado"
+        )
 
         c.setFont("Helvetica", 6.5)
         c.drawString(
@@ -657,16 +695,23 @@ class ComprobantesService:
             "Esta agencia no se responsabiliza por los datos ingresados en el detalle de la operación"
         )
 
-        # CAE y vencimiento ARRIBA A LA DERECHA
+        # ----------------------------------
+        # CAE y Vencimiento (defensivo)
+        # ----------------------------------
         c.setFont("Helvetica-Bold", 8)
-        c.drawRightString(x + w - 4 * mm, y + h - 6 * mm, f"CAE N°: {cae}" if cae else "CAE N°:")
+        c.drawRightString(
+            x + w - 4 * mm,
+            y + h - 6 * mm,
+            f"CAE N°: {cae}" if cae else "CAE N°: —"
+        )
 
         c.setFont("Helvetica", 7)
         c.drawRightString(
             x + w - 4 * mm,
             y + h - 11 * mm,
-            f"Fecha de Vto. CAE: {vto}" if vto else "Fecha de Vto. CAE:"
+            f"Fecha de Vto. CAE: {vto}" if vto else "Fecha de Vto. CAE: —"
         )
+
 
 
         

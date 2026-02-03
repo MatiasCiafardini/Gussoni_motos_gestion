@@ -1,147 +1,227 @@
-# reports/iva_ventas.py
+# app/reportes/iva_ventas.py
 
-import os
-import smtplib
-from email.message import EmailMessage
-from typing import Optional
+from __future__ import annotations
 
-from db.connection import get_connection  # ajustá si tu import es distinto
+from datetime import date
+from pathlib import Path
+from typing import Dict
+
+from sqlalchemy import text
+from app.data.database import SessionLocal
 
 
-# =========================
-# Configuración general
-# =========================
+# =========================================================
+# Helpers formato AFIP
+# =========================================================
 
-REPORTS_DIR = "reports_output"
-ENCODING = "utf-8"
+def fmt_fecha(d: date | None) -> str:
+    return d.strftime("%Y%m%d") if d else "00000000"
 
-MAIL_CONFIG = {
-    "host": "smtp.gmail.com",
-    "port": 587,
-    "user": "tu_mail@gmail.com",
-    "password": "APP_PASSWORD",
-    "from": "tu_mail@gmail.com",
-    "to": ["contador@estudio.com"]
+
+def fmt_num(valor: float | int | None, largo: int) -> str:
+    if valor is None:
+        valor = 0
+    return str(int(round(float(valor) * 100))).zfill(largo)
+
+
+def fmt_int(valor: int | None, largo: int) -> str:
+    return str(int(valor or 0)).zfill(largo)
+
+
+def fmt_str(txt: str | None, largo: int) -> str:
+    return (txt or "")[:largo].ljust(largo)
+
+
+# =========================================================
+# Códigos AFIP
+# =========================================================
+
+TIPO_COMPROBANTE = {
+    "FA": "001",
+    "FB": "006",
+    "FC": "011",
+    "NDB": "007",
+    "NCB": "008",
+}
+
+TIPO_DOC = {
+    "CUIT": "80",
+    "DNI": "96",
+}
+
+ALICUOTA_IVA = {
+    21.0: "0005",
+    10.5: "0004",
+    0.0: "0003",
 }
 
 
-# =========================
-# Query IVA Ventas (REAL)
-# =========================
+# =========================================================
+# Queries
+# =========================================================
 
-IVA_VENTAS_QUERY = """
+QUERY_CBTE = """
 SELECT
-    DATE(f.fecha_emision) AS fecha,
-    f.tipo               AS tipo_comprobante,
+    f.id,
+    f.fecha_emision,
+    f.tipo,
     f.punto_venta,
     f.numero,
+    f.total,
+    f.iva,
+    f.moneda,
+    f.cotizacion,
+    f.vto_cae,
     c.tipo_doc,
     c.nro_doc,
-    CONCAT(
-        TRIM(c.nombre),
-        CASE WHEN c.apellido <> '' THEN CONCAT(' ', TRIM(c.apellido)) ELSE '' END
-    ) AS razon_social,
-    fd.alicuota_iva,
-    SUM(fd.importe_neto)  AS neto,
-    SUM(fd.importe_iva)   AS iva,
-    SUM(fd.importe_total) AS total
+    CONCAT(TRIM(c.apellido), ' ', TRIM(c.nombre)) AS razon_social
 FROM facturas f
-JOIN facturas_detalle fd ON fd.factura_id = f.id
-JOIN clientes c ON c.id = f.cliente_id
+LEFT JOIN clientes c ON c.id = f.cliente_id
 WHERE
-    f.estado_id = 14                 -- Autorizadas
-    AND MONTH(f.fecha_emision) = %s
-    AND YEAR(f.fecha_emision) = %s
-GROUP BY
-    f.id,
-    fd.alicuota_iva
-ORDER BY
-    f.fecha_emision,
-    f.punto_venta,
-    f.numero;
+    f.estado_id = 14
+    AND MONTH(f.fecha_emision) = :mes
+    AND YEAR(f.fecha_emision) = :anio
+ORDER BY f.fecha_emision, f.punto_venta, f.numero
+"""
+
+QUERY_DETALLE = """
+SELECT
+    fd.factura_id,
+    fd.alicuota_iva,
+    SUM(fd.importe_neto) AS neto,
+    SUM(fd.importe_iva) AS iva
+FROM facturas_detalle fd
+GROUP BY fd.factura_id, fd.alicuota_iva
 """
 
 
-# =========================
-# Generar TXT
-# =========================
+# =========================================================
+# Generador principal
+# =========================================================
 
-def generar_txt_iva_ventas(mes: int, anio: int) -> str:
-    os.makedirs(REPORTS_DIR, exist_ok=True)
+def generar_txt_iva_ventas(
+    mes: int,
+    anio: int,
+    path_override: str | None = None,
+) -> Dict[str, str]:
 
-    filename = f"IVA_Ventas_{anio}_{mes:02}.txt"
-    filepath = os.path.join(REPORTS_DIR, filename)
+    base = Path(path_override) if path_override else Path.home() / "Downloads"
+    base.mkdir(parents=True, exist_ok=True)
 
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    path_cbte = base / "LIBRO_IVA_DIGITAL_VENTAS_CBTE.txt"
+    path_alic = base / "LIBRO_IVA_DIGITAL_VENTAS_ALICUOTAS.txt"
 
-    cursor.execute(IVA_VENTAS_QUERY, (mes, anio))
-    rows = cursor.fetchall()
+    session = SessionLocal()
+    try:
+        cbtes = session.execute(
+            text(QUERY_CBTE),
+            {"mes": mes, "anio": anio},
+        ).mappings().all()
 
-    cursor.close()
-    conn.close()
+        if not cbtes:
+            raise ValueError("No hay comprobantes autorizados para el período.")
 
-    if not rows:
-        raise ValueError("No hay comprobantes autorizados para el período seleccionado.")
+        detalles = session.execute(
+            text(QUERY_DETALLE)
+        ).mappings().all()
 
-    with open(filepath, "w", encoding=ENCODING) as f:
-        for r in rows:
+    finally:
+        session.close()
+
+    # indexar detalle por factura
+    detalle_por_factura: dict[int, list[dict]] = {}
+    for d in detalles:
+        detalle_por_factura.setdefault(d["factura_id"], []).append(d)
+
+    # =====================================================
+    # CBTE
+    # =====================================================
+    with open(path_cbte, "w", encoding="utf-8") as f:
+        for r in cbtes:
             line = (
-                f"{r['fecha']}|"
-                f"{r['tipo_comprobante']}|"
-                f"{int(r['punto_venta']):04d}|"
-                f"{int(r['numero']):08d}|"
-                f"{r['tipo_doc']}|"
-                f"{r['nro_doc']}|"
-                f"{r['razon_social']}|"
-                f"{r['alicuota_iva']:.2f}|"
-                f"{r['neto']:.2f}|"
-                f"{r['iva']:.2f}|"
-                f"{r['total']:.2f}"
+                fmt_fecha(r["fecha_emision"])
+                + TIPO_COMPROBANTE.get(r["tipo"], "000")
+                + fmt_int(r["punto_venta"], 5)
+                + fmt_int(r["numero"], 20)
+                + fmt_int(r["numero"], 20)
+                + TIPO_DOC.get(r["tipo_doc"], "99")
+                + fmt_str(r["nro_doc"], 20)
+                + fmt_str(r["razon_social"], 30)
+                + fmt_num(r["total"], 15)
+                + fmt_num(0, 15) * 7
+                + fmt_str(r["moneda"] or "ARS", 3)
+                + fmt_int(int((r["cotizacion"] or 1) * 1_000_000), 10)
+                + "1"
+                + "0"
+                + fmt_num(0, 15)
+                + fmt_fecha(r["vto_cae"])
             )
             f.write(line + "\n")
 
-    return filepath
+    # =====================================================
+    # ALICUOTAS (LÓGICA CORRECTA)
+    # =====================================================
+    with open(path_alic, "w", encoding="utf-8") as f:
+        for r in cbtes:
+            factura_id = r["id"]
+            filas = detalle_por_factura.get(factura_id)
 
+            if filas:
+                # 1️⃣ Usar detalle real
+                for d in filas:
+                    alic = float(d["alicuota_iva"] or 0)
+                    line = (
+                        TIPO_COMPROBANTE.get(r["tipo"], "000")
+                        + fmt_int(r["punto_venta"], 5)
+                        + fmt_int(r["numero"], 20)
+                        + fmt_num(d["neto"], 15)
+                        + ALICUOTA_IVA.get(alic, "0003")
+                        + fmt_num(d["iva"], 15)
+                    )
+                    f.write(line + "\n")
 
-# =========================
-# Envío por Email
-# =========================
+            elif r["iva"] is not None and float(r["iva"]) > 0:
+                # 2️⃣ Usar IVA cargado en la factura
+                iva = float(r["iva"])
+                total = float(r["total"] or 0)
+                neto = total - iva
 
-def enviar_iva_ventas_por_mail(
-    mes: int,
-    anio: int,
-    destinatarios: Optional[list[str]] = None
-) -> str:
-    filepath = generar_txt_iva_ventas(mes, anio)
+                alic = round((iva / neto) * 100, 1) if neto else 0.0
 
-    msg = EmailMessage()
-    msg["Subject"] = f"Libro IVA Ventas {mes:02}/{anio}"
-    msg["From"] = MAIL_CONFIG["from"]
-    msg["To"] = destinatarios or MAIL_CONFIG["to"]
+                line = (
+                    TIPO_COMPROBANTE.get(r["tipo"], "000")
+                    + fmt_int(r["punto_venta"], 5)
+                    + fmt_int(r["numero"], 20)
+                    + fmt_num(neto, 15)
+                    + ALICUOTA_IVA.get(alic, "0005")
+                    + fmt_num(iva, 15)
+                )
+                f.write(line + "\n")
 
-    msg.set_content(
-        f"""Hola,
+            else:
+                # 3️⃣ Último recurso: reconstruir desde total
+                total = float(r["total"] or 0)
 
-Adjunto el archivo TXT correspondiente al Libro IVA Ventas del período {mes:02}/{anio}.
+                if r["tipo"] in ("FA", "FB", "NDB", "NCB"):
+                    neto = total / 1.21
+                    iva = total - neto
+                    alic = 21.0
+                else:
+                    neto = total
+                    iva = 0
+                    alic = 0.0
 
-Archivo: {os.path.basename(filepath)}
+                line = (
+                    TIPO_COMPROBANTE.get(r["tipo"], "000")
+                    + fmt_int(r["punto_venta"], 5)
+                    + fmt_int(r["numero"], 20)
+                    + fmt_num(neto, 15)
+                    + ALICUOTA_IVA.get(alic, "0003")
+                    + fmt_num(iva, 15)
+                )
+                f.write(line + "\n")
 
-Saludos.
-"""
-    )
-
-    with open(filepath, "rb") as f:
-        msg.add_attachment(
-            f.read(),
-            maintype="text",
-            subtype="plain",
-            filename=os.path.basename(filepath)
-        )
-
-    with smtplib.SMTP(MAIL_CONFIG["host"], MAIL_CONFIG["port"]) as server:
-        server.starttls()
-        server.login(MAIL_CONFIG["user"], MAIL_CONFIG["password"])
-        server.send_message(msg)
-
-    return filepath
+    return {
+        "cbte": str(path_cbte),
+        "alicuotas": str(path_alic),
+    }

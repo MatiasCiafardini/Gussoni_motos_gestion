@@ -920,12 +920,12 @@ class FacturasConsultarPage(QWidget):
             old_cursor = self.cursor()
             self.setCursor(Qt.WaitCursor)
             QApplication.processEvents()
-
+            print("aca entra 1")
             path = self._svc_comprobantes.generar_pdf(self._factura_id)
 
             self.setCursor(old_cursor)
             self.btn_pdf.setEnabled(True)
-
+            print("aca entra 2")
             ok = QDesktopServices.openUrl(QUrl.fromLocalFile(path))
             if not ok:
                 popUp.toast(

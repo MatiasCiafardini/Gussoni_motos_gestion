@@ -411,14 +411,40 @@ class FacturasPage(QWidget):
                 }
 
                 for col, val in values.items():
-                    text = val if isinstance(val, str) else str(val)
-                    item = QTableWidgetItem(text)
-                    if col == self.COL_TOTAL:
-                        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    item = QTableWidgetItem()
+
+                    # 👉 columnas numéricas
+                    if col == self.COL_NUMERO:
+                        try:
+                            item.setData(Qt.DisplayRole, int(val))
+                        except Exception:
+                            item.setData(Qt.DisplayRole, 0)
+
+                    elif col == self.COL_PTO_VTA:
+                        try:
+                            item.setData(Qt.DisplayRole, int(val))
+                        except Exception:
+                            item.setData(Qt.DisplayRole, 0)
+
+                    elif col == self.COL_TOTAL:
+                        try:
+                            num = float(r.get("total") or 0)
+                            item.setData(Qt.DisplayRole, num)
+                            item.setText(self._fmt_currency(num))
+                            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                        except Exception:
+                            item.setData(Qt.DisplayRole, 0.0)
+
+                    # 👉 columnas normales (texto)
+                    else:
+                        item.setData(Qt.DisplayRole, val or "")
+
                     if col == self.COL_OBS:
-                        # tooltip con el texto completo
                         item.setToolTip(obs_full)
+
                     self.table.setItem(row, col, item)
+
+
 
                 try:
                     fid = int(id_val)

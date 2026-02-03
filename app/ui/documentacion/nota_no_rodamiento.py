@@ -136,6 +136,33 @@ def generar_nota_no_rodamiento_pdf(cliente: dict, veh: dict) -> str:
         "siendo retirada por el titular en el día de la fecha.",
         styles["Justified"]
     ))
+        # --- Firma ---
+    story.append(Spacer(1, 25))
+
+    firma = Image(paths.FIRMA_ADMIN)
+    firma.drawHeight = 25 * mm
+    firma.drawWidth = 40 * mm
+
+    firma_table = Table(
+        [[firma]],
+        colWidths=[doc.width],
+        style=TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ])
+    )
+
+    story.append(firma_table)
+    story.append(Spacer(1, 6))
+
+    story.append(Paragraph(
+        "<b>GUSSONI AUTOMOTORES 2021 S.A.S</b><br/>ADMINISTRACIÓN",
+        ParagraphStyle(
+            "FirmaTexto",
+            alignment=TA_CENTER,
+            fontSize=11,
+            leading=14
+        )
+    ))
 
     doc.build(story)
     return path

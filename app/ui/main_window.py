@@ -263,9 +263,10 @@ class MainWindow(QMainWindow):
             self.page_proveedores = PlaceholderPage("Proveedores")
 
         if ReportesPage:
-            self.page_reportes = ReportesPage()
+            self.page_reportes = ReportesPage(parent=self, main_window=self)
         else:
             self.page_reportes = PlaceholderPage("Reportes")
+
 
         self.page_config = self._make_configuracion_page()
 
@@ -285,7 +286,10 @@ class MainWindow(QMainWindow):
         self.btn_facturacion.clicked.connect(lambda: self.show_fixed_page(self.page_facturacion))
         self.btn_documentacion.clicked.connect(lambda: self.show_fixed_page(self.page_documentacion))
         self.btn_proveedores.clicked.connect(lambda: self.show_fixed_page(self.page_proveedores))
-        self.btn_reportes.clicked.connect(lambda: self.show_fixed_page(self.page_reportes))
+        self.btn_reportes.clicked.connect(
+            lambda: self.open_page("reportes")
+        )
+
         self.btn_config.clicked.connect(lambda: self.show_fixed_page(self.page_config))
         self.btn_inicio.setChecked(True)
 
@@ -621,6 +625,16 @@ class MainWindow(QMainWindow):
             else:
                 self.notify("La página de alta de usuario no está disponible.", "error")
             return
+        # -------- Reportes --------
+        if name == "reportes":
+            # 🔒 FIX: si ya estoy en Reportes, no mostrar loading
+            if self.stack.currentWidget() is self.page_reportes:
+                self.loading.hide_overlay()
+                return
+
+            self.show_fixed_page(self.page_reportes)
+            return
+
 
         # -------- Facturación --------
         if name == "facturacion":
@@ -729,6 +743,9 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.loading.hide_overlay)
 
     def show_fixed_page(self, page: QWidget):
+        if self.stack.currentWidget() is page:
+            return
+
         if page is self.page_vehiculos:
             self._ensure_catalogs_ready()
         while self._page_history:
