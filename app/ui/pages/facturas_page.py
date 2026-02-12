@@ -261,8 +261,9 @@ class FacturasPage(QWidget):
             tipos = []
         for t in tipos:
             nombre = t.get("nombre") or t.get("codigo") or ""
-            codigo = t.get("codigo") or t.get("id")
-            self.in_tipo.addItem(nombre, codigo)
+            tipo_id = t.get("id")   # 👈 USAR ID REAL
+            self.in_tipo.addItem(nombre, tipo_id)
+
 
         # Estados
         try:
@@ -352,7 +353,7 @@ class FacturasPage(QWidget):
         fd = self.in_fecha_desde.date().toString("yyyy-MM-dd")
         fh = self.in_fecha_hasta.date().toString("yyyy-MM-dd")
         return {
-            "tipo": self.in_tipo.currentData(),
+            "tipo_comprobante_id": self.in_tipo.currentData(),
             "pto_vta": self.in_pto_vta.currentData(),
             "numero": (self.in_numero.text().strip() or None),
             "cliente": (self.in_cliente.text().strip() or None),
