@@ -22,11 +22,25 @@ from app.services.clientes_service import ClientesService
 from app.services.ventas_service import VentasService
 from pathlib import Path
 
-ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
+import sys
+
+def get_assets_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        # Ejecutando como .exe (PyInstaller)
+        base_path = Path(sys._MEIPASS)
+    else:
+        # Ejecutando en desarrollo
+        base_path = Path(__file__).resolve().parents[2]
+
+    return base_path / "assets"
+
+ASSETS_DIR = get_assets_dir()
+
 
 class ClientesDetailPage(QWidget):
     navigate_back = Signal()
     navigate_to_factura = Signal(int)  # factura_id
+    navigate_to_factura_nueva = Signal(int)  # cliente_id
 
     def __init__(self, cliente_id: int, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -34,6 +48,8 @@ class ClientesDetailPage(QWidget):
         
         self.service = ClientesService()
         self.ventas_service = VentasService()
+        self.btn_add_factura = QPushButton("Agregar factura")
+        self.btn_add_factura.setObjectName("BtnPrimary")
 
         self.cliente_id = cliente_id
         self.data: Dict[str, Any] = {}
@@ -196,6 +212,8 @@ class ClientesDetailPage(QWidget):
         footer.addSpacing(16)
         footer.addWidget(self.btn_edit)
         footer.addSpacing(16)
+        footer.addWidget(self.btn_add_factura)
+        footer.addSpacing(16)
         footer.addWidget(self.btn_back)
         footer.addStretch(1)
         root.addLayout(footer)
@@ -213,6 +231,8 @@ class ClientesDetailPage(QWidget):
         self.btn_cancel.clicked.connect(self._cancel_edit)
         self.btn_save.clicked.connect(self._save)
         self.btn_back.clicked.connect(self._on_back_clicked)
+        self.btn_add_factura.clicked.connect(self._on_add_factura)
+
         self.in_tipo_doc.currentIndexChanged.connect(self._on_tipo_doc_changed)
 
         # =========================
@@ -234,6 +254,8 @@ class ClientesDetailPage(QWidget):
         lv.setUniformItemSizes(True)
         lv.setSpacing(2)
         cb.setView(lv)
+    def _on_add_factura(self):
+        self.navigate_to_factura_nueva.emit(self.cliente_id)
 
     def _set_editable(self, enabled: bool):
         for w in (
@@ -254,13 +276,21 @@ class ClientesDetailPage(QWidget):
     # DOCUMENTO
     # -----------------------------------------------------
     def _on_tipo_doc_changed(self, _):
-        tipo = (self.in_tipo_doc.currentData() or "").upper()
-        if tipo in ("CUIT", "CUIL"):
+        tipo_id = self.in_tipo_doc.currentData()
+        if not tipo_id:
+            self.in_nro_doc.setValidator(self._validator_otro)
+            return
+
+        catalogos = self.service._catalogos
+
+        if catalogos.es_cuit(tipo_id) or catalogos.es_cuil(tipo_id):
             self.in_nro_doc.setValidator(self._validator_cuit)
-        elif tipo == "DNI":
+        elif catalogos.es_dni(tipo_id):
             self.in_nro_doc.setValidator(self._validator_dni)
         else:
             self.in_nro_doc.setValidator(self._validator_otro)
+
+
 
     # -----------------------------------------------------
     # VENTAS
@@ -333,12 +363,19 @@ class ClientesDetailPage(QWidget):
     # DATA CLIENTE
     # -----------------------------------------------------
     def _load_lookups(self):
-        self.in_tipo_doc.addItem("DNI", "DNI")
-        self.in_tipo_doc.addItem("CUIT", "CUIT")
-        self.in_tipo_doc.addItem("CUIL", "CUIL")
+    # Tipos documento desde catálogo
+        self.in_tipo_doc.clear()
+        tipos = self.service.get_tipos_documento() or []
+        for t in tipos:
+            label = t.get("descripcion") or t.get("codigo") or ""
+            self.in_tipo_doc.addItem(label, t.get("id"))
 
-        self.in_estado.addItem("Activo", 10)
-        self.in_estado.addItem("Inactivo", 11)
+        # Estados desde catálogo
+        self.in_estado.clear()
+        estados = self.service.get_estados_clientes() or []
+        for e in estados:
+            self.in_estado.addItem(e.get("nombre"), e.get("id"))
+
 
     def _load_data(self):
         data = self.service.get(self.cliente_id)
@@ -357,11 +394,16 @@ class ClientesDetailPage(QWidget):
         self.in_telefono.setText(d.get("telefono", ""))
         self.in_direccion.setText(d.get("direccion", ""))
         self.in_observ.setPlainText(d.get("observaciones", ""))
-        tipo = d.get("tipo_doc")
-        if tipo:
-            idx = self.in_tipo_doc.findData(tipo)
+        tipo_id = d.get("tipo_doc_id")
+        if tipo_id is not None:
+            idx = self.in_tipo_doc.findData(tipo_id)
             if idx != -1:
                 self.in_tipo_doc.setCurrentIndex(idx)
+        estado_id = d.get("estado_id")
+        if estado_id is not None:
+            idx_estado = self.in_estado.findData(estado_id)
+            if idx_estado != -1:
+                self.in_estado.setCurrentIndex(idx_estado)
     # -----------------------------------------------------
     # EDICIÓN
     # -----------------------------------------------------
@@ -388,7 +430,7 @@ class ClientesDetailPage(QWidget):
     # -----------------------------------------------------
     def _save(self):
         payload = {
-            "tipo_doc": self.in_tipo_doc.currentData(),  # <-- FALTABA
+            "tipo_doc_id": self.in_tipo_doc.currentData(),
             "nro_doc": self.in_nro_doc.text().strip(),
             "nombre": self.in_nombre.text().strip(),
             "apellido": self.in_apellido.text().strip(),

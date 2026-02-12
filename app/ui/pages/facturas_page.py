@@ -44,6 +44,7 @@ class FacturasPage(QWidget):
         super().__init__(parent)
         self.setObjectName("FacturasPage")
         self.main_window: Optional[QMainWindow] = main_window
+        self._already_shown_once = False
 
         self.service = FacturasService()
         self.settings = QSettings("Gussoni", "SistemaFacturacion")
@@ -355,7 +356,7 @@ class FacturasPage(QWidget):
             "pto_vta": self.in_pto_vta.currentData(),
             "numero": (self.in_numero.text().strip() or None),
             "cliente": (self.in_cliente.text().strip() or None),
-            "cuit": (self.in_cuit.text().strip() or None),
+            "documento": (self.in_cuit.text().strip() or None),
             "estado_id": self.in_estado.currentData(),
             "fecha_desde": fd,
             "fecha_hasta": fh,
@@ -395,14 +396,23 @@ class FacturasPage(QWidget):
                 obs_display = obs_full.replace("\n", " ")
                 if len(obs_display) > max_obs_len:
                     obs_display = obs_display[:max_obs_len].rstrip() + "..."
+                # --- Resolver tipo correctamente ---
+                tipo_codigo = r.get("tipo_codigo") or r.get("tipo")
+                tipo_nombre = r.get("tipo_nombre")
+
+                if tipo_nombre:
+                    tipo_display = tipo_nombre
+                else:
+                    idx = self.in_tipo.findData(tipo_codigo)
+                    tipo_display = self.in_tipo.itemText(idx) if idx >= 0 else str(tipo_codigo or "")
 
                 values = {
                     self.COL_FECHA: self._fmt_date(r.get("fecha")),
-                    self.COL_TIPO: r.get("tipo_nombre", "") or r.get("tipo", ""),
+                    self.COL_TIPO: tipo_display,
                     self.COL_PTO_VTA: str(r.get("pto_vta", "") or ""),
                     self.COL_NUMERO: str(r.get("numero", "") or ""),
                     self.COL_CLIENTE: r.get("cliente", "") or r.get("cliente_nombre", ""),
-                    self.COL_CUIT: r.get("cuit", "") or "",
+                    self.COL_CUIT: r.get("documento", "") or "",
                     self.COL_TOTAL: self._fmt_currency(r.get("total")),
                     self.COL_ESTADO: r.get("estado", "") or r.get("estado_nombre", ""),
                     self.COL_CAE: r.get("cae", "") or "",
@@ -487,23 +497,20 @@ class FacturasPage(QWidget):
 
     # ---------------- Navegación / eventos ----------------
     def _abrir_consultar(self, factura_id: Optional[int]) -> None:
+        print(">>> Abrir consultar factura_id =", factura_id)
+
         if factura_id is None:
+            print(">>> factura_id es None")
             return
-        self.open_detail.emit(factura_id)
+
         mw = getattr(self, "main_window", None) or self.window()
-        if not isinstance(mw, QMainWindow):
-            return
+        print(">>> main_window =", mw)
+
         try:
-            if hasattr(mw, "open_page"):
-                
-                mw.open_page("facturas_consultar", factura_id)
-        except TypeError:
-            try:
-                mw.open_page("facturas_consultar")
-            except Exception:
-                pass
-        except Exception:
-            pass
+            mw.open_page("facturas_consultar", factura_id=factura_id)
+        except Exception as e:
+            print(">>> ERROR open_page:", repr(e))
+
 
     def _on_table_double_clicked(self, row: int, _col: int) -> None:
         id_item = self.table.item(row, self.COL_ID)

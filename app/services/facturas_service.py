@@ -189,7 +189,7 @@ class FacturasService:
 
     # -------------------- Numeración --------------------
 
-    def sugerir_proximo_numero(self, tipo: str, pto_vta: Any) -> int:
+    def sugerir_proximo_numero(self, tipo_comprobante_id: str, pto_vta: Any) -> int:
         """
         Devuelve el próximo número de factura según tipo y punto de venta.
 
@@ -197,9 +197,9 @@ class FacturasService:
         - Intenta primero con AFIP (FECompUltimoAutorizado).
         - SOLO si AFIP falla (error de WS), cae a la BD.
         """
-        print(">>> [sugerir_proximo_numero] tipo =", tipo, "pto_vta =", pto_vta)
+        print(">>> [sugerir_proximo_numero] tipo =", tipo_comprobante_id, "pto_vta =", pto_vta)
 
-        if not tipo or not pto_vta:
+        if not tipo_comprobante_id or not pto_vta:
             print(">>>   faltan datos, devuelvo 1")
             return 1
 
@@ -211,19 +211,19 @@ class FacturasService:
         db = SessionLocal()
         try:
             repo = self._repo(db)
-            nro = self._obtener_proximo_numero_real(db, repo, tipo, pto)
+            nro = self._obtener_proximo_numero_real(db, repo, tipo_comprobante_id, pto)
             print(">>> [sugerir_proximo_numero] numero sugerido =", nro)
             return nro
         finally:
             db.close()
 
-    def diagnosticar_proximo_numero(self, tipo: str, pto_vta: Any) -> Dict[str, Any]:
+    def diagnosticar_proximo_numero(self, tipo_comprobante_id: str, pto_vta: Any) -> Dict[str, Any]:
         """
         Versión 'verbose' de la numeración para usar en la pantalla
         de Configuración ARCA.
 
         Devuelve un dict con:
-          - tipo, pto_vta
+          - tipo_comprobante_id, pto_vta
           - proximo: int
           - origen: 'AFIP' | 'BD'
           - ws_ok: bool
@@ -233,7 +233,7 @@ class FacturasService:
           - mensaje: str
         """
         info: Dict[str, Any] = {
-            "tipo": tipo,
+            "tipo_comprobante_id": tipo_comprobante_id,
             "pto_vta": None,
             "proximo": 1,
             "origen": "BD",
@@ -244,7 +244,7 @@ class FacturasService:
             "mensaje": "",
         }
 
-        if not tipo or not pto_vta:
+        if not tipo_comprobante_id or not pto_vta:
             info["mensaje"] = "Tipo de comprobante y punto de venta son obligatorios."
             return info
 
@@ -267,7 +267,12 @@ class FacturasService:
             if callable(fe_ult):
                 try:
                     auth: ArcaAuthData = self._wsaa.get_auth()
-                    cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo)
+                    tipo = repo.get_tipo_comprobante_by_id(tipo_comprobante_id)
+                    codigo = tipo["codigo"]
+
+                    cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(codigo)
+
+
 
                     ultimo_afip_raw = fe_ult(
                         auth=auth,
@@ -317,7 +322,7 @@ class FacturasService:
 
                 # También podemos calcular la referencia local, sin usarla como fuente
                 try:
-                    proximo_local = repo.get_next_numero(tipo, pto)
+                    proximo_local = repo.get_next_numero(tipo_comprobante_id, pto)
                     info["proximo_local"] = proximo_local
                 except Exception as e:
                     info["errores"].append(
@@ -332,7 +337,7 @@ class FacturasService:
 
             # 3) Si el WS falló, caemos a la BD
             try:
-                proximo_local = repo.get_next_numero(tipo, pto)
+                proximo_local = repo.get_next_numero(tipo_comprobante_id, pto)
             except Exception as e:
                 proximo_local = 1
                 info["errores"].append(
@@ -358,7 +363,7 @@ class FacturasService:
         self,
         db: Session,
         repo: FacturasRepository,
-        tipo: str,
+        tipo_comprobante_id: int,
         pto_vta: int,
     ) -> int:
         """
@@ -369,7 +374,7 @@ class FacturasService:
            *Se usa SIEMPRE si el WS responde OK, aunque el último sea 0.*
         2) Si AFIP falla (error de WS): BD (repo.get_next_numero)
         """
-        print(">>> [_obtener_proximo_numero_real] INICIO tipo =", tipo, "pto_vta =", pto_vta)
+        print(">>> [_obtener_proximo_numero_real] INICIO tipo =", tipo_comprobante_id, "pto_vta =", pto_vta)
 
         # 1) Intentar AFIP primero
         ultimo_afip: Optional[int] = None
@@ -382,7 +387,12 @@ class FacturasService:
                 # Auth ARCA
                 auth: ArcaAuthData = self._wsaa.get_auth()
 
-                cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo)
+                tipo = repo.get_tipo_comprobante_by_id(tipo_comprobante_id)
+                codigo = tipo["codigo"]
+
+                cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(codigo)
+
+
 
 
                 ultimo_afip_raw = fe_ult(
@@ -425,7 +435,7 @@ class FacturasService:
         # 2) Fallback: lo que tengas en BD
         proximo_local = 1
         try:
-            proximo_local = repo.get_next_numero(tipo, pto_vta)  # normalmente last_local + 1
+            proximo_local = repo.get_next_numero(tipo_comprobante_id, pto_vta)  # normalmente last_local + 1
         except Exception as e:
             print(">>>   [LOCAL] ERROR en repo.get_next_numero:", repr(e))
             proximo_local = 1
@@ -531,11 +541,11 @@ class FacturasService:
             total = sum(float(it.get("importe_total", 0.0) or 0.0) for it in items)
 
             # ---------------- Numeración ----------------
-            tipo = cabecera.get("tipo")
+            tipo_comprobante_id = cabecera.get("tipo_comprobante_id")
             pto = cabecera.get("pto_vta")
             numero = cabecera.get("numero")
 
-            if not tipo:
+            if not tipo_comprobante_id:
                 raise ValueError("Tipo de comprobante requerido para crear la factura.")
             if not pto:
                 raise ValueError("Punto de venta requerido para crear la factura.")
@@ -544,7 +554,7 @@ class FacturasService:
 
             # Si no vino número desde la UI → usar lógica real (AFIP primero)
             if not numero:
-                numero = self._obtener_proximo_numero_real(db, repo, tipo, pto_int)
+                numero = self._obtener_proximo_numero_real(db, repo, tipo_comprobante_id, pto_int)
 
             # ---------------- Condición IVA receptor ----------------
             cliente_id = cabecera.get("cliente_id")
@@ -561,7 +571,7 @@ class FacturasService:
             estado_inicial = self.ESTADO_BORRADOR
 
             cabecera_db = {
-                "tipo": tipo,
+                "tipo_comprobante_id": tipo_comprobante_id,
                 "numero": int(numero),
                 "fecha_emision": cabecera.get("fecha_emision"),
                 "punto_venta": pto_int,
@@ -754,9 +764,11 @@ class FacturasService:
                 fe_ult = getattr(self._wsfe, "fe_comp_ultimo_autorizado", None)
                 if callable(fe_ult):
                     auth_debug: ArcaAuthData = self._wsaa.get_auth()
-                    cbte_tipo_dbg = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(
-                        factura.get("tipo")
-                    )
+                    tipo = repo.get_tipo_comprobante_by_id(factura.get("tipo_comprobante_id"))
+                    codigo = tipo["codigo"]
+
+                    cbte_tipo_dbg = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(codigo)
+
                     pto_dbg = int(factura.get("punto_venta") or 0)
                     ult_raw = fe_ult(
                         auth=auth_debug,
@@ -959,10 +971,10 @@ class FacturasService:
             rows = db.execute(
                 text(
                     """
-                    SELECT id, tipo, numero, punto_venta
+                    SELECT id, tipo_comprobante_id, numero, punto_venta
                     FROM facturas
                     WHERE estado_id IN (:est_borr, :est_err, :est_rec, :est_pen)
-                    ORDER BY tipo, punto_venta, numero
+                    ORDER BY tipo_comprobante_id, punto_venta, numero
                     """
                 ),
                 {
@@ -976,10 +988,10 @@ class FacturasService:
             if not rows:
                 return resumen
 
-            # Agrupar por (tipo, punto_venta)
+            # Agrupar por (tipo_comprobante_id, punto_venta)
             grupos: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
             for r in rows:
-                key = (r["tipo"], int(r["punto_venta"]))
+                key = (r["tipo_comprobante_id"], int(r["punto_venta"]))
                 grupos.setdefault(key, []).append(dict(r))
 
             try:
@@ -990,13 +1002,13 @@ class FacturasService:
 
             fe_ult = getattr(self._wsfe, "fe_comp_ultimo_autorizado", None)
 
-            for (tipo, pto_vta), facturas in grupos.items():
+            for (tipo_comprobante_id, pto_vta), facturas in grupos.items():
                 proximo_afip = None
 
                 # 1) Consultar último autorizado en AFIP
                 if callable(fe_ult):
                     try:
-                        cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo)
+                        cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo_comprobante_id)
                         ult_raw = fe_ult(
                             auth=auth,
                             cbte_tipo=cbte_tipo,
@@ -1021,7 +1033,7 @@ class FacturasService:
 
                     except Exception as e:
                         resumen["detalles"].append(
-                            f"[{tipo} {pto_vta}] Error al consultar FECompUltimoAutorizado: {e}"
+                            f"[{tipo_comprobante_id} {pto_vta}] Error al consultar FECompUltimoAutorizado: {e}"
                         )
 
                 # 2) Fallback local
@@ -1056,13 +1068,15 @@ class FacturasService:
                     if res.get("aprobada"):
                         resumen["aprobadas"] += 1
                         resumen["detalles"].append(
-                            f"Factura {factura_id} [{tipo} {str(pto_vta).zfill(4)}-{num_local}] APROBADA."
+                            f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] APROBADA."
                         )
 
                         # ===================== FIX NC =====================
                         factura = self._repo(db).get_by_id(factura_id)
 
-                        if factura and factura.get("tipo", "").startswith("NC"):
+                        tipo = self._repo.get_tipo_comprobante_by_id(factura["tipo_comprobante_id"])
+                        if tipo and tipo.get("es_nota_credito"):
+
                             factura_origen_id = factura.get("factura_origen_id")
 
                             if factura_origen_id:
@@ -1099,7 +1113,7 @@ class FacturasService:
                     elif res.get("rechazada"):
                         resumen["rechazadas"] += 1
                         resumen["detalles"].append(
-                            f"Factura {factura_id} [{tipo} {str(pto_vta).zfill(4)}-{num_local}] "
+                            f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] "
                             f"RECHAZADA: {res.get('mensaje')}"
                         )
                         proximo_afip += 1
@@ -1107,7 +1121,7 @@ class FacturasService:
                     else:
                         resumen["error_comunicacion"] += 1
                         resumen["detalles"].append(
-                            f"Factura {factura_id} [{tipo} {str(pto_vta).zfill(4)}-{num_local}] "
+                            f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] "
                             f"ERROR COMUNICACIÓN: {res.get('mensaje')}"
                         )
 
@@ -1122,9 +1136,12 @@ class FacturasService:
 
     def _procesar_nc_autorizada(self, db: Session, nc_id: int) -> None:
         """
-        Ejecuta la lógica de negocio cuando una Nota de Crédito queda AUTORIZADA:
-        - Anula la factura original
-        - Devuelve el stock de los vehículos
+        Lógica de negocio cuando una Nota de Crédito queda AUTORIZADA:
+
+        - Anula factura original
+        - Devuelve stock del vehículo
+        - Cancela la venta asociada
+        - Marca cuotas como ANULADAS (aunque tengan pagos)
         """
 
         repo = self._repo(db)
@@ -1133,25 +1150,34 @@ class FacturasService:
         if not nc:
             return
 
-        # Solo NC
-        if not str(nc.get("tipo", "")).startswith("NC"):
+        # Solo aplica si es Nota de Crédito
+        tipo = repo.get_tipo_comprobante_by_id(nc["tipo_comprobante_id"])
+        if not tipo or not tipo.get("es_nota_credito"):
             return
 
         factura_origen_id = nc.get("factura_origen_id")
         if not factura_origen_id:
             return
 
-        # 1) Anular factura original
+        factura_original = repo.get_by_id(factura_origen_id)
+        if not factura_original:
+            return
+
+        # ---------------------------------------------------
+        # 1️⃣ Anular factura original
+        # ---------------------------------------------------
         repo.actualizar_estado(
             factura_origen_id,
             self.ESTADO_ANULADA_POR_NC
         )
 
-        # 2) Devolver stock de vehículos
+        # ---------------------------------------------------
+        # 2️⃣ Devolver stock del vehículo
+        # ---------------------------------------------------
         db.execute(
             text("""
                 UPDATE vehiculos
-                SET estado_stock_id = :disponible
+                SET estado_stock_id = 1  -- Disponible
                 WHERE id IN (
                     SELECT fd.vehiculo_id
                     FROM facturas_detalle fd
@@ -1159,24 +1185,65 @@ class FacturasService:
                     AND fd.vehiculo_id IS NOT NULL
                 )
             """),
-            {
-                "disponible": 1,  # Disponible
-                "factura_orig_id": factura_origen_id,
-            }
+            {"factura_orig_id": factura_origen_id}
         )
+
+        # ---------------------------------------------------
+        # 3️⃣ Cancelar venta asociada
+        # ---------------------------------------------------
+        venta_id = factura_original.get("venta_id")
+        if not venta_id:
+            return
+
+        # Estado 33 = Cancelada (según tu tabla estados tipo='ventas')
+        db.execute(
+            text("""
+                UPDATE ventas
+                SET estado_id = 33
+                WHERE id = :venta_id
+            """),
+            {"venta_id": venta_id}
+        )
+
+        # ---------------------------------------------------
+        # 4️⃣ Buscar plan de financiación
+        # ---------------------------------------------------
+        plan = db.execute(
+            text("""
+                SELECT id
+                FROM plan_financiacion
+                WHERE venta_id = :venta_id
+            """),
+            {"venta_id": venta_id}
+        ).mappings().first()
+
+        if not plan:
+            return
+
+        plan_id = plan["id"]
+
+        # ---------------------------------------------------
+        # 5️⃣ Anular TODAS las cuotas (aunque tengan pagos)
+        # ---------------------------------------------------
+        db.execute(
+            text("""
+                UPDATE cuotas
+                SET estado = 'ANULADA'
+                WHERE plan_id = :plan_id
+            """),
+            {"plan_id": plan_id}
+        )
+
+
 
     # -------------------- Nota de crédito --------------------
     def generar_nota_credito(self, factura_id: int) -> Dict[str, Any]:
         """
         Genera una Nota de Crédito que anula la factura indicada.
-
-        Importante:
-        - En BD se siguen guardando importes negativos (lógica contable clásica).
-        - Para AFIP, el wsfe_client ya se encarga de enviar los importes en positivo
-          y de armar el CbteAsoc usando los campos cbte_asoc_*.
-        - Las observaciones de ARCA SOLO se guardan si la NC NO queda aprobada.
         """
+
         db = SessionLocal()
+
         try:
             repo = self._repo(db)
 
@@ -1186,28 +1253,44 @@ class FacturasService:
 
             items_original = repo.get_detalle_by_factura(factura_id)
             if not items_original:
-                raise ValueError("La factura original no tiene ítems en el detalle.")
+                raise ValueError("La factura original no tiene ítems.")
 
-            tipo_orig = factura_original.get("tipo")
+            # ---------------------------------------------------
+            # Tipo original
+            # ---------------------------------------------------
+            tipo_orig = repo.get_tipo_comprobante_by_id(
+                factura_original["tipo_comprobante_id"]
+            )
+
+            if not tipo_orig:
+                raise ValueError("Tipo comprobante original no encontrado.")
+
             pto_vta = factura_original.get("punto_venta")
-            if not tipo_orig or not pto_vta:
-                raise ValueError("La factura original no tiene tipo o punto de venta válido.")
 
-            map_nc = {
-                "FA": "NCA",
-                "FB": "NCB",
-                "FC": "NCC",
-            }
-            tipo_nc = map_nc.get(tipo_orig, "NCB")  # default B
+            # ---------------------------------------------------
+            # Buscar tipo NC correspondiente
+            # ---------------------------------------------------
+            tipo_nc = repo.get_tipo_nota_credito_por_letra(tipo_orig["letra"])
 
-            # Obtener último autorizado en AFIP para la NC (WSFE)
+            if not tipo_nc:
+                raise ValueError("No se encontró tipo de Nota de Crédito correspondiente.")
+
+            tipo_nc_id = tipo_nc["id"]
+            tipo_nc_codigo = tipo_nc["codigo"]
+
+            # ---------------------------------------------------
+            # Obtener último autorizado en AFIP
+            # ---------------------------------------------------
             ultimo_autorizado = 0
 
             try:
                 fe_ult = getattr(self._wsfe, "fe_comp_ultimo_autorizado", None)
                 if callable(fe_ult):
                     auth: ArcaAuthData = self._wsaa.get_auth()
-                    cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo_nc)
+
+                    cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(
+                        tipo_nc_codigo
+                    )
 
                     ult_raw = fe_ult(
                         auth=auth,
@@ -1222,12 +1305,15 @@ class FacturasService:
                                 break
                     else:
                         ultimo_autorizado = int(ult_raw or 0)
+
             except Exception:
                 ultimo_autorizado = 0
 
+            numero_nc = ultimo_autorizado + 1
 
-            numero_nc = (ultimo_autorizado or 0) + 1
-
+            # ---------------------------------------------------
+            # Generar items negativos
+            # ---------------------------------------------------
             items_nc: List[Dict[str, Any]] = []
             subtotal_nc = 0.0
             iva_nc = 0.0
@@ -1238,11 +1324,10 @@ class FacturasService:
                 precio_unit = float(it.get("precio_unitario") or 0.0)
                 alic_iva = float(it.get("alicuota_iva") or 0.0)
 
-                neto_orig = float(it.get("importe_neto") or cantidad * precio_unit)
-                iva_orig = float(it.get("importe_iva") or neto_orig * alic_iva / 100.0)
-                total_orig = float(it.get("importe_total") or (neto_orig + iva_orig))
+                neto_orig = float(it.get("importe_neto") or 0.0)
+                iva_orig = float(it.get("importe_iva") or 0.0)
+                total_orig = float(it.get("importe_total") or 0.0)
 
-                # En la NC, en BD usamos importes negativos (anulan la original)
                 neto_nc = -abs(neto_orig)
                 iva_nc_item = -abs(iva_orig)
                 total_nc_item = -abs(total_orig)
@@ -1266,8 +1351,9 @@ class FacturasService:
                 )
 
             hoy = date.today().strftime("%Y-%m-%d")
+
             observ = (
-                f"NC que anula factura {tipo_orig} "
+                f"NC que anula factura {tipo_orig['codigo']} "
                 f"{str(pto_vta).zfill(4)}-{factura_original.get('numero')}"
             )
 
@@ -1276,9 +1362,8 @@ class FacturasService:
                 factura_original,
             )
 
-            # Campos cbte_asoc_* para que el wsfe_client pueda armar <CbtesAsoc>
             cabecera_nc = {
-                "tipo": tipo_nc,
+                "tipo_comprobante_id": tipo_nc_id,
                 "numero": int(numero_nc),
                 "fecha_emision": hoy,
                 "punto_venta": int(pto_vta),
@@ -1294,72 +1379,29 @@ class FacturasService:
                 "estado_id": self.ESTADO_BORRADOR,
                 "cliente_id": factura_original.get("cliente_id"),
                 "condicion_iva_receptor_id": condicion_iva_nc_id,
-                # NUEVO: datos explícitos del comprobante asociado
-                "cbte_asoc_tipo": tipo_orig,
+                "cbte_asoc_tipo": tipo_orig["codigo"],   # ✅ FIX
                 "cbte_asoc_pto_vta": int(pto_vta),
                 "cbte_asoc_numero": factura_original.get("numero"),
-                "factura_origen_id": factura_id, 
-
+                "factura_origen_id": factura_id,
             }
 
             nc_id = repo.insert_factura(cabecera_nc)
             repo.insert_detalle(nc_id, items_nc)
 
-            # 1) Autenticación ARCA
-            try:
-                auth: ArcaAuthData = self._wsaa.get_auth()
-            except Exception as e:
-                import traceback
-                print("ERROR al obtener auth en generar_nota_credito:", repr(e))
-                traceback.print_exc()
-                db.rollback()
-                return {
-                    "factura_original_id": factura_id,
-                    "nc_id": nc_id,
-                    "aprobada": False,
-                    "rechazada": False,
-                    "cae": None,
-                    "fecha_cae": None,
-                    "vto_cae": None,
-                    "estado_nc_id": self.ESTADO_BORRADOR,
-                    "estado_factura_original_nuevo": factura_original.get("estado_id"),
-                    "errores": [],
-                    "observaciones": [],
-                    "mensaje": f"Error al obtener autenticación ARCA para NC: {e}",
-                }
+            # ---------------------------------------------------
+            # Solicitar CAE
+            # ---------------------------------------------------
+            auth: ArcaAuthData = self._wsaa.get_auth()
 
             factura_nc = repo.get_by_id(nc_id)
             factura_nc["condicion_iva_receptor_id"] = condicion_iva_nc_id
-            factura_nc["cbte_asoc_tipo"] = tipo_orig
-            factura_nc["cbte_asoc_pto_vta"] = int(pto_vta)
-            factura_nc["cbte_asoc_numero"] = factura_original.get("numero")
+            factura_nc["cbte_asoc_tipo"] = tipo_orig["codigo"]
 
-            # 2) Llamar WSFE para solicitar CAE de la NC
-            try:
-                wsfe_result: ArcaWSFEResult = self._wsfe.solicitar_cae(
-                    auth=auth,
-                    factura=factura_nc,
-                    items=items_nc,
-                )
-            except Exception as e:
-                import traceback
-                print("ERROR al llamar a WSFE.solicitar_cae en NC:", repr(e))
-                traceback.print_exc()
-                db.rollback()
-                return {
-                    "factura_original_id": factura_id,
-                    "nc_id": nc_id,
-                    "aprobada": False,
-                    "rechazada": False,
-                    "cae": None,
-                    "fecha_cae": None,
-                    "vto_cae": None,
-                    "estado_nc_id": self.ESTADO_ERROR_COMUNICACION,
-                    "estado_factura_original_nuevo": factura_original.get("estado_id"),
-                    "errores": [],
-                    "observaciones": [],
-                    "mensaje": f"Error al invocar WSFE.solicitar_cae para NC: {e}",
-                }
+            wsfe_result: ArcaWSFEResult = self._wsfe.solicitar_cae(
+                auth=auth,
+                factura=factura_nc,
+                items=items_nc,
+            )
 
             if wsfe_result.aprobada:
                 estado_nc = self.ESTADO_AUTORIZADA
@@ -1376,43 +1418,10 @@ class FacturasService:
                 estado_id=estado_nc,
             )
 
-            # Observaciones de ARCA SOLO si la NC no fue aprobada
-            if not wsfe_result.aprobada:
-                partes: List[str] = []
-
-                if wsfe_result.mensaje:
-                    partes.append(wsfe_result.mensaje.strip())
-
-                if wsfe_result.errores:
-                    partes.append(
-                        "Errores ARCA (NC):\n" + "\n".join(f"- {e}" for e in wsfe_result.errores)
-                    )
-
-                if wsfe_result.observaciones:
-                    partes.append(
-                        "Observaciones ARCA (NC):\n"
-                        + "\n".join(f"- {o}" for o in wsfe_result.observaciones)
-                    )
-
-                texto_obs = "\n".join(p for p in partes if p).strip()
-                if texto_obs:
-                    self._actualizar_observaciones_factura(
-                        db,
-                        factura_id=nc_id,
-                        mensaje=texto_obs,
-                    )
-
-            # ✅ ACÁ ESTÁ EL FIX: ya no dependemos de 19 (CAE Vencido).
-            # Por defecto pasa a "Anulada" (16), o a "Anulada por NC" si existe
-            # y fue resuelta por nombre al iniciar.
-            estado_orig_nuevo = factura_original.get("estado_id")
             if wsfe_result.aprobada:
                 self._procesar_nc_autorizada(db, nc_id)
 
-
-
             db.commit()
-
             nc_header = repo.get_by_id(nc_id)
 
             return {
@@ -1423,41 +1432,33 @@ class FacturasService:
                 "cae": wsfe_result.cae,
                 "fecha_cae": wsfe_result.fecha_cae,
                 "vto_cae": wsfe_result.vto_cae,
-                "estado_nc_id": estado_nc,
-                "estado_factura_original_nuevo": estado_orig_nuevo,
-                "errores": wsfe_result.errores or [],
-                "observaciones": wsfe_result.observaciones or [],
                 "mensaje": wsfe_result.mensaje,
-                "nc_tipo": nc_header.get("tipo") if nc_header else tipo_nc,
-                "nc_pto_vta": nc_header.get("punto_venta") if nc_header else pto_vta,
-                "nc_numero": nc_header.get("numero") if nc_header else numero_nc,
-                "nc_total": nc_header.get("total") if nc_header else total_nc,
+
+                # 👇 ESTO ES LO QUE TE FALTA
+                "nc_tipo_codigo": tipo_nc_codigo,
+                "nc_letra": tipo_nc["letra"],
+                "nc_pto_vta": nc_header.get("punto_venta"),
+                "nc_numero": nc_header.get("numero"),
+                "nc_total": nc_header.get("total"),
             }
 
+
         except Exception as ex:
-            import traceback
-            print("ERROR general en generar_nota_credito:", repr(ex))
-            traceback.print_exc()
             db.rollback()
             return {
                 "factura_original_id": factura_id,
                 "nc_id": None,
                 "aprobada": False,
                 "rechazada": False,
-                "cae": None,
-                "fecha_cae": None,
-                "vto_cae": None,
-                "estado_nc_id": None,
-                "estado_factura_original_nuevo": None,
-                "errores": [],
-                "observaciones": [],
                 "mensaje": f"Error interno en generar_nota_credito: {ex}",
             }
+
         finally:
             db.close()
+
     def consultar_comprobante_arca(
         self,
-        tipo: str,
+        tipo_comprobante_id: str,
         pto_vta: int,
         numero: int,
     ) -> Dict[str, Any]:
@@ -1466,7 +1467,7 @@ class FacturasService:
         y devuelve datos normalizados para la UI.
         """
         auth: ArcaAuthData = self._wsaa.get_auth()
-        cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo)
+        cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo_comprobante_id)
 
         fe_cons = getattr(self._wsfe, "fe_comp_consultar", None)
         if not callable(fe_cons):
@@ -1496,6 +1497,13 @@ class FacturasService:
             "observaciones": raw.get("observaciones") or [],
         }
 
+    def get_codigo_tipo(self, tipo_id: int) -> Optional[str]:
+        db = SessionLocal()
+        try:
+            repo = self._repo(db)
+            return repo.get_codigo_tipo_comprobante(tipo_id)
+        finally:
+            db.close()
 
     # -------------------- Método viejo (no se toca) --------------------
 
@@ -1635,23 +1643,41 @@ class FacturasService:
             row = db.execute(
                 text(
                     """
-                    SELECT tipo_doc
+                    SELECT tipo_doc_id
                     FROM clientes
                     WHERE id = :id
                     """
                 ),
                 {"id": cliente_id},
             ).mappings().first()
+
             if row:
-                tipo_doc = (row.get("tipo_doc") or "").upper()
+                tipo_doc_id = row.get("tipo_doc_id")
+            else:
+                tipo_doc_id = None
+
         except Exception:
             tipo_doc = None
 
         default_code = None
-        if tipo_doc == "DNI":
-            default_code = "CF"   # Consumidor Final
-        elif tipo_doc == "CUIT":
-            default_code = "RI"   # Responsable Inscripto
+        # AFIP:
+        # 96 = DNI → Consumidor Final
+        # 80 = CUIT → Responsable Inscripto
+
+        # Resolver desde catálogo de tipos_documento (sin IDs mágicos)
+        tipo_doc = self._catalogos.get_tipo_doc_by_id(tipo_doc_id)
+
+        default_code = None
+
+        if tipo_doc:
+            codigo = (tipo_doc.get("codigo") or "").upper()
+
+            if codigo == "DNI":
+                default_code = "CF"   # Consumidor Final
+            elif codigo in ("CUIT", "CUIL"):
+                default_code = "RI"   # Responsable Inscripto
+
+
 
         if default_code:
             return self._map_condicion_iva_code_to_id(default_code)

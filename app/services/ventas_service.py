@@ -297,7 +297,7 @@ class VentasService:
                         v.precio_total,
                         v.forma_pago_id,
                         fp.nombre AS forma_pago,            
-
+                        v.estado_id,
                         f.id AS factura_id,         
 
                         -- cuotas
@@ -329,14 +329,21 @@ class VentasService:
                 # ----------------------------
                 # Estado financiero calculado
                 # ----------------------------
-                if r["total_cuotas"] == 0:
-                    estado = "PAGADA"
-                elif r["cuotas_pagadas"] == r["total_cuotas"]:
-                    estado = "PAGADA"
-                elif r["cuotas_vencidas"] > 0:
-                    estado = "CON DEUDA"
+                estado_id = r["estado_id"]
+
+                # 🔴 PRIORIDAD: si la venta está cancelada/anulada
+                if estado_id in (33, 34):  # <-- poné acá los IDs reales de cancelada/anulada
+                    estado = "CANCELADA"
                 else:
-                    estado = "PENDIENTE"
+                    if r["total_cuotas"] == 0:
+                        estado = "PAGADA"
+                    elif r["cuotas_pagadas"] == r["total_cuotas"]:
+                        estado = "PAGADA"
+                    elif r["cuotas_vencidas"] > 0:
+                        estado = "CON DEUDA"
+                    else:
+                        estado = "PENDIENTE"
+
 
                 ventas.append({
                     "id": r["id"],

@@ -206,26 +206,24 @@ class ClientesAgregarPage(QWidget):
 
     # -------------------- Cambio tipo doc → validadores --------------------
     def _on_tipo_doc_changed(self, _idx: int) -> None:
-        """
-        Ajusta el validador y el placeholder del número de documento
-        según el tipo seleccionado (DNI, CUIT, CUIL, otros).
-        """
-        tipo = (self.in_tipo_doc.currentData() or "").upper()
+        tipo_id = self.in_tipo_doc.currentData()
 
-        if tipo in ("CUIT", "CUIL"):
-            # 11 dígitos numéricos
+        if not tipo_id:
+            self.in_nro_doc.setValidator(self._validator_otro_doc)
+            self.in_nro_doc.setPlaceholderText("Documento")
+            self.in_nro_doc.clear()
+            return
+
+        if self._catalogos.es_cuit(tipo_id) or self._catalogos.es_cuil(tipo_id):
             self.in_nro_doc.setValidator(self._validator_cuit_cuil)
             self.in_nro_doc.setPlaceholderText("Ej: 20301122334 (11 dígitos)")
-        elif tipo == "DNI" or not tipo:
-            # 1–8 dígitos numéricos
+        elif self._catalogos.es_dni(tipo_id):
             self.in_nro_doc.setValidator(self._validator_dni)
-            self.in_nro_doc.setPlaceholderText("Ej: 30111222 (sólo números)")
+            self.in_nro_doc.setPlaceholderText("Ej: 30111222 (hasta 8 dígitos)")
         else:
-            # Otros documentos: hasta 20 caracteres alfanuméricos
             self.in_nro_doc.setValidator(self._validator_otro_doc)
             self.in_nro_doc.setPlaceholderText("Documento (hasta 20 caracteres)")
 
-        # Limpiamos el campo cuando cambia el tipo
         self.in_nro_doc.clear()
 
     # -------------------- Catálogos --------------------
@@ -249,13 +247,11 @@ class ClientesAgregarPage(QWidget):
     def _fill_catalogos(self, data: dict):
         # Tipos de documento
         self.in_tipo_doc.clear(); self.in_tipo_doc.addItem("Seleccione...", None)
-        tipos = (data.get("tipos_documento") or
-                 data.get("tipos_doc") or
-                 [{"codigo": "DNI", "nombre": "DNI"}, {"codigo": "CUIT", "nombre": "CUIT"}, {"codigo": "CUIL", "nombre": "CUIL"}])
+        tipos = data.get("tipos_documento") or []
         for t in tipos:
-            codigo = t.get("codigo") or t.get("nombre") or ""
-            nombre = t.get("nombre") or t.get("codigo") or codigo
-            self.in_tipo_doc.addItem(nombre, codigo)
+            label = t.get("descripcion") or t.get("codigo") or ""
+            self.in_tipo_doc.addItem(label, t.get("id"))
+
 
         # Estados de cliente (1 Activo / 0 Inactivo por defecto)
         self.in_estado.clear()
@@ -335,7 +331,7 @@ class ClientesAgregarPage(QWidget):
     # -------------------- Utils --------------------
     def _collect_data(self) -> Dict[str, Any]:
         return {
-            "tipo_doc": self.in_tipo_doc.currentData(),
+            "tipo_doc_id": self.in_tipo_doc.currentData(),
             "nro_doc": self._only_digits(self.in_nro_doc.text()),
             "nombre": self.in_nombre.text().strip() or None,
             "apellido": self.in_apellido.text().strip() or None,

@@ -76,21 +76,24 @@ class VehiculoDetailPage(QWidget):
                 normalize_title(self.in_modelo.text())
             )
         )
-        self.in_numero_cuadro.editingFinished.connect(
-            lambda: self.in_numero_cuadro.setText(
-                normalize_title(self.in_numero_cuadro.text())
+        self.in_cuadro.editingFinished.connect(
+            lambda: self.in_cuadro.setText(
+                normalize_title(self.in_cuadro.text())
             )
         )
-        self.in_nro_certificado.editingFinished.connect(
-            lambda: self.in_nro_certificado.setText(
-                normalize_title(self.in_nro_certificado.text())
+
+        self.in_nro_cert.editingFinished.connect(
+            lambda: self.in_nro_cert.setText(
+                normalize_title(self.in_nro_cert.text())
             )
         )
+
         self.in_nro_dnrpa.editingFinished.connect(
             lambda: self.in_nro_dnrpa.setText(
                 normalize_title(self.in_nro_dnrpa.text())
             )
         )
+
 
         # ---------- Botonera del pie (centrada) ----------
         self.btn_edit = QPushButton("Editar");      self.btn_edit.setObjectName("BtnPrimary")

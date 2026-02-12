@@ -15,6 +15,9 @@ from app.services.vehiculos_service import VehiculosService
 from app.domain.facturas_validaciones import validar_factura
 from app.ui.widgets.cliente_selector_combo import ClienteSelectorCombo
 from app.ui.widgets.vehiculo_selector_combo import VehiculoSelectorCombo
+from app.ui.widgets.factura_preview_dialog import FacturaPreviewDialog
+from PySide6.QtWidgets import QDialog
+from app.ui.widgets.loading_overlay import LoadingOverlay
 
 from PySide6.QtCore import Qt, QDate
 from app.data.database import SessionLocal
@@ -103,7 +106,12 @@ class FacturasAgregarPage(QWidget):
     go_back = Signal()
     go_to_detalle = Signal(int)
 
-    def __init__(self, parent: Optional[QWidget] = None, main_window: Optional[QMainWindow] = None) -> None:
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        main_window: Optional[QMainWindow] = None,
+        cliente_id: Optional[int] = None,
+    ) -> None:
         super().__init__(parent)
         self.setObjectName("FacturasAgregarPage")
 
@@ -112,6 +120,8 @@ class FacturasAgregarPage(QWidget):
         self._svc_vehiculos = VehiculosService()
 
         self._main_window = main_window
+        self._cliente_id_inicial = cliente_id
+
         self._dirty = False
         self._selected_cliente: Optional[Dict[str, Any]] = None
         self._catalogos = CatalogosService()
@@ -131,10 +141,13 @@ class FacturasAgregarPage(QWidget):
         self._load_condicion_iva_receptor()
         self._add_detalle_row()
         # Ajuste inicial de anchos (por las dudas)
-        self._ajustar_ancho_detalle()
         # Aseguramos que arranca en modo "factura normal"
         self._actualizar_modo_nc()
         self._on_forma_pago_changed()
+        # 🔥 Si viene desde ClienteDetail, precargamos cliente
+        if self._cliente_id_inicial:
+            self._cargar_cliente_inicial(self._cliente_id_inicial)
+
 
     # ---------------- UI ----------------
     def _build_ui(self) -> None:
@@ -408,18 +421,13 @@ class FacturasAgregarPage(QWidget):
         )
         header = self.tbl_detalle.horizontalHeader()
 
-        # Todas las columnas en modo interactivo; el tamaño lo manejamos nosotros.
-        for col in range(7):
-            header.setSectionResizeMode(col, QHeaderView.Interactive)
+        # Vehículo ocupa todo lo sobrante
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
 
-        # ancho inicial aproximado
-        self.tbl_detalle.setColumnWidth(0, 320)  # Vehículo
-        self.tbl_detalle.setColumnWidth(1, 100)
-        self.tbl_detalle.setColumnWidth(2, 140)
-        self.tbl_detalle.setColumnWidth(3, 90)
-        self.tbl_detalle.setColumnWidth(4, 130)
-        self.tbl_detalle.setColumnWidth(5, 130)
-        self.tbl_detalle.setColumnWidth(6, 130)
+        # Las demás se ajustan al contenido
+        for col in range(1, 7):
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+
 
         sec3_l.addWidget(self.tbl_detalle)
 
@@ -528,7 +536,34 @@ class FacturasAgregarPage(QWidget):
 
         self.btn_volver.clicked.connect(self._on_volver)
         #self.btn_guardar.clicked.connect(lambda: self._on_guardar(False))
-        self.btn_guardar_ver.clicked.connect(lambda: self._on_guardar(True))
+        self.btn_guardar_ver.clicked.connect(lambda: self._mostrar_preview(True))
+        self.loading_overlay = LoadingOverlay(self, "Enviando factura...")
+
+    def _show_loading(self, text="Procesando..."):
+        self.loading_overlay.lbl_text.setText(text)
+        self.loading_overlay.show_overlay()
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()
+
+    def _hide_loading(self):
+        self.loading_overlay.hide_overlay()
+    def _cargar_cliente_inicial(self, cliente_id: int) -> None:
+        try:
+            cliente = self._svc_clientes.get(cliente_id)
+        except Exception:
+            return
+
+        if not cliente:
+            return
+
+        if hasattr(self.cb_cliente, "select_cliente_externo"):
+            self.cb_cliente.select_cliente_externo(cliente)
+
+
+
+    def set_cliente(self, cliente: Dict[str, Any]):
+        self.selected_cliente = cliente
+        self.lineEdit().setText(_cliente_label(cliente))
 
     # --- layout: lógica de ancho responsive con mínimo para Vehículo ---
     def _recalcular_precio_real(self):
@@ -544,53 +579,9 @@ class FacturasAgregarPage(QWidget):
         total = anticipo + (cuotas * importe_cuota)
         self.in_precio_real.setValue(total)
 
-    def _ajustar_ancho_detalle(self) -> None:
-        """
-        Reparte el ancho de la tabla:
-        - Columnas 1..6 respetan un mínimo y se ajustan a contenido.
-        - Columna 0 (Vehículo) tiene un mínimo y usa el espacio restante.
-        """
-        if not hasattr(self, "tbl_detalle") or self.tbl_detalle is None:
-            return
-
-        vp_width = self.tbl_detalle.viewport().width()
-        if vp_width <= 0:
-            return
-
-        # mínimos por columna
-        min_widths = {
-            0: 260,  # Vehículo (mínimo visible)
-            1: 90,   # Cant.
-            2: 130,  # P. Unitario
-            3: 90,   # IVA %
-            4: 120,  # Neto
-            5: 120,  # IVA
-            6: 120,  # Total
-        }
-
-        # Ajustar 1..6 al contenido pero no menos del mínimo
-        for col in range(1, 7):
-            self.tbl_detalle.resizeColumnToContents(col)
-            current = self.tbl_detalle.columnWidth(col)
-            if current < min_widths[col]:
-                self.tbl_detalle.setColumnWidth(col, min_widths[col])
-
-        other_width = sum(self.tbl_detalle.columnWidth(c) for c in range(1, 7))
-
-        # Vehículo = lo que sobra, pero nunca menos que su mínimo
-        veh_min = min_widths[0]
-        space_for_veh = vp_width - other_width
-
-        if space_for_veh >= veh_min:
-            veh_width = space_for_veh
-        else:
-            veh_width = veh_min  # esto puede pasarse del viewport => scroll horizontal
-
-        self.tbl_detalle.setColumnWidth(0, veh_width)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._ajustar_ancho_detalle()
 
     def showEvent(self, event) -> None:
         """
@@ -598,15 +589,20 @@ class FacturasAgregarPage(QWidget):
         todo el ancho disponible (después de que el layout se calcule).
         """
         super().showEvent(event)
-        QTimer.singleShot(0, self._ajustar_ancho_detalle)
 
     # ---------------- Helpers modo NC ----------------
 
     def _es_nota_credito(self) -> bool:
-        tipo = self.in_tipo.currentData()
+        tipo_id = self.in_tipo.currentData()
+        if not tipo_id:
+            return False
+
+        tipo = self._catalogos.get_tipo_comprobante_by_id(tipo_id)
         if not tipo:
             return False
-        return str(tipo).upper().startswith("NC")
+
+        return bool(tipo.get("es_nota_credito"))
+
 
     def _actualizar_modo_nc(self) -> None:
         """
@@ -658,7 +654,11 @@ class FacturasAgregarPage(QWidget):
 
 
         # Nos quedamos solo con FA/FB/FC (facturas, no NC/ND)
-        rows_ok = [r for r in rows if str(r.get("tipo") or "").upper() in ("FA", "FB", "FC")]
+        rows_ok = [
+            r for r in rows
+            if r.get("tipo_codigo") in ("FA", "FB", "FC")
+        ]
+
 
         # Ordenar por número de mayor a menor
         def _key_num(r: Dict[str, Any]) -> int:
@@ -698,12 +698,23 @@ class FacturasAgregarPage(QWidget):
 
         self.in_tipo.blockSignals(True)
         self.in_tipo.clear()
+
+        idx_default = -1
+
         for t in tipos:
-            self.in_tipo.addItem(t["nombre"], t["codigo"])
+            self.in_tipo.addItem(t["nombre"], t["id"])
+
+            # Buscar Factura B por código
+            if t.get("codigo") == "FB":
+                idx_default = self.in_tipo.count() - 1
+
         self.in_tipo.blockSignals(False)
 
-        idx_fb = self.in_tipo.findData("FB")
-        self.in_tipo.setCurrentIndex(idx_fb if idx_fb >= 0 else 0)
+        if idx_default >= 0:
+            self.in_tipo.setCurrentIndex(idx_default)
+        elif self.in_tipo.count() > 0:
+            self.in_tipo.setCurrentIndex(0)
+
 
 
     def _load_puntos_venta(self):
@@ -852,8 +863,17 @@ class FacturasAgregarPage(QWidget):
         self._dirty = True
         self._selected_cliente = data
 
-        self.in_cliente_tipo_doc.setText(data.get("tipo_doc") or "")
+        tipo_doc_id = data.get("tipo_doc_id")
+        tipo_codigo = ""
+
+        if tipo_doc_id:
+            tipo = self._catalogos.get_tipo_doc_by_id(tipo_doc_id)
+            if tipo:
+                tipo_codigo = tipo.get("codigo", "")
+
+        self.in_cliente_tipo_doc.setText(tipo_codigo)
         self.in_cliente_nro_doc.setText(data.get("nro_doc") or "")
+
         self.in_cliente_email.setText(data.get("email") or "")
         self.in_cliente_telefono.setText(data.get("telefono") or "")
         self.in_cliente_direccion.setText(data.get("direccion") or "")
@@ -913,10 +933,26 @@ class FacturasAgregarPage(QWidget):
             it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             it.setFlags(it.flags() & ~Qt.ItemIsEditable)
             self.tbl_detalle.setItem(row, col, it)
+        in_cant.setMinimumWidth(1)
+        in_cant.setMaximumWidth(90)
+        in_cant.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+
+        in_pu.setMinimumWidth(180)
+        in_pu.setMaximumWidth(180)
+        in_pu.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+    
+        in_iva.setMinimumWidth(1)
+        in_iva.setMaximumWidth(70)
+        in_iva.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.tbl_detalle.resizeColumnsToContents()
+        self.tbl_detalle.resizeColumnsToContents()
+
+        for col in (4, 5, 6):
+            ancho = self.tbl_detalle.columnWidth(col)
+            self.tbl_detalle.setColumnWidth(col, ancho + 15)
 
         self._dirty = True
         self._recalcular_fila(row)
-        self._ajustar_ancho_detalle()
 
     def _remove_selected_row(self) -> None:
         row = self.tbl_detalle.currentRow()
@@ -927,7 +963,6 @@ class FacturasAgregarPage(QWidget):
             self._add_detalle_row()
         self._dirty = True
         self._recalcular_totales()
-        self._ajustar_ancho_detalle()
 
     def _on_vehiculo_en_fila_seleccionado(self, row: int, vehiculo: Dict[str, Any]) -> None:
         if row < 0 or row >= self.tbl_detalle.rowCount():
@@ -998,18 +1033,32 @@ class FacturasAgregarPage(QWidget):
     def _clear_detalle_row(self, row: int) -> None:
         if row < 0 or row >= self.tbl_detalle.rowCount():
             return
-        defaults = {1: "1", 2: "0,00", 3: "21"}
-        for col, val in defaults.items():
-            w = self.tbl_detalle.cellWidget(row, col)
-            if isinstance(w, QLineEdit):
-                w.setText(val)
+
+        # Cantidad
+        cant_w = self.tbl_detalle.cellWidget(row, 1)
+        if isinstance(cant_w, QLineEdit):
+            cant_w.setText("1")
+
+        # Precio unitario
+        pu_w = self.tbl_detalle.cellWidget(row, 2)
+        if isinstance(pu_w, MoneySpinBox):
+            pu_w.setValue(0)
+
+        # IVA %
+        iva_w = self.tbl_detalle.cellWidget(row, 3)
+        if isinstance(iva_w, QLineEdit):
+            iva_w.setText("21")
+
+        # Neto / IVA / Total
         for col in (4, 5, 6):
             item = self.tbl_detalle.item(row, col)
             if not item:
                 item = QTableWidgetItem()
                 self.tbl_detalle.setItem(row, col, item)
             item.setText("0,00")
+
         self._recalcular_totales()
+
 
     # ---------------- Observaciones ----------------
 
@@ -1042,7 +1091,7 @@ class FacturasAgregarPage(QWidget):
         observaciones_text = (self.in_observaciones.toPlainText() or "").strip()
 
         cabecera = {
-            "tipo": tipo,
+            "tipo_comprobante_id": tipo,
             "pto_vta": int(pto_vta) if pto_vta is not None else None,
             # si por alguna razón no hay número (falló sugerencia),
             # lo dejamos en None para que el service calcule el próximo
@@ -1104,18 +1153,7 @@ class FacturasAgregarPage(QWidget):
             )
 
         return cabecera, items
-
-    def _on_guardar(self, abrir_detalle: bool) -> None:
-        """
-        Guarda:
-        - Si es factura (FA/FB/FC, etc.) → alta normal + ARCA.
-        - Si es Nota de Crédito (NCA/NCB/NCC) → genera NC a partir del comprobante seleccionado.
-        """
-        if self._es_nota_credito():
-            self._on_guardar_nota_credito(abrir_detalle)
-            return
-
-        # ----- Flujo normal de factura -----
+    def _mostrar_preview(self, abrir_detalle: bool) -> None:
         cabecera, items = self._collect_data()
 
         ok, errs = validar_factura(
@@ -1129,109 +1167,85 @@ class FacturasAgregarPage(QWidget):
             msg = "\n".join(f"• {e}" for e in errs)
             popUp.toast(self, msg, kind="warning")
             return
+        tipo_id = cabecera.get("tipo_comprobante_id")
+        tipo = self._catalogos.get_tipo_comprobante_by_id(tipo_id)
+        tipo_nombre = tipo.get("nombre") if tipo else ""
+
+        cond_id = cabecera.get("condicion_iva_receptor_id")
+        cond = None
+        for c in self._cond_iva_receptor_list:
+            if c.get("id") == cond_id:
+                cond = c
+                break
+        cond_desc = cond.get("descripcion") if cond else ""
+
+        forma_pago_id = cabecera.get("forma_pago_id")
+        forma_pago_nombre = self.cb_forma_pago.currentText()
+
+        dialog = FacturaPreviewDialog(
+            cabecera=cabecera,
+            items=items,
+            cliente=self._selected_cliente or {},
+            tipo_nombre=tipo_nombre,
+            condicion_iva=cond_desc,
+            forma_pago=forma_pago_nombre,
+            subtotal=_parse_decimal(self.in_subtotal.text()),
+            iva=_parse_decimal(self.in_iva_total.text()),
+            total=_parse_decimal(self.in_total.text()),
+            parent=self
+        )
+
+
+        result = dialog.exec()
+
+        if result == QDialog.Accepted:
+            self._on_guardar(abrir_detalle)
 
 
 
-        create_full = getattr(self._svc_facturas, "create_factura_completa", None)
-        if not callable(create_full):
-            popUp.info(
-                self,
-                "Pendiente",
-                (
-                    "La pantalla de alta de factura ya está lista, pero todavía no está "
-                    "implementado el método 'create_factura_completa' en FacturasService."
-                ),
-            )
-            return
+    def _on_guardar(self, abrir_detalle: bool) -> None:
+        self._show_loading("Enviando factura...")
 
-        # 1) Guardar factura en BD
         try:
-            new_id = create_full(cabecera, items)
-        except Exception as ex:
-            popUp.toast(self, f"Error al guardar la factura: {ex}", kind="error")
-            return
+            if self._es_nota_credito():
+                self._on_guardar_nota_credito(abrir_detalle)
+                return
 
+            cabecera, items = self._collect_data()
 
-        self._dirty = False
-        popUp.toast(self, "Factura guardada correctamente.", kind="success")
-
-
-        # 2) Autorizar en ARCA (si existe el método en el service)
-        autorizar = getattr(self._svc_facturas, "autorizar_en_arca", None)
-        if callable(autorizar) and isinstance(new_id, int):
-            try:
-                result = autorizar(new_id)
-                from pprint import pformat
-
-                # Popup técnico (te sirve mientras estás en homologación)
-                #popUp.toast(
-                #    self,
-                #    "Resultado ARCA",
-                #    pformat(result),
-                #)
-
-
-                msg = result.get("mensaje") if isinstance(result, dict) else ""
-                estado_id = result.get("estado_id") if isinstance(result, dict) else None
-
-                if isinstance(result, dict) and result.get("aprobada"):
-                    # Autorizada ok
-                    popUp.toast(
-                        self,
-                        "Factura autorizada correctamente en ARCA.",
-                        kind="success",
-                    )
-
-                elif isinstance(result, dict) and result.get("rechazada"):
-                    # Rechazada por AFIP/ARCA
-                    popUp.toast(
-                        self,
-                        "Factura rechazada por ARCA.",
-                        kind="error",
-                    )
-
-                else:
-                    # Ni aprobada ni rechazada → error de comunicación o quedó en borrador
-                    extra = ""
-                    try:
-                        if estado_id in (
-                            self._svc_facturas.ESTADO_BORRADOR,
-                            self._svc_facturas.ESTADO_ERROR_COMUNICACION,
-                        ):
-                            extra = (
-                                "\n\nLa factura quedó guardada en el sistema. "
-                                "Podés reintentar la autorización desde la pantalla "
-                                "de facturas usando 'Sincronizar con ARCA'."
-                            )
-                    except Exception:
-                        pass
-
-                    popUp.toast(
-                        self,
-                        "No se pudo confirmar la autorización en ARCA. La factura quedó guardada.",
-                        kind="warning",
-                    )
-
-            except Exception as ex:
-                # Si algo explota acá, la factura igual ya se guardó como borrador.
-                popUp.toast(
-                    self,
-                    "La factura se guardó, pero hubo un error al autorizar en ARCA.",
-                    kind="error",
-                )
-
-        else:
-            # Si por alguna razón el método no está, solo informamos guardar local.
-            popUp.toast(self,
-                "La factura se guardó localmente, pero la integración con ARCA no está disponible.",
-                kind="warning"
+            ok, errs = validar_factura(
+                cabecera=cabecera,
+                items=items,
+                es_nota_credito=self._es_nota_credito(),
+                comprobante_nc_id=self.cb_comprobante.currentData(),
             )
 
-        # 3) Navegación según el botón
-        if abrir_detalle and isinstance(new_id, int):
-            self.go_to_detalle.emit(new_id)
-        else:
-            self.go_back.emit()
+            if not ok:
+                msg = "\n".join(f"• {e}" for e in errs)
+                popUp.toast(self, msg, kind="warning")
+                return
+
+            new_id = self._svc_facturas.create_factura_completa(cabecera, items)
+
+            # 🔥 ACÁ recién autorizás
+            autorizar = getattr(self._svc_facturas, "autorizar_en_arca", None)
+            if callable(autorizar):
+                autorizar(new_id)
+
+            self._dirty = False
+            popUp.toast(self, "Factura procesada correctamente.", kind="success")
+
+            if abrir_detalle:
+                self.go_to_detalle.emit(new_id)
+            else:
+                self.go_back.emit()
+
+        except Exception as ex:
+            popUp.toast(self, f"Error: {ex}", kind="error")
+
+        finally:
+            self._hide_loading()
+
 
     def _on_guardar_nota_credito(self, abrir_detalle: bool) -> None:
         """
@@ -1312,6 +1326,7 @@ class FacturasAgregarPage(QWidget):
             self.go_to_detalle.emit(nc_id)
         else:
             self.go_back.emit()
+        self._hide_loading()
 
     # ---------------- Volver ----------------
 
@@ -1329,14 +1344,6 @@ class FacturasAgregarPage(QWidget):
 
         # Señal para quien esté escuchando (MainWindow normalmente).
         self.go_back.emit()
-
-        # Fallback: por si nadie está conectado al signal.
-        mw = getattr(self, "_main_window", None) or self.window()
-        if isinstance(mw, QMainWindow) and hasattr(mw, "navigate_back"):
-            try:
-                mw.navigate_back()
-            except Exception:
-                pass
 
     def _hay_info_cargada(self) -> bool:
         # Cabecera

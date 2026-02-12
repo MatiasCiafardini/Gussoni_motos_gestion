@@ -1,136 +1,192 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
+from typing import Dict, Any, List, Optional
 
-from PySide6.QtCore import Qt, QTimer, QRect, QEvent, Signal
-from PySide6.QtWidgets import QComboBox, QListView, QAbstractItemView, QLineEdit
-from PySide6.QtGui import QStandardItemModel, QStandardItem
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import QLineEdit, QCompleter
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QAction
 
 import app.ui.app_message as popUp
 from app.services.clientes_service import ClientesService
+from PySide6.QtCore import QEvent
+from PySide6.QtWidgets import QToolTip
 
 
+# -------------------------------------------------
 def _cliente_label(c: Dict[str, Any]) -> str:
     nombre = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
-    doc = f"{c.get('tipo_doc', '')} {c.get('nro_doc', '')}".strip()
-    label = nombre
-    if doc:
-        label += f" ({doc})"
-    return label or "(sin nombre)"
+
+    if c.get("tipo_doc") and c.get("nro_doc"):
+        nombre += f" | {c['tipo_doc']} {c['nro_doc']}"
+
+    return nombre or "(sin nombre)"
 
 
-class ClienteSelectorCombo(QComboBox):
+# =================================================
+class ClienteSelectorCombo(QLineEdit):
+
     cliente_selected = Signal(dict)
     cliente_cleared = Signal()
-    def __init__(self, clientes_service: ClientesService, parent=None) -> None:
+
+    def __init__(self, clientes_service: ClientesService, parent=None):
         super().__init__(parent)
 
-        self.setEditable(True)
-        self.setInsertPolicy(QComboBox.NoInsert)
-
         self._svc = clientes_service
-        self._results: List[Dict[str, Any]] = []
         self._selected: Optional[Dict[str, Any]] = None
+        self._results: List[Dict[str, Any]] = []
 
-        le = self.lineEdit()
-        le.addAction(le.findChild(type(le.addAction)), QLineEdit.TrailingPosition)
+        self.setPlaceholderText("Buscar cliente...")
+        self.setClearButtonEnabled(True)
 
-        le.setPlaceholderText("Buscar cliente...")
-        le.setClearButtonEnabled(True)
+        # ------------------ MODEL ------------------
+        self._model = QStandardItemModel(self)
 
-        self._popup = QListView()
-        self._popup.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
-        self._popup.setFocusPolicy(Qt.NoFocus)
-        self._popup.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._popup.setSelectionMode(QAbstractItemView.SingleSelection)
+        # ---------------- COMPLETER ----------------
+        self._completer = QCompleter(self._model, self)
+        self._completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._completer.setFilterMode(Qt.MatchContains)
+        self._completer.setCompletionMode(QCompleter.PopupCompletion)
+        self._completer.setMaxVisibleItems(5)
 
-        fm = self._popup.fontMetrics()
-        row_h = max(24, fm.height() + 8)
+        self.setCompleter(self._completer)
 
-        self._popup.setStyleSheet(f"""
-        QListView {{
-            background: #ffffff;
-            border: 1px solid #cfcfcf;
-            border-radius: 6px;
-            padding: 4px;
-        }}
-        QListView::item {{
-            padding: 6px 8px;
-            min-height: {row_h}px;
-        }}
-        QListView::item:selected {{
-            background: #6c63ff;
-            color: white;
-        }}
-        QListView::item:hover {{
-            background: #e8e7ff;
-        }}
-        """)
-
-        self._model = QStandardItemModel(self._popup)
-        self._popup.setModel(self._model)
-        self._popup.clicked.connect(self._on_popup_clicked)
-
-        self.installEventFilter(self)
-        le.installEventFilter(self)
-
+        # ------------------ TIMER ------------------
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
-        self._timer.setInterval(150)
+        self._timer.setInterval(300)
         self._timer.timeout.connect(self._do_search)
 
-        le.textChanged.connect(self._on_text_changed)
+        self.textEdited.connect(self._on_text_edited)
+        self._completer.activated.connect(self._on_selected)
 
-    @property
-    def selected_cliente(self) -> Optional[Dict[str, Any]]:
-        return self._selected
+        popup = self._completer.popup()
+        popup.setMinimumWidth(self.width())
+        popup.setUniformItemSizes(False)
+        popup.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-    # -------- búsqueda --------
+        # 🔥 Estética idéntica a VehiculoSelectorCombo
+        fm = popup.fontMetrics()
+        row_height = max(32, fm.height() + 12)
 
-    def _on_text_changed(self, text: str) -> None:
-        # Si había un cliente seleccionado
-        if self._selected is not None:
-            # Caso 1: el usuario borró todo (❌ o Ctrl+A + Delete)
-            if not text.strip():
-                self._selected = None
-                self._popup.hide()
-                self.cliente_cleared.emit()
-                return
+        popup.setStyleSheet(f"""
+            QListView {{
+                border: 1px solid #dcdcdc;
+                background: white;
+            }}
 
-            # Caso 2: el usuario empieza a escribir algo nuevo
-            self._selected = None
-            self._popup.hide()
-            self.cliente_cleared.emit()
-            self._timer.start()
+            QListView::item {{
+                padding: 8px 10px;
+                min-height: {row_height}px;
+                border-radius: 6px;
+            }}
+
+            QListView::item:hover {{
+                background-color: rgba(108, 99, 255, 0.12);
+            }}
+
+            QListView::item:selected {{
+                background-color: #6c63ff;
+                color: white;
+            }}
+        """)
+
+        # 🔥 Botón forzar búsqueda
+        self._search_action = QAction("-", self)
+        self._search_action.triggered.connect(self._force_search)
+        self.addAction(self._search_action, QLineEdit.TrailingPosition)
+
+    # =================================================
+    # 🔥 Forzar búsqueda manual
+    def _force_search(self):
+        text = self.text().strip()
+        if not text:
+            return
+        self._do_search()
+    def event(self, event):
+
+        if event.type() == QEvent.ToolTip:
+            text = self.text().strip()
+            if not text:
+                return True
+
+            fm = self.fontMetrics()
+            text_width = fm.horizontalAdvance(text)
+
+            # Solo mostrar si está cortado
+            if text_width > self.width() - 10:
+                QToolTip.showText(
+                    event.globalPos(),
+                    text,
+                    self
+                )
+            return True
+
+        return super().event(event)
+    # -------------------------------------------------
+    # 🔥 Buscar también al hacer click si ya hay texto
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+
+        text = self.text().strip()
+        if len(text) >= 3:
+            self._force_search()
+    def _update_tooltip(self):
+        text = self.text().strip()
+
+        if not text:
+            self.setToolTip("")
             return
 
-        # ---- Sin cliente seleccionado ----
+        fm = self.fontMetrics()
+        text_width = fm.horizontalAdvance(text)
+
+        # Solo mostrar si está cortado
+        if text_width > self.width() - 10:
+            self.setToolTip(text)
+        else:
+            self.setToolTip("")
+    def resizeEvent(self, event):
+            super().resizeEvent(event)
+            self._update_tooltip()
+    # =================================================
+    def _on_text_edited(self, text):
+
         if not text.strip():
-            self._popup.hide()
+            self._model.clear()
+            self._selected = None
+            self.cliente_cleared.emit()
             return
 
         self._timer.start()
-
-
-
-
-
-
-    def _do_search(self) -> None:
-        text = (self.lineEdit().text() or "").strip()
-        if len(text) < 4:
-            self._model.clear()
-            self._popup.hide()
+    def select_cliente_externo(self, cliente: Dict[str, Any]) -> None:
+        """
+        Permite seleccionar un cliente programáticamente
+        (por ejemplo cuando se abre desde ClientesDetail).
+        """
+        if not cliente:
             return
 
-        filtros = {
-            "q": text,
-            "page": 1,
-            "page_size": 20,
-        }
+        self._selected = cliente
 
+        # Mostrar texto visible
+        self.setText(_cliente_label(cliente))
+
+        # Emitir señal como si el usuario lo hubiera elegido
+        self.cliente_selected.emit(cliente)
+
+    # =================================================
+    def _do_search(self):
+
+        text = self.text().strip()
+
+        if len(text) < 3:
+            return
 
         try:
-            rows, _ = self._svc.search(filtros, page=1, page_size=20)
+            rows, _ = self._svc.search(
+                {"q": text},
+                page=1,
+                page_size=20
+            )
         except Exception as ex:
             popUp.toast(self, f"Error al buscar clientes: {ex}", kind="error")
             rows = []
@@ -139,60 +195,26 @@ class ClienteSelectorCombo(QComboBox):
         self._model.clear()
 
         for c in self._results:
-            it = QStandardItem(_cliente_label(c))
-            it.setData(c, Qt.UserRole)
-            self._model.appendRow(it)
+            item = QStandardItem(_cliente_label(c))
+            item.setData(c, Qt.UserRole)
+            self._model.appendRow(item)
 
-        if self._model.rowCount():
-            self._show_popup()
-        else:
-            self._popup.hide()
+        # 🔥 Mostrar popup sin perder foco
+        self._completer.complete()
 
-    def _show_popup(self) -> None:
-        le = self.lineEdit()
-        pos = le.mapToGlobal(le.rect().bottomLeft())
-        h = min(220, self._popup.sizeHintForRow(0) * self._model.rowCount() + 6)
-        self._popup.setGeometry(QRect(pos.x(), pos.y(), le.width(), h))
-        self._popup.show()
-        self._popup.raise_()
+    # =================================================
+    def _on_selected(self, text):
 
-    def _on_popup_clicked(self, index) -> None:
-        item = self._model.itemFromIndex(index)
-        data = item.data(Qt.UserRole) if item else None
-        if not isinstance(data, dict):
-            return
+        for row in range(self._model.rowCount()):
+            item = self._model.item(row)
+            if item.text() == text:
+                data = item.data(Qt.UserRole)
+                if isinstance(data, dict):
+                    self._selected = data
+                    self.cliente_selected.emit(data)
+                break
 
-        self._selected = data
-        le = self.lineEdit()
-
-        le.blockSignals(True)
-        le.setText(_cliente_label(data))
-        le.blockSignals(False)
-
-        self._popup.hide()
-        self.cliente_selected.emit(data)
-        self.clearFocus()
-
-
-
-
-    # -------- eventos --------
-
-    def eventFilter(self, obj, event) -> bool:
-        if event.type() in (QEvent.FocusOut, QEvent.MouseButtonPress):
-            self._popup.hide()
-
-            # Si quedó vacío, forzamos limpieza
-            if not (self.lineEdit().text() or "").strip():
-                if self._selected is not None:
-                    self._selected = None
-                    self.lineEdit().setReadOnly(False)
-                    self.cliente_cleared.emit()
-
-
-        return super().eventFilter(obj, event)
-
-
-    def hideEvent(self, event) -> None:
-        super().hideEvent(event)
-        self._popup.hide()
+    # =================================================
+    @property
+    def selected_cliente(self):
+        return self._selected

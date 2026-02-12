@@ -17,8 +17,15 @@ def validar_factura(
     errores: List[str] = []
 
     # ---------- Cabecera ----------
-    if not cabecera.get("tipo"):
+    try:
+        tipo_id = int(cabecera.get("tipo_comprobante_id"))
+    except (TypeError, ValueError):
+        tipo_id = None
+
+    if not tipo_id:
         errores.append("Seleccioná el tipo de comprobante.")
+
+
 
     if not cabecera.get("pto_vta"):
         errores.append("Seleccioná el punto de venta.")

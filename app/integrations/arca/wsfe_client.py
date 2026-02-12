@@ -9,6 +9,7 @@ import urllib.error
 import xml.etree.ElementTree as ET
 from app.core.config import settings
 
+from app.services.catalogos_service import CatalogosService
 
 import ssl
 # -------------------- Resultado WSFE --------------------
@@ -257,7 +258,19 @@ class ArcaWSFEClient:
         Construye el Envelope SOAP de FECAESolicitar.
         """
 
-        tipo_cbte_str = str(factura.get("tipo") or "").strip()
+        tipo_id = factura.get("tipo_comprobante_id")
+        if not tipo_id:
+            raise ValueError("Factura sin tipo_comprobante_id.")
+
+
+        catalogos = CatalogosService()
+        tipo_data = catalogos.get_tipo_comprobante_by_id(int(tipo_id))
+
+        if not tipo_data:
+            raise ValueError(f"No se encontró tipo_comprobante_id {tipo_id} en catálogo.")
+
+        tipo_cbte_str = tipo_data["codigo"]
+
         pto_vta = int(factura.get("punto_venta") or 0)
         numero = int(factura.get("numero") or 0)
 
@@ -598,35 +611,25 @@ class ArcaWSFEClient:
 
     @staticmethod
     def _extract_doc_from_factura(factura: Dict[str, Any]) -> Tuple[int, int]:
-        tipo_doc = (factura.get("cliente_tipo_doc") or "").upper()
+        """
+        Extrae DocTipo y DocNro usando directamente el código ARCA
+        guardado en cliente_tipo_doc_id.
+        """
+
+        doc_tipo = factura.get("cliente_tipo_doc_id")
         nro_doc_raw = factura.get("cliente_nro_doc")
 
-        if not tipo_doc and not nro_doc_raw:
-            raw = str(factura.get("cuit") or "").strip()
-            if not raw:
-                return 99, 0
-            parts = raw.split()
-            if len(parts) == 1:
-                tipo_doc = ""
-                nro_doc_raw = parts[0]
-            else:
-                tipo_doc = parts[0].upper()
-                nro_doc_raw = "".join(parts[1:])
+        if not doc_tipo:
+            # fallback ultra defensivo → consumidor final
+            return 99, 0
 
         nro_digits = "".join(ch for ch in str(nro_doc_raw) if ch.isdigit()) or "0"
 
-        if tipo_doc == "CUIT":
-            doc_tipo = 80
-        elif tipo_doc == "CUIL":
-            doc_tipo = 86
-        elif tipo_doc == "DNI":
-            doc_tipo = 96
-        elif tipo_doc == "PAS":
-            doc_tipo = 94
-        else:
-            doc_tipo = 99
+        try:
+            return int(doc_tipo), int(nro_digits)
+        except Exception:
+            return 99, 0
 
-        return doc_tipo, int(nro_digits)
 
     @staticmethod
     def _extract_condicion_iva_receptor_id(factura: Dict[str, Any]) -> Optional[int]:

@@ -212,7 +212,8 @@ class ConfiguracionArcaPage(QWidget):
                 or ""
             )
             label = f"{codigo} – {descripcion}".strip(" –")
-            self.cb_tipo.addItem(label, codigo)
+            self.cb_tipo.addItem(label, t.get("id"))
+
     @with_loading("Consultando comprobante en ARCA / AFIP...")
     def on_consultar_comprobante_clicked(self) -> None:
         tipo = self.cb_tipo.currentData()
@@ -239,11 +240,26 @@ class ConfiguracionArcaPage(QWidget):
             return
 
         try:
+            tipo_id = self.cb_tipo.currentData()
+            pto_vta = self.cb_pto_vta.currentData()
+
+            if not tipo_id or not pto_vta:
+                popUp.warning(
+                    self,
+                    "Faltan datos",
+                    "Seleccioná el tipo de comprobante y el punto de venta.",
+                )
+                return
+
+            # Obtener código desde el service
+            codigo = self.service.get_codigo_tipo(tipo_id)
+
             data = self.service.consultar_comprobante_arca(
-                tipo=str(tipo),
+                tipo_comprobante_id=codigo,
                 pto_vta=int(pto_vta),
                 numero=numero,
             )
+
         except Exception as e:
             popUp.toast(
                 self,
@@ -318,7 +334,7 @@ class ConfiguracionArcaPage(QWidget):
 
         try:
             diag = self.service.diagnosticar_proximo_numero(
-                tipo=str(tipo_codigo),
+                tipo_comprobante_id=str(tipo_codigo),
                 pto_vta=pto_vta,
             )
         except Exception as e:
@@ -335,10 +351,10 @@ class ConfiguracionArcaPage(QWidget):
         ws_ok = diag.get("ws_ok", False)
         errores: List[str] = diag.get("errores") or []
         mensaje = diag.get("mensaje") or ""
-
+        codigo = self.service.get_codigo_tipo(diag.get("tipo_comprobante_id"))
         lineas: List[str] = []
         lineas.append(
-            f"Tipo: {diag.get('tipo')} | Punto de venta: {str(diag.get('pto_vta')).zfill(4)}"
+            f"Tipo: {codigo} | Punto de venta: {str(diag.get('pto_vta')).zfill(4)}"
         )
         lineas.append(f"Próximo número sugerido: {proximo}")
 

@@ -14,123 +14,42 @@ class FacturasRepository:
         self.db = db
 
     # -------------------- Lookups --------------------
+    def list_tipos_comprobante(self):
+        rows = self.db.execute(
+            text("""
+                SELECT
+                    id,
+                    codigo,
+                    nombre,
+                    letra,
+                    es_nota_credito,
+                    es_nota_debito,
+                    activo
+                FROM tipos_comprobante
+                WHERE activo = 1
+                ORDER BY nombre
+            """)
+        ).mappings().all()
 
-    def list_tipos_comprobante(self) -> List[Dict[str, Any]]:
-        """
-        Tipos de comprobante (tabla opcional 'tipos_comprobante').
-        Fallback a códigos comunes AR.
-        """
-        try:
-            rows = self.db.execute(
-                text("SELECT codigo, nombre FROM tipos_comprobante ORDER BY nombre ASC")
-            ).mappings().all()
-            out = [{"codigo": r["codigo"], "nombre": r["nombre"]} for r in rows]
-            if out:
-                return out
-        except Exception:
-            pass
+        return [dict(r) for r in rows]
 
-        return [
-            {"codigo": "FA", "nombre": "Factura A"},
-            {"codigo": "FB", "nombre": "Factura B"},
-            {"codigo": "FC", "nombre": "Factura C"},
-            {"codigo": "NCA", "nombre": "Nota de crédito A"},
-            {"codigo": "NCB", "nombre": "Nota de crédito B"},
-            {"codigo": "NCC", "nombre": "Nota de crédito C"},
-            {"codigo": "NDA", "nombre": "Nota de débito A"},
-            {"codigo": "NDB", "nombre": "Nota de débito B"},
-            {"codigo": "NDC", "nombre": "Nota de débito C"},
-        ]
 
-    def list_estados_facturas(self) -> List[Dict[str, Any]]:
-        """
-        Estados de facturas desde 'estados' (tipo='facturas'), si existe.
-        Fallback vacío (UI mostrará "Todos").
-        """
-        try:
-            rows = self.db.execute(
-                text(
-                    "SELECT id, nombre "
-                    "FROM estados "
-                    "WHERE tipo = 'facturas' "
-                    "ORDER BY nombre ASC"
-                )
-            ).mappings().all()
-            return [dict(r) for r in rows]
-        except Exception:
-            return []
-
-    def list_puntos_venta(self) -> List[Dict[str, Any]]:
-        """
-        Devuelve los puntos de venta definidos en la tabla 'puntos_venta'.
-        """
-        try:
-            rows = self.db.execute(
-                text(
-                    """
-                    SELECT
-                        idpunto_venta,
-                        punto_venta
-                    FROM puntos_venta
-                    ORDER BY punto_venta
-                    """
-                )
-            ).mappings().all()
-        except Exception:
-            rows = []
-
-        out: List[Dict[str, Any]] = []
-        for r in rows:
-            raw_pv = r.get("punto_venta")
-            try:
-                pv_int = int(raw_pv)
-            except (TypeError, ValueError):
-                pv_int = raw_pv
-            out.append(
-                {
-                    "id": r.get("idpunto_venta"),
-                    "punto_venta": pv_int,
-                }
-            )
-        return out
-
-    def list_condiciones_iva_receptor(self) -> List[Dict[str, Any]]:
-        """
-        Condiciones frente al IVA del receptor, desde tabla 'condiciones_iva_receptor'.
-        """
-        try:
-            rows = self.db.execute(
-                text(
-                    """
-                    SELECT
-                        id,
-                        nombre,
-                        codigo,
-                        descripcion
-                    FROM condiciones_iva_receptor
-                    ORDER BY nombre ASC, id ASC
-                    """
-                )
-            ).mappings().all()
-            return [dict(r) for r in rows]
-        except Exception:
-            return []
     def get_by_id_con_venta(self, factura_id: int) -> dict | None:
         row = self.db.execute(
             text("""
                 SELECT
                     f.*,
-    
+                    tc.codigo AS tipo,
                     -- Cliente
                     c.id        AS cliente_id,
                     c.nombre    AS cliente_nombre,
                     c.apellido  AS cliente_apellido,
-                    c.tipo_doc  AS cliente_tipo_doc,
+                    c.tipo_doc_id  AS cliente_tipo_doc_id,
                     c.nro_doc   AS cliente_nro_doc,
                     c.email     AS cliente_email,
                     c.telefono  AS cliente_telefono,
                     c.direccion AS cliente_direccion,
-    
+
                     -- Venta
                     v.precio_total,
                     v.forma_pago_id,
@@ -148,6 +67,8 @@ class FacturasRepository:
                 LEFT JOIN ventas v ON v.id = f.venta_id
                 LEFT JOIN plan_financiacion pf ON pf.venta_id = v.id
                 LEFT JOIN forma_pago fp ON fp.id = v.forma_pago_id
+                LEFT JOIN tipos_comprobante tc ON tc.id = f.tipo_comprobante_id
+
                 WHERE f.id = :id
             """),
             {"id": factura_id}
@@ -157,28 +78,6 @@ class FacturasRepository:
     
     
     # -------------------- Alta / helpers de numeración --------------------
-
-    def get_next_numero(self, tipo: str, punto_venta: int) -> int:
-        """
-        Devuelve el próximo número de comprobante para (tipo, punto_venta),
-        a partir del MAX(numero) actual. Si no hay registros, devuelve 1.
-        """
-        pv = int(punto_venta) if punto_venta is not None else 0
-
-        row = self.db.execute(
-            text(
-                """
-                SELECT COALESCE(MAX(numero), 0) AS max_nro
-                FROM facturas
-                WHERE tipo = :tipo AND punto_venta = :pv
-                """
-            ),
-            {"tipo": tipo, "pv": pv},
-        ).mappings().first()
-
-        max_nro = int(row["max_nro"]) if row and row.get("max_nro") is not None else 0
-        return max_nro + 1
-
     def insert_factura(self, cabecera: Dict[str, Any]) -> int:
         """
         Inserta un registro en 'facturas' y devuelve el ID generado.
@@ -189,7 +88,7 @@ class FacturasRepository:
           -> intenta insertarlos y si la tabla no los tiene, reintenta sin ellos.
         """
         base_data: Dict[str, Any] = {
-            "tipo": cabecera.get("tipo"),
+            "tipo_comprobante_id": cabecera.get("tipo_comprobante_id"),
             "numero": cabecera.get("numero"),
             "fecha_emision": cabecera.get("fecha_emision"),
             "punto_venta": cabecera.get("punto_venta"),
@@ -225,7 +124,7 @@ class FacturasRepository:
                     text(
                         """
                         INSERT INTO facturas (
-                            tipo,
+                            tipo_comprobante_id,
                             numero,
                             fecha_emision,
                             punto_venta,
@@ -248,7 +147,7 @@ class FacturasRepository:
                             venta_id
                         )
                         VALUES (
-                            :tipo,
+                            :tipo_comprobante_id,
                             :numero,
                             :fecha_emision,
                             :punto_venta,
@@ -285,7 +184,7 @@ class FacturasRepository:
             text(
                 """
                 INSERT INTO facturas (
-                    tipo,
+                    tipo_comprobante_id,
                     numero,
                     fecha_emision,
                     punto_venta,
@@ -304,7 +203,7 @@ class FacturasRepository:
                     factura_origen_id
                 )
                 VALUES (
-                    :tipo,
+                    :tipo_comprobante_id,
                     :numero,
                     :fecha_emision,
                     :punto_venta,
@@ -457,7 +356,7 @@ class FacturasRepository:
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Filtros admitidos:
-          - tipo, pto_vta, numero, cliente, cuit
+          - tipo, pto_vta, numero, cliente, documento
           - estado_id
           - fecha_desde (YYYY-MM-DD), fecha_hasta (YYYY-MM-DD)
         """
@@ -480,9 +379,10 @@ class FacturasRepository:
         offset = (page_i - 1) * page_size_i
 
         # tipo comprobante
-        if f.get("tipo"):
-            where.append("f.tipo = :tipo")
-            params["tipo"] = f["tipo"]
+        if f.get("tipo_comprobante_id"):
+            where.append("f.tipo_comprobante_id = :tipo")
+            params["tipo"] = f["tipo_comprobante_id"]
+
 
         # punto de venta
         if f.get("pto_vta"):
@@ -502,9 +402,9 @@ class FacturasRepository:
             where.append("LOWER(CONCAT_WS(' ', c.nombre, c.apellido)) LIKE :cliente")
             params["cliente"] = f"%{str(f['cliente']).lower()}%"
 
-        # CUIT/CUIL del filtro -> usamos nro_doc
-        if f.get("cuit"):
-            doc_digits = "".join(ch for ch in str(f["cuit"]) if ch.isdigit())
+        # documento -> usamos nro_doc
+        if f.get("documento"):
+            doc_digits = "".join(ch for ch in str(f["documento"]) if ch.isdigit())
             if doc_digits:
                 where.append("REPLACE(COALESCE(c.nro_doc, ''), '-', '') LIKE :doc")
                 params["doc"] = f"%{doc_digits}%"
@@ -540,7 +440,10 @@ class FacturasRepository:
         sql_base = f"""
             FROM facturas f
             LEFT JOIN clientes c ON c.id = f.cliente_id
+            LEFT JOIN tipos_documento td ON td.id = c.tipo_doc_id
             LEFT JOIN estados  e ON e.id = f.estado_id
+            LEFT JOIN tipos_comprobante tc ON tc.id = f.tipo_comprobante_id
+
             WHERE {where_sql}
         """
 
@@ -552,13 +455,12 @@ class FacturasRepository:
                 SELECT
                     f.id,
                     f.fecha_emision AS fecha,
-                    f.tipo,
-                    f.punto_venta    AS pto_vta,
+                    tc.codigo AS tipo_codigo,
+                    f.punto_venta AS pto_vta,
                     f.numero,
                     CONCAT_WS(' ', c.nombre, c.apellido) AS cliente,
-                    TRIM(CONCAT(COALESCE(c.tipo_doc, ''),
-                                CASE WHEN c.tipo_doc IS NULL OR c.tipo_doc = '' THEN '' ELSE ' ' END,
-                                COALESCE(c.nro_doc, ''))) AS cuit,
+                    c.nro_doc AS documento,
+                    
                     f.total,
                     f.estado_id,
                     e.nombre AS estado,
@@ -574,6 +476,142 @@ class FacturasRepository:
         ).mappings().all()
 
         return [dict(r) for r in rows], int(total)
+    def get_tipo_comprobante_by_id(
+        self,
+        tipo_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Devuelve un tipo de comprobante por ID.
+        """
+
+        row = self.db.execute(
+            text("""
+                SELECT
+                    id,
+                    codigo,
+                    nombre,
+                    letra,
+                    es_nota_credito,
+                    es_nota_debito,
+                    activo
+                FROM tipos_comprobante
+                WHERE id = :id
+            """),
+            {"id": tipo_id}
+        ).mappings().first()
+
+        return dict(row) if row else None
+    def get_tipo_comprobante_by_codigo(
+        self,
+        codigo: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Devuelve un tipo de comprobante por código (FA, FB, NCA, etc.).
+        """
+
+        row = self.db.execute(
+            text("""
+                SELECT
+                    id,
+                    codigo,
+                    nombre,
+                    letra,
+                    es_nota_credito,
+                    es_nota_debito,
+                    activo
+                FROM tipos_comprobante
+                WHERE codigo = :codigo
+            """),
+            {"codigo": codigo}
+        ).mappings().first()
+
+        return dict(row) if row else None
+    def get_tipo_nota_credito_por_letra(
+        self,
+        letra: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Devuelve el tipo de comprobante que sea Nota de Crédito
+        correspondiente a la letra indicada.
+        """
+
+        row = self.db.execute(
+            text("""
+                SELECT
+                    id,
+                    codigo,
+                    nombre,
+                    letra,
+                    es_nota_credito,
+                    es_nota_debito,
+                    activo
+                FROM tipos_comprobante
+                WHERE letra = :letra
+                AND es_nota_credito = 1
+                AND activo = 1
+                LIMIT 1
+            """),
+            {"letra": letra}
+        ).mappings().first()
+
+        return dict(row) if row else None
+    def get_codigo_tipo_comprobante(
+        self,
+        tipo_id: int
+    ) -> Optional[str]:
+        """
+        Devuelve solo el código (FA, FB, NCA, etc.)
+        """
+
+        row = self.db.execute(
+            text("""
+                SELECT codigo
+                FROM tipos_comprobante
+                WHERE id = :id
+            """),
+            {"id": tipo_id}
+        ).mappings().first()
+
+        if not row:
+            return None
+
+        return row["codigo"]
+    def get_next_numero(
+        self,
+        tipo_comprobante_id: int,
+        pto_vta: int
+    ) -> int:
+        """
+        Devuelve el próximo número local para el tipo y punto de venta.
+        """
+
+        row = self.db.execute(
+            text("""
+                SELECT MAX(numero) AS ultimo
+                FROM facturas
+                WHERE tipo_comprobante_id = :tipo
+                AND punto_venta = :pto
+            """),
+            {
+                "tipo": tipo_comprobante_id,
+                "pto": pto_vta
+            }
+        ).mappings().first()
+
+        ultimo = row["ultimo"] if row and row["ultimo"] else 0
+
+        return int(ultimo) + 1
+    def es_nota_credito(self, tipo_id: int) -> bool:
+        row = self.db.execute(
+            text("""
+                SELECT es_nota_credito
+                FROM tipos_comprobante
+                WHERE id = :id
+            """),
+            {"id": tipo_id}
+        ).mappings().first()
+
+        return bool(row["es_nota_credito"]) if row else False
 
     def get_by_id(self, factura_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -585,13 +623,13 @@ class FacturasRepository:
                 """
                 SELECT
                     f.*,
+                    tc.codigo AS tipo,
                     CONCAT_WS(' ', c.nombre, c.apellido) AS cliente,
-                    TRIM(CONCAT(COALESCE(c.tipo_doc, ''),
-                                CASE WHEN c.tipo_doc IS NULL OR c.tipo_doc = '' THEN '' ELSE ' ' END,
-                                COALESCE(c.nro_doc, ''))) AS cuit,
+                    CONCAT(td.descripcion, ' ', c.nro_doc) AS documento,
+                    c.nro_doc as cuit,
                     c.nombre      AS cliente_nombre,
                     c.apellido    AS cliente_apellido,
-                    c.tipo_doc    AS cliente_tipo_doc,
+                    c.tipo_doc_id    AS cliente_tipo_doc_id,
                     c.nro_doc     AS cliente_nro_doc,
                     c.email       AS cliente_email,
                     c.telefono    AS cliente_telefono,
@@ -599,7 +637,10 @@ class FacturasRepository:
                     e.nombre      AS estado_nombre
                 FROM facturas f
                 LEFT JOIN clientes c ON c.id = f.cliente_id
+                LEFT JOIN tipos_documento td ON td.id = c.tipo_doc_id
                 LEFT JOIN estados  e ON e.id = f.estado_id
+                LEFT JOIN tipos_comprobante tc ON tc.id = f.tipo_comprobante_id
+
                 WHERE f.id = :id
                 """
             ),

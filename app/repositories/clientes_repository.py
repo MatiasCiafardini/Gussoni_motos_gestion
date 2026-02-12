@@ -13,24 +13,6 @@ class ClientesRepository:
 
     # -------------------- Lookups (opcionales) --------------------
 
-    def list_tipos_documento(self) -> List[Dict[str, Any]]:
-        """
-        Retorna tipos de documento si existe la tabla 'tipos_documento(codigo, nombre)'.
-        Fallback: defaults comunes.
-        """
-        try:
-            rows = self.db.execute(
-                text("SELECT codigo, nombre FROM tipos_documento ORDER BY nombre ASC")
-            ).mappings().all()
-            out = [{"codigo": r["codigo"], "nombre": r["nombre"]} for r in rows]
-            if out:
-                return out
-        except Exception:
-            pass
-        return [{"codigo": "DNI", "nombre": "DNI"},
-                {"codigo": "CUIT", "nombre": "CUIT"},
-                {"codigo": "CUIL", "nombre": "CUIL"}]
-
     def list_estados_clientes(self) -> List[Dict[str, Any]]:
         """
         Estados de cliente (activo/inactivo). Si no hay tabla, devuelve defaults.
@@ -48,16 +30,16 @@ class ClientesRepository:
 
     # -------------------- Validaciones / existencia --------------------
 
-    def exists_by_doc(self, tipo_doc: Optional[str], nro_doc: Optional[str]) -> bool:
+    def exists_by_doc(self, tipo_doc_id: int, nro_doc: str) -> bool:
         """
         True si ya existe un cliente con ese par (tipo_doc, nro_doc).
         """
-        if not nro_doc or not tipo_doc:
+        if not nro_doc or not tipo_doc_id:
             return False
         sql = text(
-            "SELECT 1 FROM clientes WHERE tipo_doc = :tipo_doc AND nro_doc = :nro_doc LIMIT 1"
+            "SELECT 1 FROM clientes WHERE tipo_doc_id = :tipo_doc_id AND nro_doc = :nro_doc LIMIT 1"
         )
-        return self.db.execute(sql, {"tipo_doc": tipo_doc, "nro_doc": nro_doc}).first() is not None
+        return self.db.execute(sql, {"tipo_doc_id": tipo_doc_id, "nro_doc": nro_doc}).first() is not None
 
     # -------------------- Alta --------------------
 
@@ -74,7 +56,7 @@ class ClientesRepository:
             payload["email"] = str(payload["email"]).strip().lower()
 
         allowed = [
-            "tipo_doc", "nro_doc",
+            "tipo_doc_id", "nro_doc",
             "nombre", "apellido",
             "telefono", "email",
             "direccion",
@@ -116,7 +98,7 @@ class ClientesRepository:
         self,
         nombre: Optional[str] = None,
         apellido: Optional[str] = None,
-        tipo_doc: Optional[str] = None,
+        tipo_doc_id: Optional[int] = None,
         nro_doc: Optional[str] = None,
         email: Optional[str] = None,
         direccion: Optional[str] = None,
@@ -140,7 +122,7 @@ class ClientesRepository:
         if isinstance(nombre, dict):
             filtros = nombre
             apellido = filtros.get("apellido")
-            tipo_doc = filtros.get("tipo_doc")
+            tipo_doc_id = filtros.get("tipo_doc_id")
             nro_doc = filtros.get("nro_doc")
             email = filtros.get("email")
             direccion = filtros.get("direccion")
@@ -177,9 +159,11 @@ class ClientesRepository:
         if apellido:
             where.append("LOWER(c.apellido) LIKE :apellido")
             params["apellido"] = f"%{apellido.lower()}%"
-        if tipo_doc:
-            where.append("c.tipo_doc = :tipo_doc")
-            params["tipo_doc"] = tipo_doc
+        if tipo_doc_id is not None:
+            where.append("c.tipo_doc_id = :tipo_doc_id")
+            params["tipo_doc_id"] = tipo_doc_id
+
+
         if nro_doc:
             where.append("c.nro_doc LIKE :nro_doc")
             params["nro_doc"] = f"%{nro_doc}%"
@@ -202,6 +186,7 @@ class ClientesRepository:
         # Si existe una tabla de estados, mostrar el nombre; si no, inferir
         sql_base = f"""
             FROM clientes c
+            LEFT JOIN tipos_documento td ON td.id = c.tipo_doc_id
             LEFT JOIN estados ec ON ec.id = c.estado_id
             WHERE {where_sql}
         """
@@ -213,11 +198,18 @@ class ClientesRepository:
                 f"""
                 SELECT
                     c.id,
-                    c.tipo_doc, c.nro_doc,
+                    c.tipo_doc_id, td.codigo AS tipo_doc_codigo, c.nro_doc,
                     c.nombre, c.apellido,
                     c.telefono, c.email, c.direccion,
                     c.estado_id,
-                    COALESCE(ec.nombre, CASE c.estado_id WHEN 1 THEN 'Activo' WHEN 0 THEN 'Inactivo' END) AS estado,
+                    COALESCE(
+                        ec.nombre,
+                        CASE c.estado_id
+                            WHEN 10 THEN 'Activo'
+                            WHEN 11 THEN 'Inactivo'
+                        END
+                    ) AS estado_nombre,
+
                     c.observaciones
                 {sql_base}
                 ORDER BY c.id DESC
@@ -235,10 +227,21 @@ class ClientesRepository:
                 """
                 SELECT
                     c.*,
-                    COALESCE(ec.nombre, CASE c.estado_id WHEN 1 THEN 'Activo' WHEN 0 THEN 'Inactivo' END) AS estado_nombre
+                    td.codigo AS tipo_doc_codigo,
+                    td.descripcion AS tipo_doc_descripcion,
+                    COALESCE(
+                        ec.nombre,
+                        CASE c.estado_id
+                            WHEN 10 THEN 'Activo'
+                            WHEN 11 THEN 'Inactivo'
+                        END
+                    ) AS estado_nombre
+
                 FROM clientes c
+                LEFT JOIN tipos_documento td ON td.id = c.tipo_doc_id
                 LEFT JOIN estados ec ON ec.id = c.estado_id
                 WHERE c.id = :id
+
                 """
             ),
             {"id": cliente_id},
@@ -250,7 +253,7 @@ class ClientesRepository:
         Actualiza columnas permitidas. Devuelve filas afectadas.
         """
         editable = [
-            "tipo_doc", "nro_doc",
+            "tipo_doc_id", "nro_doc",
             "nombre", "apellido",
             "telefono", "email",
             "direccion",

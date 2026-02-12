@@ -432,14 +432,14 @@ class MainWindow(QMainWindow):
         if not ClientesDetailPage:
             self.notify("La página de detalle de cliente no está disponible.", "error")
             return
-    
+
         detail = ClientesDetailPage(cliente_id)
-    
+
         # volver
         if hasattr(detail, "navigate_back"):
             detail.navigate_back.connect(lambda: self.navigate_back())
-    
-        # 👉 NUEVO: ir a factura desde lupa
+
+        # 👉 abrir factura existente (lupa)
         if hasattr(detail, "navigate_to_factura"):
             detail.navigate_to_factura.connect(
                 lambda fid, cid=cliente_id: self.open_page(
@@ -450,9 +450,20 @@ class MainWindow(QMainWindow):
                 )
             )
 
-    
+        # 🔥 NUEVO: abrir factura nueva con cliente precargado
+        if hasattr(detail, "navigate_to_factura_nueva"):
+            detail.navigate_to_factura_nueva.connect(
+                lambda cid=cliente_id: self.open_page(
+                    "facturas_agregar",
+                    cliente_id=cid,
+                    return_to="cliente"
+                )
+            )
+
+
         self.navigate_to(detail)
-    
+
+        
     
     def open_usuario_detail(self, user_id: int):
         if not UsuariosDetailPage:
@@ -643,17 +654,37 @@ class MainWindow(QMainWindow):
 
         if name == "facturas_agregar":
             if FacturasAgregarPage:
-                page = FacturasAgregarPage(parent=self, main_window=self)
+
+                cliente_id = kwargs.get("cliente_id")
+                return_to = kwargs.get("return_to")
+
+                page = FacturasAgregarPage(
+                    parent=self,
+                    main_window=self,
+                    cliente_id=cliente_id
+                )
+
+                # 🔥 CONEXIÓN INTELIGENTE DE VOLVER
                 if hasattr(page, "go_back"):
                     page.go_back.connect(self.navigate_back)
+
+
                 if hasattr(page, "go_to_detalle"):
                     page.go_to_detalle.connect(
-                        lambda fid: self.open_page("facturas_consultar", factura_id=fid)
+                        lambda fid: self.open_page(
+                            "facturas_consultar",
+                            factura_id=fid
+                        )
                     )
+
                 self.navigate_to(page)
+
             else:
                 self.notify("La página de alta de factura no está disponible.", "error")
+
             return
+
+
         # NUEVO: consulta de factura
         if name == "facturas_consultar":
 
@@ -735,12 +766,27 @@ class MainWindow(QMainWindow):
     def navigate_back(self):
         if not self._page_history:
             return
+
         current = self.stack.currentWidget()
         prev = self._page_history.pop()
+
         self.stack.setCurrentWidget(prev)
+
+        # 🔥 SOLO recargar si volvemos desde FacturasConsultar a Facturacion
+        if (
+            isinstance(current, FacturasConsultarPage)
+            and prev is self.page_facturacion
+        ):
+            try:
+                self.page_facturacion.reload(reset_page=False)
+            except Exception:
+                pass
+
         current.setParent(None)
         current.deleteLater()
+
         QTimer.singleShot(0, self.loading.hide_overlay)
+
 
     def show_fixed_page(self, page: QWidget):
         if self.stack.currentWidget() is page:

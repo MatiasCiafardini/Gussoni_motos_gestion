@@ -385,6 +385,13 @@ class ComprobantesService:
                 or ""
             ).strip()
         )
+
+        telefono = str(
+            fac.get("cliente_telefono")
+            or fac.get("telefono")
+            or ""
+        ).strip()
+
     
         # -------------------------
         # Línea 1
@@ -413,9 +420,12 @@ class ComprobantesService:
         # -------------------------
         c.setFont("Helvetica-Bold", 7.2)
         c.drawString(left_x, l3, "Condición de Venta:")
-    
+        c.drawString(right_x, l3, "Teléfono:")
+
         c.setFont("Helvetica", 7.2)
         c.drawString(left_x + 32 * mm, l3, condicion_venta)
+        c.drawString(right_x + 20 * mm, l3, telefono)
+
     
 
 
@@ -747,9 +757,11 @@ class ComprobantesService:
         cbte_tipo_map = {"FA": 1, "FB": 6, "FC": 11, "NCA": 3, "NCB": 8, "NCC": 13}
         cbte_tipo = int(cbte_tipo_map.get(tipo, 0))
 
-        cli_tipo_doc = str(fac.get("cliente_tipo_doc") or fac.get("tipo_doc") or "").strip().upper()
-        tipo_doc_map = {"CUIT": 80, "CUIL": 86, "CDI": 87, "DNI": 96}
-        tipo_doc_rec = int(tipo_doc_map.get(cli_tipo_doc, 0))
+        # Tipo doc receptor (ya viene como ID AFIP)
+        tipo_doc_rec = self._to_int(
+            fac.get("cliente_tipo_doc_id")
+        ) or 0
+
         nro_doc_rec = int(self._digits(fac.get("cliente_nro_doc") or fac.get("nro_doc") or "0") or 0)
 
         payload = {

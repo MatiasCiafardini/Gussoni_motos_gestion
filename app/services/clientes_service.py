@@ -30,26 +30,17 @@ class ClientesService:
             if tipos:
                 return tipos
         except Exception:
-            pass
-        # fallback
-        return [
-            {"codigo": "DNI", "nombre": "DNI"},
-            {"codigo": "CUIT", "nombre": "CUIT"},
-            {"codigo": "CUIL", "nombre": "CUIL"},
-        ]
-
+            return []
     def get_estados_clientes(self) -> List[Dict[str, Any]]:
         """
-        Estados de cliente (1 Activo / 0 Inactivo).
+        Devuelve estados de cliente desde catálogo.
         """
         try:
             estados = self._catalogos.get_estados_clientes()
-            if estados:
-                return estados
+            return estados or []
         except Exception:
-            pass
-        # fallback
-        return [{"id": 1, "nombre": "Activo"}, {"id": 0, "nombre": "Inactivo"}]
+            return []
+    
 
     # -------------------- Search / CRUD --------------------
     def search(
@@ -58,24 +49,49 @@ class ClientesService:
         page: int,
         page_size: int,
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        Recibe un dict de filtros (nombre, apellido, tipo_doc, nro_doc, email,
-        direccion, estado_id, q, etc.) y delega al repositorio.
-        """
+
         db = SessionLocal()
         try:
             repo = self._repo(db)
             rows, total = repo.search(filtros, page=page, page_size=page_size)
+
+            if not rows:
+                return rows, total
+
+            # 🔥 Agregamos tipo_doc_label desde catálogo
+            for r in rows:
+                tipo = self._catalogos.get_tipo_doc_by_id(r.get("tipo_doc_id"))
+                if tipo:
+                    r["tipo_doc_label"] = tipo.get("descripcion") or tipo.get("codigo")
+                else:
+                    r["tipo_doc_label"] = ""
+
+
             return rows, total
+
         finally:
             db.close()
+
 
     def get(self, cliente_id: int) -> Optional[Dict[str, Any]]:
         db = SessionLocal()
         try:
-            return self._repo(db).get_by_id(cliente_id)
+            row = self._repo(db).get_by_id(cliente_id)
+            if not row:
+                return None
+
+            tipo = self._catalogos.get_tipo_doc_by_id(row.get("tipo_doc_id"))
+            if tipo:
+                row["tipo_doc_label"] = tipo.get("descripcion") or tipo.get("codigo")
+            else:
+                row["tipo_doc_label"] = ""
+
+
+            return row
+
         finally:
             db.close()
+
 
     def update(self, cliente_id: int, data: Dict[str, Any]) -> int:
         db = SessionLocal()

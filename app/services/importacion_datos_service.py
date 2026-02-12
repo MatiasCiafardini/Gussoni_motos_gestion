@@ -127,7 +127,15 @@ class ImportacionDatosService:
             "Cliente de ejemplo",
         ])
 
-        dv_tipo = DataValidation(type="list", formula1='"DNI,CUIT,CUIL"', allow_blank=False)
+        catalogos = CatalogosService()
+        tipos = [t["codigo"] for t in catalogos.get_tipos_documento()]
+
+        dv_tipo = DataValidation(
+            type="list",
+            formula1=f'"{",".join(tipos)}"',
+            allow_blank=False
+        )
+
         ws.add_data_validation(dv_tipo)
         dv_tipo.add("A2:A1000")
 
@@ -142,6 +150,11 @@ class ImportacionDatosService:
     def _importar_clientes(self, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         db: Session = SessionLocal()
         repo = ClientesRepository(db)
+        catalogos = CatalogosService()
+
+        tipos = catalogos.get_tipos_documento()
+        codigo_map = {t["codigo"].upper(): t["id"] for t in tipos}
+        id_map = {t["id"]: t for t in tipos}
 
         errores, insertados = [], 0
 
@@ -149,7 +162,7 @@ class ImportacionDatosService:
             for row in rows:
                 fila = row["__rownum__"]
                 try:
-                    payload = self._validar_cliente(row, repo)
+                    payload = self._validar_cliente(row, repo, codigo_map, id_map)
                     repo.create_cliente(payload)
                     insertados += 1
                 except Exception as e:
@@ -167,26 +180,43 @@ class ImportacionDatosService:
         finally:
             db.close()
 
-    def _validar_cliente(self, row: Dict[str, Any], repo: ClientesRepository) -> Dict[str, Any]:
+
+    def _validar_cliente(
+        self,
+        row: Dict[str, Any],
+        repo: ClientesRepository,
+        codigo_map: Dict[str, int],
+        id_map: Dict[int, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+
         def req(k):
             v = row.get(k)
             if v is None or str(v).strip() == "":
                 raise ValueError(f"{k} es obligatorio")
             return str(v).strip()
 
-        tipo = req("tipo_doc").upper()
+        codigo = req("tipo_doc").upper()
+
+        if codigo not in codigo_map:
+            raise ValueError(f"Tipo de documento inválido: {codigo}")
+
+        tipo_doc_id = codigo_map[codigo]
         nro = "".join(ch for ch in req("nro_doc") if ch.isdigit())
 
-        if tipo == "DNI" and len(nro) not in (7, 8):
+        tipo_obj = id_map[tipo_doc_id]
+        codigo_real = tipo_obj["codigo"].upper()
+
+        if codigo_real == "DNI" and len(nro) not in (7, 8):
             raise ValueError("DNI inválido")
-        if tipo in ("CUIT", "CUIL") and len(nro) != 11:
+
+        if codigo_real in ("CUIT", "CUIL") and len(nro) != 11:
             raise ValueError("CUIT/CUIL inválido")
 
-        if repo.exists_by_doc(tipo, nro):
+        if repo.exists_by_doc(tipo_doc_id, nro):
             raise ValueError("Documento duplicado")
 
         payload = {
-            "tipo_doc": tipo,
+            "tipo_doc_id": tipo_doc_id,
             "nro_doc": nro,
             "nombre": req("nombre"),
             "apellido": req("apellido"),
@@ -201,6 +231,7 @@ class ImportacionDatosService:
                 payload[opt] = str(row[opt]).strip()
 
         return payload
+
 
     # ==================================================
     # ---------------- VEHÍCULOS -----------------------

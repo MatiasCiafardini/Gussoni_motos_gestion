@@ -51,10 +51,10 @@ class ClientesPage(QWidget):
         # ---- Filtros ----
         self.in_nombre = QLineEdit(); self.in_nombre.setPlaceholderText("Nombre")
         self.in_apellido = QLineEdit(); self.in_apellido.setPlaceholderText("Apellido")
-        self.in_tipo_doc = QComboBox(); self._setup_combo(self.in_tipo_doc); self.in_tipo_doc.addItem("Todos", None)
-        # valores comunes; si tu servicio trae catálogo, los sobreescribimos más abajo
-        for td in ("DNI", "CUIT", "CUIL", "LE", "LC"):
-            self.in_tipo_doc.addItem(td, td)
+        self.in_tipo_doc = QComboBox()
+        self._setup_combo(self.in_tipo_doc)
+        self.in_tipo_doc.addItem("Todos", None)
+
         self.in_nro_doc = QLineEdit(); self.in_nro_doc.setPlaceholderText("N° documento")
 
         self.in_email = QLineEdit(); self.in_email.setPlaceholderText("Email")
@@ -182,11 +182,15 @@ class ClientesPage(QWidget):
         # Tipos de documento desde el servicio (opcional)
         try:
             tipos = self.service.get_tipos_documento()
+            print("TIPOS DOC:", tipos)
+
             if tipos:
                 self.in_tipo_doc.clear()
                 self.in_tipo_doc.addItem("Todos", None)
                 for t in tipos:
-                    self.in_tipo_doc.addItem(t.get("nombre", t.get("codigo", "")) or "", t.get("codigo") or t.get("nombre"))
+                    label = t.get("descripcion") or t.get("codigo") or ""
+                    self.in_tipo_doc.addItem(label, t.get("id"))
+
         except Exception:
             pass
 
@@ -249,7 +253,7 @@ class ClientesPage(QWidget):
         return {
             "nombre": self.in_nombre.text().strip() or None,
             "apellido": self.in_apellido.text().strip() or None,
-            "tipo_doc": self.in_tipo_doc.currentData(),
+            "tipo_doc_id": self.in_tipo_doc.currentData(),
             "nro_doc": self.in_nro_doc.text().strip() or None,
             "email": self.in_email.text().strip() or None,
             "direccion": self.in_direccion.text().strip() or None,
@@ -285,11 +289,10 @@ class ClientesPage(QWidget):
                 self.table.setItem(row, self.COL_ID, id_item)
 
                 estado_nombre = r.get("estado", "") or r.get("estado_nombre", "")
-                if not estado_nombre and r.get("estado_id") is not None:
-                    estado_nombre = "Activo" if int(r.get("estado_id")) == 1 else "Inactivo"
+
 
                 values = {
-                    self.COL_TIPO_DOC: r.get("tipo_doc", ""),
+                    self.COL_TIPO_DOC: r.get("tipo_doc_label", ""),
                     self.COL_NRO_DOC: r.get("nro_doc", ""),
                     self.COL_NOMBRE: r.get("nombre", ""),
                     self.COL_APELLIDO: r.get("apellido", "") or "",

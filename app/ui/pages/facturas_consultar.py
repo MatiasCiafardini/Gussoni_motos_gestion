@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QIcon, QDesktopServices
 import app.ui.app_message as popUp
-from sqlalchemy import text
+from sqlalchemy import text as sql_text
+
 from app.domain.facturas_validaciones import validar_factura
 from app.ui.utils.table_utils import setup_compact_table
 from app.data.database import SessionLocal
@@ -25,6 +26,9 @@ from PySide6.QtWidgets import QListView, QAbstractItemView
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtCore import Qt, QTimer, QRect, QEvent
 from app.ui.documentacion.nota_no_rodamiento import generar_nota_no_rodamiento_pdf
+from PySide6.QtCore import Signal
+
+
 
 # -------------------- Ventana popup movible --------------------
 from datetime import date
@@ -103,11 +107,14 @@ def _format_money(value: float) -> str:
 
 def _cliente_label(c: Dict[str, Any]) -> str:
     nombre = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
-    doc = f"{c.get('tipo_doc', '')} {c.get('nro_doc', '')}".strip()
+    tipo_doc_label = c.get("tipo_doc_label") or ""
+    nro_doc = c.get("nro_doc") or ""
+    doc = f"{tipo_doc_label} {nro_doc}".strip()
     label = nombre
     if doc:
         label += f" ({doc})"
     return label or "(sin nombre)"
+
 
 
 def _vehiculo_label(v: Dict[str, Any]) -> str:
@@ -874,7 +881,7 @@ class FacturasConsultarPage(QWidget):
             db = SessionLocal()
             try:
                 row = db.execute(
-                    text("""
+                    sql_text("""
                         SELECT v.*,
                          c.nombre as color
                         FROM facturas_detalle fd
@@ -1044,14 +1051,8 @@ class FacturasConsultarPage(QWidget):
         self._cond_iva_by_codigo.clear()
         self.in_condicion_iva_receptor.blockSignals(True)
         self.in_condicion_iva_receptor.clear()
-
         if not conds:
-            conds = [
-                {"id": 5, "codigo": "CF", "descripcion": "Consumidor Final"},
-                {"id": 1, "codigo": "RI", "descripcion": "Responsable Inscripto"},
-                {"id": 6, "codigo": "MT", "descripcion": "Monotributista"},
-                {"id": 4, "codigo": "EX", "descripcion": "Exento"},
-            ]
+            return  # no fallback hardcodeado
 
         idx_cf = -1
         for c in conds:
@@ -1166,7 +1167,10 @@ class FacturasConsultarPage(QWidget):
                 return
 
             self._factura = factura
-            self._tipo = factura.get("tipo") or ""
+            tipo_id = factura.get("tipo_comprobante_id")
+            self._tipo = self._svc_facturas.get_codigo_tipo(tipo_id) if tipo_id else "" 
+
+
 
             try:
                 self._estado_id = int(factura.get("estado_id")) if factura.get("estado_id") is not None else None
@@ -1205,14 +1209,28 @@ class FacturasConsultarPage(QWidget):
             obs = factura.get("observaciones") or ""
 
             if tipo:
+                # 1️⃣ Intentar por código exacto (FA, FB, NC-B, etc.)
                 idx_tipo = self.in_tipo.findData(tipo)
+
+                # 2️⃣ Si no lo encontró, intentar por texto visible
                 if idx_tipo < 0:
-                    idx_tipo = self.in_tipo.findText(str(tipo))
+                    idx_tipo = self.in_tipo.findText(str(tipo), Qt.MatchContains)
+
+                # 3️⃣ Si todavía no lo encontró, intentar buscar por coincidencia parcial
+                if idx_tipo < 0:
+                    for i in range(self.in_tipo.count()):
+                        data = self.in_tipo.itemData(i)
+                        text = self.in_tipo.itemText(i)
+
+                        if str(tipo).upper() in str(data).upper() or \
+                        str(tipo).upper() in str(text).upper():
+                            idx_tipo = i
+                            break
+
+                # 4️⃣ Si lo encontró, setearlo
                 if idx_tipo >= 0:
                     self.in_tipo.setCurrentIndex(idx_tipo)
-                else:
-                    self.in_tipo.addItem(str(tipo), tipo)
-                    self.in_tipo.setCurrentIndex(self.in_tipo.count() - 1)
+
 
             if pto != "":
                 try:
@@ -1241,18 +1259,26 @@ class FacturasConsultarPage(QWidget):
             self.in_observaciones.setPlainText(str(obs))
 
             cliente_id = factura.get("cliente_id")
-            cliente_tipo_doc = factura.get("cliente_tipo_doc") or factura.get("tipo_doc") or ""
+            cliente_tipo_doc_id = factura.get("cliente_tipo_doc_id")
             cliente_nro_doc = factura.get("cliente_nro_doc") or factura.get("nro_doc") or ""
             cliente_email = factura.get("cliente_email") or factura.get("email") or ""
             cliente_telefono = factura.get("cliente_telefono") or factura.get("telefono") or ""
             cliente_direccion = factura.get("cliente_direccion") or factura.get("direccion") or ""
+            tipo_doc_label = ""
+            if cliente_tipo_doc_id:
+                tipos = self._catalogos.get_tipos_documento()
+                for t in tipos:
+                    if t.get("id") == cliente_tipo_doc_id:
+                        tipo_doc_label = t.get("descripcion") or t.get("codigo")
+                        break
 
             if cliente_id is not None:
                 cli_data = {
                     "id": cliente_id,
                     "nombre": factura.get("cliente_nombre"),
                     "apellido": factura.get("cliente_apellido"),
-                    "tipo_doc": cliente_tipo_doc,
+                    "tipo_doc_id": cliente_tipo_doc_id,
+                    "tipo_doc_label": tipo_doc_label,
                     "nro_doc": cliente_nro_doc,
                     "email": cliente_email,
                     "telefono": cliente_telefono,
@@ -1267,14 +1293,14 @@ class FacturasConsultarPage(QWidget):
             else:
                 self._selected_cliente = None
 
-            self.in_cliente_tipo_doc.setText(str(cliente_tipo_doc))
+            self.in_cliente_tipo_doc.setText(tipo_doc_label)
             self.in_cliente_nro_doc.setText(str(cliente_nro_doc))
             self.in_cliente_email.setText(str(cliente_email))
             self.in_cliente_telefono.setText(str(cliente_telefono))
             self.in_cliente_direccion.setText(str(cliente_direccion))
 
             rows = db.execute(
-                text(
+                sql_text(
                     """
                     SELECT
                         item_tipo,
@@ -1301,7 +1327,7 @@ class FacturasConsultarPage(QWidget):
             venta_id = factura.get("venta_id")
             if venta_id:
                 row_venta = db.execute(
-                    text("""
+                    sql_text("""
                         SELECT
                             v.precio_total,
                             v.forma_pago_id,
@@ -1328,7 +1354,7 @@ class FacturasConsultarPage(QWidget):
                     plan_id = row_venta.get("plan_id")
                     if plan_id:
                         cuotas = db.execute(
-                            text("""
+                            sql_text("""
                                 SELECT
                                     nro_cuota,
                                     fecha_vencimiento,
@@ -1645,7 +1671,7 @@ class FacturasConsultarPage(QWidget):
         if not isinstance(data, dict):
             return
         self._selected_cliente = data
-        self.in_cliente_tipo_doc.setText(str(data.get("tipo_doc") or ""))
+        self.in_cliente_tipo_doc.setText(str(data.get("tipo_doc_label") or ""))
         self.in_cliente_nro_doc.setText(str(data.get("nro_doc") or ""))
         self.in_cliente_email.setText(str(data.get("email") or ""))
         self.in_cliente_telefono.setText(str(data.get("telefono") or ""))
@@ -1705,7 +1731,7 @@ class FacturasConsultarPage(QWidget):
         db = SessionLocal()
         try:
             rows = db.execute(
-                text(
+                sql_text(
                     """
                     SELECT
                         item_tipo,
@@ -1826,15 +1852,29 @@ class FacturasConsultarPage(QWidget):
             msg = "\n".join(f"• {e}" for e in errs)
             popUp.toast(self, msg, kind="warning")
             return
+        codigo_tipo = (cabecera.get("tipo") or "").strip().upper()
+
+        db_lookup = SessionLocal()
+        try:
+            repo = self._svc_facturas._repo(db_lookup)
+            tipo_row = repo.get_tipo_comprobante_by_codigo(codigo_tipo)
+        finally:
+            db_lookup.close()
+
+        if not tipo_row:
+            popUp.toast(self, "Tipo de comprobante inválido.", kind="error")
+            return
+
+        tipo_id = tipo_row["id"]
 
         db = SessionLocal()
         try:
             db.execute(
-                text(
+                sql_text(
                     """
                     UPDATE facturas
                     SET
-                        tipo = :tipo,
+                        tipo_comprobante_id = :tipo_id,
                         punto_venta = :pto_vta,
                         numero = :numero,
                         fecha_emision = :fecha_emision,
@@ -1849,7 +1889,7 @@ class FacturasConsultarPage(QWidget):
                     """
                 ),
                 {
-                    "tipo": cabecera["tipo"],
+                    "tipo_id": tipo_id,
                     "pto_vta": cabecera["pto_vta"],
                     "numero": cabecera["numero"],
                     "fecha_emision": cabecera["fecha_emision"],
@@ -1864,14 +1904,15 @@ class FacturasConsultarPage(QWidget):
                 },
             )
 
+
             db.execute(
-                text("DELETE FROM facturas_detalle WHERE factura_id = :fid"),
+                sql_text("DELETE FROM facturas_detalle WHERE factura_id = :fid"),
                 {"fid": self._factura_id},
             )
 
             for it in items:
                 db.execute(
-                    text(
+                    sql_text(
                         """
                         INSERT INTO facturas_detalle (
                             factura_id,
@@ -1952,17 +1993,17 @@ class FacturasConsultarPage(QWidget):
         telefono = str(self._factura.get("cliente_telefono") or "")
         email = str(self._factura.get("cliente_email") or "")
 
-        tipo_doc_raw = (self._factura.get("cliente_tipo_doc") or "").strip().upper()
+        cliente_tipo_doc_id = self._factura.get("cliente_tipo_doc_id")
+        tipo_doc_label = ""
+        if cliente_tipo_doc_id:
+            tipo = self._catalogos.get_tipo_doc_by_id(cliente_tipo_doc_id)
+            if tipo:
+                tipo_doc_label = tipo.get("descripcion") or tipo.get("codigo")
+
+
         nro_doc = str(self._factura.get("cliente_nro_doc") or "")
 
-        TIPO_DOC_MAP = {
-            "DNI": "DNI",
-            "CUIT": "CUIT",
-            "CUIL": "CUIL",
-            "PAS": "Pasaporte",
-        }
-
-        tipo_doc_label = TIPO_DOC_MAP.get(tipo_doc_raw, tipo_doc_raw or "Documento")
+        
 
         # --- Sacar DNRPA + chasis desde el vehículo de la factura ---
         dnrpa = ""
@@ -1971,7 +2012,7 @@ class FacturasConsultarPage(QWidget):
         db = SessionLocal()
         try:
             row = db.execute(
-                text(
+                sql_text(
                     """
                     SELECT
                         v.nro_dnrpa,
@@ -2001,7 +2042,7 @@ class FacturasConsultarPage(QWidget):
             ("Apellido", apellido),
             ("Teléfono", telefono),
             ("Email", email),
-            (tipo_doc_label, nro_doc),
+            (tipo_doc_label or "Documento", nro_doc),
             ("DNRPA", dnrpa),
             ("Chasis (últimos 7)", ultimos_7_chasis),
         ]
@@ -2168,12 +2209,15 @@ class FacturasConsultarPage(QWidget):
         FIX: en MySQL NO existe '||' para concatenar.
         Usamos CONCAT(...) + salto de línea.
         """
+
         if not mensaje:
             return
         db = SessionLocal()
         try:
+            
+
             db.execute(
-                text(
+                sql_text(
                     """
                     UPDATE facturas
                     SET observaciones = TRIM(
@@ -2263,15 +2307,22 @@ class FacturasConsultarPage(QWidget):
         observaciones = result.get("observaciones") or []
 
         if result.get("aprobada"):
+            tipo_codigo = result.get("nc_tipo_codigo") or ""
+            letra = result.get("nc_letra") or ""
+            pto = result.get("nc_pto_vta")
+            numero = result.get("nc_numero")
+            total = abs(float(result.get("nc_total") or 0.0))
+            vto = result.get("vto_cae") or ""
+
             detalle = (
                 f"Nota de crédito generada y autorizada.\n"
-                f"Tipo: {result.get('nc_tipo')} "
-                f"{str(result.get('nc_pto_vta')).zfill(4) if result.get('nc_pto_vta') is not None else ''}-"
-                f"{result.get('nc_numero')}\n"
-                f"Total: {_format_money(float(result.get('nc_total') or 0.0))}\n"
+                f"Tipo: {tipo_codigo} ({letra}) "
+                f"{str(pto).zfill(4) if pto is not None else ''}-{numero}\n"
+                f"Total: {_format_money(total)}\n"
                 f"CAE: {result.get('cae')}\n"
-                f"Vto CAE: {result.get('vto_cae')}"
+                f"Vto CAE: {vto}"
             )
+
             if msg:
                 detalle += "\n\n" + msg
             popUp.info(
