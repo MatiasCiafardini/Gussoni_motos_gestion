@@ -117,7 +117,27 @@ try:
     ConfiguracionPage = _ConfiguracionPage
 except Exception:
     ConfiguracionPage = None
+# =================== REMITOS ===================
+RemitosPage = None
+try:
+    from app.ui.pages.remitos_page import RemitosPage as _RemitosPage
+    RemitosPage = _RemitosPage
+except Exception:
+    RemitosPage = None
 
+RemitosAgregarPage = None
+try:
+    from app.ui.pages.remitos_agregar import RemitosAgregarPage as _RemitosAgregarPage
+    RemitosAgregarPage = _RemitosAgregarPage
+except Exception:
+    RemitosAgregarPage = None
+
+RemitosDetailPage = None
+try:
+    from app.ui.pages.remitos_detail_page import RemitosDetailPage as _RemitosDetailPage
+    RemitosDetailPage = _RemitosDetailPage
+except Exception:
+    RemitosDetailPage = None
 # =================== USUARIOS ===================
 UsuariosPage = None
 try:
@@ -217,13 +237,14 @@ class MainWindow(QMainWindow):
         self.btn_clientes     = self._mk_btn("Clientes")
         self.btn_vehiculos    = self._mk_btn("Vehículos")
         self.btn_facturacion  = self._mk_btn("Facturación")
+        self.btn_remitos  = self._mk_btn("Remitos")
         self.btn_documentacion= self._mk_btn("Documentación")
         self.btn_proveedores  = self._mk_btn("Proveedores")
         self.btn_reportes     = self._mk_btn("Reportes")
         self.btn_config       = self._mk_btn("Configuración")
 
         for b in (
-            self.btn_inicio, self.btn_clientes, self.btn_vehiculos, self.btn_facturacion,self.btn_documentacion,
+            self.btn_inicio, self.btn_clientes, self.btn_vehiculos, self.btn_facturacion,self.btn_remitos,self.btn_documentacion,
             self.btn_proveedores, self.btn_reportes, self.btn_config
         ):
             sbl.addWidget(b)
@@ -251,6 +272,7 @@ class MainWindow(QMainWindow):
         self.page_clientes = self._make_clientes_page()
         self.page_vehiculos = self._make_vehiculos_page()
         self.page_facturacion = self._make_facturacion_page()
+        self.page_remitos = self._make_remitos_page()
         if DocumentacionPage:
             self.page_documentacion = DocumentacionPage()
         else:
@@ -271,7 +293,7 @@ class MainWindow(QMainWindow):
         self.page_config = self._make_configuracion_page()
 
         for p in (
-            self.page_inicio, self.page_clientes, self.page_vehiculos, self.page_facturacion,self.page_documentacion,
+            self.page_inicio, self.page_clientes, self.page_vehiculos, self.page_facturacion,self.page_remitos,self.page_documentacion,
             self.page_proveedores, self.page_reportes, self.page_config
         ):
             self.stack.addWidget(p)
@@ -284,6 +306,7 @@ class MainWindow(QMainWindow):
         self.btn_clientes.clicked.connect(lambda: self.show_fixed_page(self.page_clientes))
         self.btn_vehiculos.clicked.connect(lambda: self.show_fixed_page(self.page_vehiculos))
         self.btn_facturacion.clicked.connect(lambda: self.show_fixed_page(self.page_facturacion))
+        self.btn_remitos.clicked.connect(lambda: self.show_fixed_page(self.page_remitos))
         self.btn_documentacion.clicked.connect(lambda: self.show_fixed_page(self.page_documentacion))
         self.btn_proveedores.clicked.connect(lambda: self.show_fixed_page(self.page_proveedores))
         self.btn_reportes.clicked.connect(
@@ -336,7 +359,7 @@ class MainWindow(QMainWindow):
             print(f"[Warmup Lazy] Falló: {e}")
 
     def _route_requires_catalogs(self, route: str) -> bool:
-        return route.startswith("vehiculos")
+        return route.startswith(("vehiculos", "remitos", "facturas"))
     def show_loading(self, text: str = "Cargando…"):
         self.loading.lbl_text.setText(text)
         self.loading.show_overlay()
@@ -398,7 +421,30 @@ class MainWindow(QMainWindow):
             pass
 
         return page
+    def _make_remitos_page(self) -> QWidget:
+        if not RemitosPage:
+            return PlaceholderPage("Remitos")
 
+        try:
+            page = RemitosPage(parent=self, main_window=self)
+        except Exception:
+            return PlaceholderPage("Remitos")
+
+        try:
+            if hasattr(page, "open_add"):
+                page.open_add.connect(lambda: self.open_page("remitos_agregar"))
+
+            if hasattr(page, "open_detail"):
+                page.open_detail.connect(
+                    lambda rid: self.open_page(
+                        "remitos_detalle",
+                        remito_id=int(rid)
+                    )
+                )
+        except Exception:
+            pass
+
+        return page
     def _make_configuracion_page(self) -> QWidget:
         if not ConfiguracionPage:
             return PlaceholderPage("Configuración")
@@ -568,8 +614,58 @@ class MainWindow(QMainWindow):
             page = VehiculosAgregarPage(self)
             self.stack.setCurrentWidget(self._mount(page))
             return
+        # -------- Remitos --------
+        if name == "remitos":
+            self.show_fixed_page(self.page_remitos)
+            return
+        if name == "remitos_agregar":
 
-        # -------- Clientes --------
+            if not RemitosAgregarPage:
+                self.notify("La página de alta de remito no está disponible.", "error")
+                return
+
+            page = RemitosAgregarPage(parent=self, main_window=self)
+
+            if hasattr(page, "go_back"):
+                page.go_back.connect(self.navigate_back)
+
+            if hasattr(page, "go_to_detalle"):
+                page.go_to_detalle.connect(
+                    lambda rid: self.open_page(
+                        "remitos_detalle",
+                        remito_id=rid
+                    )
+                )
+
+            self.navigate_to(page)
+            return
+        if name == "remitos_detalle":
+
+            current = self.stack.currentWidget()
+            if isinstance(current, RemitosDetailPage):
+                return
+
+            rid = kwargs.get("remito_id") or (args[0] if args else None)
+            if not rid:
+                self.notify("Falta remito_id para abrir el detalle.", "error")
+                return
+
+            if not RemitosDetailPage:
+                self.notify("La página de detalle de remito no está disponible.", "error")
+                return
+
+            page = RemitosDetailPage(
+                remito_id=int(rid),
+                parent=self,
+                main_window=self,
+            )
+
+            if hasattr(page, "go_back"):
+                page.go_back.connect(self.navigate_back)
+
+            self.navigate_to(page)
+            return
+                # -------- Clientes --------
         if name == "clientes":
             self.show_fixed_page(self.page_clientes)
             return
@@ -781,7 +877,11 @@ class MainWindow(QMainWindow):
                 self.page_facturacion.reload(reset_page=False)
             except Exception:
                 pass
-
+        if isinstance(current, RemitosDetailPage) and prev is self.page_remitos:
+            try:
+                self.page_remitos.reload(reset_page=False)
+            except Exception:
+                pass          
         current.setParent(None)
         current.deleteLater()
 

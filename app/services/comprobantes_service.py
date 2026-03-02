@@ -14,7 +14,7 @@ if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent
 else:
     BASE_DIR = Path(__file__).resolve().parents[1]  # app/
-
+from app.services.remitos_service import RemitosService
 
 
 from reportlab.pdfgen import canvas
@@ -45,41 +45,35 @@ class EmpresaConfig:
 class ComprobantesService:
     TOP_BAND_H = 10 * mm
     HEADER_H = 36 * mm
-    CLIENTE_H = 22 * mm
-    TABLE_H = 150 * mm
+    CLIENTE_H = 30 * mm
+    TABLE_H = 130 * mm
     RESUMEN_H = 22 * mm
-    FOOTER_H = 24 * mm
+    FOOTER_H = 40 * mm
 
     def __init__(self, *, empresa: Optional[EmpresaConfig] = None) -> None:
         self._svc = FacturasService()
         self._empresa = empresa or EmpresaConfig()
-
+        self._remitos_svc = RemitosService()   # 👈 NUEVO
         self.LOGO_GUSSONI_PATH = paths.LOGO_GUSSONI
         self.LOGO_AFIP_PATH   = paths.LOGO_AFIP
-
+    
     def generar_pdf(self, factura_id: int) -> str:
         fac = self._svc.get(int(factura_id))
         if not fac:
             raise ValueError(f"No se encontró la factura ID {factura_id}.")
-        print("aca entra 3")
         items = self._svc.get_detalle(int(factura_id)) or []
 
         out_dir = Path.home() / "Downloads"
         out_dir.mkdir(parents=True, exist_ok=True)
-        print("aca entra 4")
         tipo = (fac.get("tipo") or "").upper() or "FB"
         pv = self._to_int(fac.get("punto_venta") or fac.get("pto_vta") or self._empresa.punto_venta_default) or 0
         nro = self._to_int(fac.get("numero") or 0) or 0
-        print("aca entra 5")
         filename = f"{tipo}_{str(pv).zfill(5)}-{str(nro).zfill(8)}.pdf"
         pdf_path = out_dir / filename
-        print("aca entra 6")
         c = canvas.Canvas(str(pdf_path), pagesize=A4)
         c.setTitle(filename)
-        print("aca entra 7")
         estado_id = self._to_int(fac.get("estado_id"))
         cae = str(fac.get("cae") or "").strip()
-        print("aca entra 8")
         try:
             est_aut = self._svc.ESTADO_AUTORIZADA
         except Exception:
@@ -92,7 +86,6 @@ class ComprobantesService:
 
         letra = self._letra_from_tipo(tipo)
         cod_afip = self._cod_afip_from_tipo(tipo)
-        print("aca entra 9")
         for i, page_items in enumerate(pages or [[]], start=1):
             self._draw_page(
                 c=c,
@@ -105,13 +98,45 @@ class ComprobantesService:
                 letra=letra,
                 cod_afip=cod_afip,
             )
-            print("aca nuevamente llega")
             if i < total_pages:
                 c.showPage()
-        print("aca entra 10")
         c.save()
         return str(pdf_path)
+    def generar_pdf_remito(self, remito_id: int) -> str:
+        rem = self._remitos_svc.get(int(remito_id))
+        if not rem:
+            raise ValueError(f"No se encontró el remito ID {remito_id}.")
 
+        items = self._remitos_svc.get_detalle(int(remito_id)) or []
+
+        out_dir = Path.home() / "Downloads"
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        pv = self._to_int(rem.get("punto_venta")) or self._empresa.punto_venta_default
+        nro = self._to_int(rem.get("numero")) or 0
+
+        filename = f"REMITO_{str(pv).zfill(5)}-{str(nro).zfill(8)}.pdf"
+        pdf_path = out_dir / filename
+
+        c = canvas.Canvas(str(pdf_path), pagesize=A4)
+        c.setTitle(filename)
+
+        pages = self._paginate_items(items, per_page=18)
+        total_pages = len(pages) if pages else 1
+
+        for i, page_items in enumerate(pages or [[]], start=1):
+            self._draw_page_remito(
+                c=c,
+                rem=rem,
+                page_items=page_items,
+                page=i,
+                total_pages=total_pages,
+            )
+            if i < total_pages:
+                c.showPage()
+
+        c.save()
+        return str(pdf_path)
     def _draw_page(
         self,
         *,
@@ -132,27 +157,20 @@ class ComprobantesService:
         c.rect(M, M, W - 2 * M, H - 2 * M, stroke=1, fill=0)
 
         y_top = H - M
-        print("header 1")
         # Banda ORIGINAL
         self._draw_top_band(c, M, y_top)
         y_top -= self.TOP_BAND_H
-        print("header 2")
         # Header principal
         self._draw_header(c, fac, M, y_top, self.HEADER_H, page, total_pages, letra, cod_afip)
         y = y_top - self.HEADER_H
 
-        print("cliente 1")
         self._draw_cliente(c, fac, M, y, self.CLIENTE_H)
         y -= self.CLIENTE_H
-        print("tabla 1")
         self._draw_table(c, page_items, M, y, self.TABLE_H)
         y -= self.TABLE_H
-        print("resumen 1")
         self._draw_resumen(c, fac, all_items, M, y, self.RESUMEN_H)
         y -= self.RESUMEN_H
-        print("footer 1")
         self._draw_footer(c, fac, all_items, M, y, self.FOOTER_H, autorizado, page, total_pages)
-        print("footer 2")
 
 
     def _draw_top_band(self, c: canvas.Canvas, M: float, y_top: float) -> None:
@@ -394,40 +412,80 @@ class ComprobantesService:
 
     
         # -------------------------
-        # Línea 1
+        # Línea 1 (Cliente dinámico)
         # -------------------------
         c.setFont("Helvetica-Bold", 7.2)
         c.drawString(left_x, l1, "CUIL:")
-        c.drawString(right_x, l1, "Apellido y Nombre / Razón Social:")
-    
+        c.drawString(right_x, l1, "Razón Social:")
+
         c.setFont("Helvetica", 7.2)
         c.drawString(left_x + 10 * mm, l1, cuil)
-        c.drawString(right_x + 52 * mm, l1, cliente)
-    
+        label_rs = "Razón Social:"
+        label_rs_w = stringWidth(label_rs, "Helvetica-Bold", 7.2)
+        cliente_x = right_x + label_rs_w + 2 * mm
+        cliente_max_w = (x + w - 5 * mm) - cliente_x
+
+        line_h = 3.5 * mm
+
+        cliente_lines = self._draw_multiline(
+            c,
+            cliente,
+            cliente_x,
+            l1,
+            max_w=cliente_max_w,
+            line_h=line_h,
+            max_lines=2,
+            font="Helvetica",
+            size=7.2,
+        )
+
+        # Ajustamos la siguiente línea según lo que ocupó cliente
+        offset = (cliente_lines - 1) * line_h
+
+        l2_dyn = l2 - offset
+        l3_dyn = l3 - offset
+            
         # -------------------------
-        # Línea 2
+        # Línea 2 (Domicilio dinámico)
         # -------------------------
         c.setFont("Helvetica-Bold", 7.2)
-        c.drawString(left_x, l2, "Condición frente al IVA:")
-        c.drawString(right_x, l2, "Domicilio:")
-    
+        c.drawString(left_x, l2_dyn, "Condición frente al IVA:")
+        c.drawString(right_x, l2_dyn, "Domicilio:")
+
         c.setFont("Helvetica", 7.2)
-        c.drawString(left_x + 38 * mm, l2, condicion_iva)
-        c.drawString(right_x + 20 * mm, l2, domicilio)
-    
+        c.drawString(left_x + 38 * mm, l2_dyn, condicion_iva)
+
+        label_dom = "Domicilio:"
+        label_dom_w = stringWidth(label_dom, "Helvetica-Bold", 7.2)
+
+        dom_x = right_x + label_dom_w + 2 * mm
+        dom_max_w = (x + w - 5 * mm) - dom_x
+
+        dom_lines = self._draw_multiline(
+            c,
+            domicilio,
+            dom_x,
+            l2_dyn,
+            max_w=dom_max_w,
+            line_h=line_h,
+            max_lines=2,
+            font="Helvetica",
+            size=7.2,
+        )
+
+        # Ajustamos tercera línea si domicilio también ocupa más
+        offset2 = (dom_lines - 1) * line_h
+        l3_dyn = l3_dyn - offset2
         # -------------------------
-        # Línea 3
+        # Línea 3 (Venta / Teléfono dinámico)
         # -------------------------
         c.setFont("Helvetica-Bold", 7.2)
-        c.drawString(left_x, l3, "Condición de Venta:")
-        c.drawString(right_x, l3, "Teléfono:")
+        c.drawString(left_x, l3_dyn, "Condición de Venta:")
+        c.drawString(right_x, l3_dyn, "Teléfono:")
 
         c.setFont("Helvetica", 7.2)
-        c.drawString(left_x + 32 * mm, l3, condicion_venta)
-        c.drawString(right_x + 20 * mm, l3, telefono)
-
-    
-
+        c.drawString(left_x + 32 * mm, l3_dyn, condicion_venta)
+        c.drawString(right_x + 20 * mm, l3_dyn, telefono)
 
 
     # ====== lo demás igual (tabla/resumen/footer/helpers) ======
@@ -815,9 +873,11 @@ class ComprobantesService:
         max_lines: int,
         font: str,
         size: float,
-    ) -> None:
+    ) -> int:
+
         c.setFont(font, size)
         lines: List[str] = []
+
         for raw in str(text or "").splitlines():
             raw = raw.strip()
             if not raw:
@@ -833,11 +893,15 @@ class ComprobantesService:
                     cur = word
             if cur:
                 lines.append(cur)
+
         lines = lines[:max_lines]
+
         yy = y_top
         for ln in lines:
             c.drawString(x, yy, ln)
             yy -= line_h
+
+        return len(lines)
 
     def _letra_from_tipo(self, tipo: str) -> str:
         t = (tipo or "").upper()
@@ -933,3 +997,287 @@ class ComprobantesService:
 
     def _digits(self, s: Any) -> str:
         return "".join(ch for ch in str(s or "") if ch.isdigit())
+    "Seccion de remitos"
+    
+    def _draw_page_remito(
+        self,
+        *,
+        c: canvas.Canvas,
+        rem: Dict[str, Any],
+        page_items: List[Dict[str, Any]],
+        page: int,
+        total_pages: int,
+    ) -> None:
+
+        W, H = A4
+        M = 8 * mm
+
+        c.setLineWidth(0.8)
+        c.rect(M, M, W - 2 * M, H - 2 * M, stroke=1, fill=0)
+
+        y_top = H - M
+
+        # =========================
+        # TOP BAND
+        # =========================
+        self._draw_top_band(c, M, y_top)
+        y_top -= self.TOP_BAND_H
+
+        # =========================
+        # HEADER
+        # =========================
+        self._draw_header_remito(c, rem, M, y_top, self.HEADER_H, page, total_pages)
+        y = y_top - self.HEADER_H
+
+        # =========================
+        # CLIENTE
+        # =========================
+        self._draw_cliente(c, rem, M, y, self.CLIENTE_H)
+        y -= self.CLIENTE_H
+
+        # =========================
+        # CALCULAR ESPACIO RESTANTE
+        # =========================
+        footer_h = self.FOOTER_H
+
+        # El footer debe terminar exactamente en el margen inferior (M)
+        footer_y_top = M + footer_h
+
+        # La tabla ocupa todo el espacio entre cliente y footer
+        table_h = y - footer_y_top
+
+        # =========================
+        # TABLA (DINÁMICA)
+        # =========================
+        self._draw_table_remito(c, page_items, M, y, table_h)
+
+        # =========================
+        # FOOTER PEGADO ABAJO
+        # =========================
+        self._draw_footer_remito(c, rem, page_items, M, footer_y_top, footer_h)
+    def _draw_header_remito(
+        self,
+        c: canvas.Canvas,
+        rem: Dict[str, Any],
+        M: float,
+        y_top: float,
+        h: float,
+        page: int,
+        total_pages: int,
+    ) -> None:
+        W, _ = A4
+        x = M
+        y = y_top - h
+        w = W - 2 * M
+
+        c.setLineWidth(0.6)
+        c.rect(x, y, w, h, stroke=1, fill=0)
+
+        split_x = x + w / 2
+
+        # ==================================================
+        # IZQUIERDA (idéntico a factura)
+        # ==================================================
+        lx = x + 3 * mm
+        top_y = y + h - 6 * mm
+
+        logo_w = 14 * mm
+        logo_h = 10 * mm
+
+        self._draw_logo_if_exists(
+            c,
+            self.LOGO_GUSSONI_PATH,
+            lx,
+            top_y - logo_h,
+            logo_w,
+            logo_h
+        )
+
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(lx + logo_w + 3 * mm, top_y - 2 * mm, self._empresa.nombre_fantasia)
+
+        info_y = top_y - logo_h - 4 * mm
+
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(lx, info_y, "Razón Social:")
+        c.drawString(lx, info_y - 4 * mm, "Domicilio Comercial:")
+        c.drawString(lx, info_y - 8 * mm, "Condición frente al IVA:")
+
+        c.setFont("Helvetica", 7)
+        c.drawString(lx + 28 * mm, info_y, self._empresa.razon_social)
+        c.drawString(lx + 28 * mm, info_y - 4 * mm, self._empresa.domicilio)
+        c.drawString(lx + 28 * mm, info_y - 8 * mm, self._empresa.condicion_iva)
+
+        # ==================================================
+        # DERECHA (REMITO)
+        # ==================================================
+        rx = split_x + 6 * mm
+
+        pv = self._to_int(rem.get("punto_venta")) or self._empresa.punto_venta_default
+        nro = self._to_int(rem.get("numero")) or 0
+        fecha = self._fmt_fecha(rem.get("fecha_emision"))
+
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(rx, y + h - 8 * mm, "REMITO")
+
+        c.setFont("Helvetica", 8)
+        c.drawRightString(
+            x + w - 3 * mm,
+            y + h - 6 * mm,
+            f"Página {page} de {total_pages}"
+        )
+
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, y + h - 16 * mm, "Punto de Venta:")
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + 32 * mm, y + h - 16 * mm, str(pv).zfill(5))
+
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, y + h - 21 * mm, "Remito N°:")
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + 32 * mm, y + h - 21 * mm, str(nro).zfill(8))
+
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(rx, y + h - 26 * mm, "Fecha:")
+        c.setFont("Helvetica", 8)
+        c.drawString(rx + 32 * mm, y + h - 26 * mm, fecha)
+
+        # Línea divisoria vertical
+        c.line(split_x, y, split_x, y + h)
+    def _draw_table_remito(self, c, items, M, y_top, h):
+        W, _ = A4
+        x = M
+        y = y_top - h
+        w = W - 2 * M
+
+        c.rect(x, y, w, h)
+
+        th = 7 * mm
+        c.line(x, y_top - th, x + w, y_top - th)
+
+        cols = [
+            ("Marca", 25 * mm),
+            ("Modelo", 30 * mm),
+            ("Año", 18 * mm),
+            ("N° Cuadro", 35 * mm),
+            ("N° Motor", 35 * mm),
+            ("Certificado", 30 * mm),
+            ("Cantidad", 20 * mm),
+        ]
+
+        scale = w / sum(cw for _, cw in cols)
+        cols = [(n, cw * scale) for n, cw in cols]
+
+        xcur = x
+        for _name, cw in cols[:-1]:
+            xcur += cw
+            c.line(xcur, y, xcur, y_top)
+
+        c.setFont("Helvetica", 7)
+        header_y = y_top - 5 * mm
+        xcur = x + 2 * mm
+        for name, cw in cols:
+            c.drawString(xcur, header_y, name)
+            xcur += cw
+
+        row_top = y_top - th
+        row_h = 10 * mm
+        rows = items[: int((h - th) // row_h)]
+
+        yrow = row_top
+        for it in rows:
+            yrow -= row_h
+            c.line(x, yrow, x + w, yrow)
+
+            marca = it.get("marca") or ""
+            modelo = it.get("modelo") or ""
+            anio = it.get("anio") or ""
+            cuadro = it.get("numero_cuadro") or ""
+            motor = it.get("numero_motor") or ""
+            certificado = it.get("nro_certificado") or ""
+            cant = self._fmt_qty(self._to_float(it.get("cantidad") or 1))
+
+            values = [marca, modelo, str(anio), cuadro, motor, certificado, cant]
+
+            xcur = x
+            for ((_, cw), val) in zip(cols, values):
+                c.drawString(xcur + 2 * mm, yrow + 4 * mm, str(val))
+                xcur += cw
+    def _draw_footer_remito(self, c, rem, items, M, y_top, h):
+        W, _ = A4
+        x = M
+        y = y_top - h
+        w = W - 2 * M
+
+        c.setLineWidth(0.6)
+        c.rect(x, y, w, h)
+
+        # =====================================
+        # LOGO IZQUIERDA
+        # =====================================
+        logo_w = 35 * mm
+        logo_h = 22 * mm
+
+        logo_x = x + 8 * mm
+        logo_y = y + h - logo_h - 6 * mm
+
+        self._draw_logo_if_exists(
+            c,
+            self.LOGO_GUSSONI_PATH,
+            logo_x,
+            logo_y,
+            logo_w,
+            logo_h
+        )
+
+        # =====================================
+        # BLOQUE DERECHO (RECEPCIÓN)
+        # =====================================
+        right_x = x + w * 0.45   # arranca desde la mitad derecha
+        top_line = y + h - 6 * mm
+
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(
+            right_x,
+            top_line,
+            "Mercadería recibida en buen estado."
+        )
+
+        # -----------------------------
+        # Primera línea de campos
+        # -----------------------------
+        line_y = top_line - 10 * mm
+
+        col1 = right_x
+        col2 = right_x + 40 * mm
+        col3 = right_x + 80 * mm
+
+        c.setFont("Helvetica", 8)
+
+        # DNI
+        c.drawString(col1, line_y + 4 * mm, "DNI:")
+        c.line(col1, line_y, col2 - 5 * mm, line_y)
+
+        # Firma
+        c.drawString(col2, line_y + 4 * mm, "Firma:")
+        c.line(col2, line_y, col3 - 5 * mm, line_y)
+
+        # Aclaración
+        c.drawString(col3, line_y + 4 * mm, "Aclaración:")
+        c.line(col3, line_y, x + w - 10 * mm, line_y)
+        # =====================================
+        # TEXTO LEGAL INFERIOR
+        # =====================================
+        c.setFont("Helvetica", 6.5)
+
+        c.drawCentredString(
+            x + w * 0.70,
+            y + 6 * mm,
+            "Atención: Controle su mercadería y recuerde que los reclamos por daños en el ámbito del transporte"
+        )
+
+        c.drawCentredString(
+            x + w * 0.70,
+            y + 3 * mm,
+            "deben realizarse en el momento de la descarga. Sin excepción."
+        )

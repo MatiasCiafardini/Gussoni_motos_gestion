@@ -32,18 +32,14 @@ class ApplicationController(QObject):
         self._current_user: Optional[Dict[str, Any]] = None
 
     def start(self) -> None:
-        print("ANTES db_config_completa")
         ok = db_config_completa()
-        print("DESPUES db_config_completa:", ok)
         if not ok:
             self._show_config()
         else:
-            print("esto es el showlogin de nuevo")
             self._show_login()
 
     def _show_login(self) -> None:
         from app.ui.login_dialog import LoginDialog  # lazy import
-        print("esto es el show_login")
         dialog = LoginDialog()
         result = dialog.exec()
 
@@ -97,7 +93,6 @@ def start_app(app):
     ensure_user_dirs()
 
     setup_logging(settings.APP_NAME)
-    print("hasta aca llega")
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
         "gussoni.app"
     )

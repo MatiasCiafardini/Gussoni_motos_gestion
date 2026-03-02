@@ -182,7 +182,6 @@ class ClientesPage(QWidget):
         # Tipos de documento desde el servicio (opcional)
         try:
             tipos = self.service.get_tipos_documento()
-            print("TIPOS DOC:", tipos)
 
             if tipos:
                 self.in_tipo_doc.clear()

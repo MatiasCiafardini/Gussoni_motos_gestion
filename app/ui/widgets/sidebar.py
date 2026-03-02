@@ -15,6 +15,7 @@ class Sidebar(QWidget):
         self.btnInicio   = self._mk_btn("Inicio")
         self.btnClientes = self._mk_btn("Clientes")
         self.btnVehiculos= self._mk_btn("Vehículos")
+        self.btnRemitos     = self._mk_btn("Remitos")
         self.btnFact     = self._mk_btn("Facturación")
         self.btnProv     = self._mk_btn("Proveedores")
         self.btnDoc     = self._mk_btn("Documentacion")
@@ -25,7 +26,7 @@ class Sidebar(QWidget):
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(10)
         lay.addWidget(title)
-        for b in (self.btnInicio, self.btnClientes, self.btnVehiculos, self.btnFact,self.btnDoc, self.btnProv, self.btnReportes, self.btnConfig):
+        for b in (self.btnInicio, self.btnClientes, self.btnVehiculos,self.btnRemitos, self.btnFact,self.btnDoc, self.btnProv, self.btnReportes, self.btnConfig):
             lay.addWidget(b)
         lay.addStretch(1)
 

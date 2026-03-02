@@ -62,7 +62,7 @@ def generar_nota_no_rodamiento_pdf(cliente: dict, veh: dict) -> str:
     logo.drawWidth = max_height * ratio
 
     header_left = Paragraph(
-        """<b>GUSSONI MULTIMARCAS S.A.S</b><br/>
+        """<b>GUSSONI AUTOMOTORES 2021 SAS</b><br/>
         AV VIEYTES 664<br/>
         SAN ANTONIO DE ARECO (BS. AS.)<br/>
         2325-650604""",

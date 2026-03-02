@@ -53,7 +53,7 @@ class VehiculoDetailPage(QWidget):
 
         # PROVEEDOR: combo dinámico (muestra nombres, guarda ID)
         self.in_proveedor = QComboBox();        self._setup_combo(self.in_proveedor)
-        self.in_proveedor.addItem("Seleccionar", 0)
+        self.in_proveedor.addItem("Seleccionar", None)
 
         # Línea 3 – combos dinámicos
         self.in_color = QComboBox();            self._setup_combo(self.in_color)
