@@ -64,7 +64,7 @@ QUERY_CBTE = """
 SELECT
     f.id,
     f.fecha_emision,
-    f.tipo,
+    f.tipo_comprobante_id AS tipo,
     f.punto_venta,
     f.numero,
     f.total,
@@ -72,7 +72,7 @@ SELECT
     f.moneda,
     f.cotizacion,
     f.vto_cae,
-    c.tipo_doc,
+    c.tipo_doc_id AS tipo_doc,
     c.nro_doc,
     CONCAT(TRIM(c.apellido), ' ', TRIM(c.nombre)) AS razon_social
 FROM facturas f
