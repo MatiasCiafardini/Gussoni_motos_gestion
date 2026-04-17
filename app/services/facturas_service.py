@@ -5,6 +5,8 @@ from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from loguru import logger
+
 from app.data.database import SessionLocal
 from app.repositories.facturas_repository import FacturasRepository
 from app.services.catalogos_service import CatalogosService
@@ -35,6 +37,9 @@ class FacturasService:
     # estado específico "Anulada por NC", se resolverá automáticamente.
     ESTADO_ANULADA_POR_NC = 16
 
+    # Estado de venta (tipo='ventas') que se aplica al cancelar por NC.
+    ESTADO_VENTA_CANCELADA = 33
+
     def __init__(self) -> None:
         # Servicio de catálogos con caché global (estados, tipos de comprobante, etc.).
         self._catalogos = CatalogosService()
@@ -53,6 +58,26 @@ class FacturasService:
     def _repo(self, db: Optional[Session] = None) -> FacturasRepository:
         return FacturasRepository(db or SessionLocal())
 
+    @staticmethod
+    def _clean_error_message(ex: Exception) -> str:
+        """Devuelve un mensaje legible para el usuario, ocultando detalles SQL internos."""
+        from sqlalchemy.exc import OperationalError, IntegrityError
+        if isinstance(ex, OperationalError):
+            orig = getattr(ex, "orig", None)
+            if orig and hasattr(orig, "args") and len(orig.args) >= 2:
+                code = orig.args[0]
+                if code == 1205:
+                    return "Tiempo de espera agotado en la base de datos. Por favor reintentá en unos segundos."
+                if code in (2003, 2006, 2013):
+                    return "No se pudo conectar a la base de datos. Verificá la conexión de red."
+                return f"Error de base de datos (código {code}). Contactá al soporte."
+        if isinstance(ex, IntegrityError):
+            return "Error de integridad en los datos. Verificá que no haya duplicados."
+        msg = str(ex)
+        if any(kw in msg for kw in ("[SQL:", "UPDATE ", "INSERT ", "SELECT ", "pymysql")):
+            return "Error al guardar los datos. Por favor reintentá o contactá al soporte."
+        return msg
+
     def _init_estado_ids(self) -> None:
         """Intenta resolver IDs de estados por nombre desde la BD.
 
@@ -62,8 +87,8 @@ class FacturasService:
         db = SessionLocal()
         try:
             repo = self._repo(db)
-            estados = repo.list_estados_facturas() or []
-            por_nombre = {str(e.get("nombre", "")).strip().lower(): int(e.get("id")) for e in estados if e.get("id") is not None}
+            estados_fact = repo.list_estados_facturas() or []
+            por_nombre = {str(e.get("nombre", "")).strip().lower(): int(e.get("id")) for e in estados_fact if e.get("id") is not None}
 
             def pick(*names: str) -> Optional[int]:
                 for n in names:
@@ -74,9 +99,22 @@ class FacturasService:
 
             self.ESTADO_ANULADA = pick("Anulada") or self.ESTADO_ANULADA
             self.ESTADO_ANULADA_POR_NC = pick("Anulada por NC", "Anulada por N/C", "Anulada") or self.ESTADO_ANULADA_POR_NC
+
+            # Resolver estado de ventas
+            try:
+                estados_venta = db.execute(
+                    text("SELECT id, nombre FROM estados WHERE tipo = 'ventas'")
+                ).mappings().all()
+                por_nombre_venta = {str(e["nombre"]).strip().lower(): int(e["id"]) for e in estados_venta}
+                self.ESTADO_VENTA_CANCELADA = (
+                    por_nombre_venta.get("cancelada")
+                    or por_nombre_venta.get("cancelado")
+                    or self.ESTADO_VENTA_CANCELADA
+                )
+            except Exception:
+                pass
         except Exception:
-            # No interrumpimos el inicio por un problema de catálogos
-            pass
+            logger.warning("No se pudieron resolver IDs de estados desde la BD; usando valores por defecto.")
         finally:
             db.close()
 
@@ -197,10 +235,9 @@ class FacturasService:
         - Intenta primero con AFIP (FECompUltimoAutorizado).
         - SOLO si AFIP falla (error de WS), cae a la BD.
         """
-        print(">>> [sugerir_proximo_numero] tipo =", tipo_comprobante_id, "pto_vta =", pto_vta)
+        logger.debug("sugerir_proximo_numero tipo={} pto_vta={}", tipo_comprobante_id, pto_vta)
 
         if not tipo_comprobante_id or not pto_vta:
-            print(">>>   faltan datos, devuelvo 1")
             return 1
 
         try:
@@ -212,7 +249,7 @@ class FacturasService:
         try:
             repo = self._repo(db)
             nro = self._obtener_proximo_numero_real(db, repo, tipo_comprobante_id, pto)
-            print(">>> [sugerir_proximo_numero] numero sugerido =", nro)
+            logger.debug("sugerir_proximo_numero → {}", nro)
             return nro
         finally:
             db.close()
@@ -374,7 +411,7 @@ class FacturasService:
            *Se usa SIEMPRE si el WS responde OK, aunque el último sea 0.*
         2) Si AFIP falla (error de WS): BD (repo.get_next_numero)
         """
-        print(">>> [_obtener_proximo_numero_real] INICIO tipo =", tipo_comprobante_id, "pto_vta =", pto_vta)
+        logger.debug("_obtener_proximo_numero_real tipo={} pto_vta={}", tipo_comprobante_id, pto_vta)
 
         # 1) Intentar AFIP primero
         ultimo_afip: Optional[int] = None
@@ -410,20 +447,20 @@ class FacturasService:
                                 ultimo_afip = int(ultimo_afip_raw[key])
                                 break
                             except Exception as e:
-                                print(">>>   [AFIP] ERROR parseando", key, ":", repr(e))
+                                logger.debug("Error parseando campo {} de AFIP: {}", key, e)
                 else:
                     try:
                         ultimo_afip = int(ultimo_afip_raw or 0)
                     except Exception as e:
-                        print(">>>   [AFIP] ERROR parseando ultimo_afip_raw directo:", repr(e))
+                        logger.debug("Error parseando ultimo_afip_raw directo: {}", e)
                         ultimo_afip = None
 
             except Exception as e:
-                print(">>>   [AFIP] ERROR al llamar FECompUltimoAutorizado:", repr(e))
+                logger.warning("Error al llamar FECompUltimoAutorizado: {}", e)
                 ws_llamado_ok = False
                 ultimo_afip = None
         else:
-            print(">>>   [AFIP] self._wsfe NO tiene fe_comp_ultimo_autorizado")
+            logger.debug("_wsfe no tiene fe_comp_ultimo_autorizado")
 
         # Si el WS respondió OK, usamos SIEMPRE lo que diga AFIP
         if ws_llamado_ok:
@@ -437,7 +474,7 @@ class FacturasService:
         try:
             proximo_local = repo.get_next_numero(tipo_comprobante_id, pto_vta)  # normalmente last_local + 1
         except Exception as e:
-            print(">>>   [LOCAL] ERROR en repo.get_next_numero:", repr(e))
+            logger.warning("Error en repo.get_next_numero: {}", e)
             proximo_local = 1
 
         if not proximo_local or proximo_local <= 0:
@@ -730,7 +767,7 @@ class FacturasService:
 
             # 1) Leer cabecera
             factura = repo.get_by_id(factura_id)
-            print("Factura leída en autorizar_en_arca:", factura)
+            logger.debug("Factura {} leída para autorizar", factura_id)
 
             if not factura:
                 raise ValueError(f"Factura {factura_id} no encontrada.")
@@ -775,9 +812,6 @@ class FacturasService:
                         cbte_tipo=cbte_tipo_dbg,
                         pto_vta=pto_dbg,
                     )
-                    print(
-                        ">>> [autorizar_en_arca][DEBUG] FECompUltimoAutorizado RAW =", ult_raw
-                    )
                     ult_nro = 0
                     if isinstance(ult_raw, dict):
                         for key in ("cbte_nro", "numero", "CbteNro", "cbtenro"):
@@ -792,25 +826,12 @@ class FacturasService:
                             ult_nro = int(ult_raw or 0)
                         except Exception:
                             ult_nro = 0
-                    esperado = ult_nro + 1
-                    print(
-                        ">>> [autorizar_en_arca][DEBUG] AFIP último =",
-                        ult_nro,
-                        "espera próximo =",
-                        esperado,
-                        "numero_local =",
-                        factura.get("numero"),
-                    )
-                else:
-                    print(
-                        ">>> [autorizar_en_arca][DEBUG] self._wsfe no tiene "
-                        "fe_comp_ultimo_autorizado"
+                    logger.debug(
+                        "AFIP último={} espera próximo={} numero_local={}",
+                        ult_nro, ult_nro + 1, factura.get("numero"),
                     )
             except Exception as e:
-                print(
-                    ">>> [autorizar_en_arca][DEBUG] Error consultando FECompUltimoAutorizado:",
-                    repr(e),
-                )
+                logger.warning("Error consultando FECompUltimoAutorizado: {}", e)
             # 2) Leer detalle
             items = self._get_detalle_factura(db, factura_id)
             if not items:
@@ -819,13 +840,7 @@ class FacturasService:
             # 3) Obtener credenciales (token + sign)
             auth: ArcaAuthData = self._wsaa.get_auth()
 
-            # Debug rápido
-            print("Auth:", auth)
-            print("Factura:", factura)
-            print("Items:", items)
-
             # 4) Llamar a WSFE para solicitar CAE
-            from pprint import pformat
             try:
                 wsfe_result: ArcaWSFEResult = self._wsfe.solicitar_cae(
                     auth=auth,
@@ -833,22 +848,20 @@ class FacturasService:
                     items=items,
                 )
             except Exception as e:
-                import traceback
-                traceback.print_exc()
+                logger.exception("Error al invocar WSFE.solicitar_cae para factura {}", factura_id)
                 db.rollback()
 
-                # Guardar el error en observaciones (sin tocar estado)
+                # Guardar el error completo en observaciones (para revisión interna)
                 try:
                     self._actualizar_observaciones_factura(
                         db,
                         factura_id=factura_id,
-                        mensaje=f"[ARCA] Error al invocar WSFE.solicitar_cae: {e}",
+                        mensaje=f"[ARCA] Error de comunicación: {e}",
                     )
                     db.commit()
-                except Exception as ex2:
+                except Exception:
                     db.rollback()
 
-                # Devolvemos algo entendible para la UI; NO cambiamos estado
                 return {
                     "factura_id": factura_id,
                     "aprobada": False,
@@ -859,7 +872,7 @@ class FacturasService:
                     "estado_id": factura.get("estado_id") if factura else None,
                     "errores": [],
                     "observaciones": [],
-                    "mensaje": f"Error al invocar WSFE.solicitar_cae: {e}",
+                    "mensaje": self._clean_error_message(e),
                 }
 
             # 5) Determinar nuevo estado
@@ -870,7 +883,7 @@ class FacturasService:
             else:
                 # WS respondió pero no marcó ni A ni R -> problema de comunicación / formato
                 nuevo_estado = self.ESTADO_ERROR_COMUNICACION
-            print("6 - nuevo estado:", nuevo_estado)
+            logger.debug("Factura {} → nuevo estado {}", factura_id, nuevo_estado)
 
             # 6) Actualizar cabecera con CAE / fechas / estado
             repo.actualizar_cae_y_estado(
@@ -880,7 +893,7 @@ class FacturasService:
                 vto_cae=wsfe_result.vto_cae,
                 estado_id=nuevo_estado,
             )
-            print("7 - cabecera actualizada con CAE/estado")
+            logger.debug("Factura {} cabecera actualizada con CAE/estado", factura_id)
 
             # 7) Guardar observaciones SOLO si NO está aprobada
             if not wsfe_result.aprobada:
@@ -907,10 +920,8 @@ class FacturasService:
                         factura_id=factura_id,
                         mensaje=texto_obs,
                     )
-            print("8 - observaciones actualizadas (solo si había error / rechazo)")
-
             db.commit()
-            print("9 - commit OK en autorizar_en_arca")
+            logger.info("Factura {} autorizada en ARCA. CAE={}", factura_id, wsfe_result.cae)
 
             return {
                 "factura_id": factura_id,
@@ -926,9 +937,7 @@ class FacturasService:
             }
 
         except Exception as ex:
-            import traceback
-            print("ERROR general en autorizar_en_arca:", repr(ex))
-            traceback.print_exc()
+            logger.exception("Error en autorizar_en_arca para factura {}", factura_id)
             db.rollback()
             return {
                 "factura_id": factura_id,
@@ -940,7 +949,7 @@ class FacturasService:
                 "estado_id": factura.get("estado_id") if factura else None,
                 "errores": [],
                 "observaciones": [],
-                "mensaje": f"Error interno en autorizar_en_arca: {ex}",
+                "mensaje": self._clean_error_message(ex),
             }
         finally:
             db.close()
@@ -958,7 +967,8 @@ class FacturasService:
             * anular factura original
             * devolver stock del vehículo
         """
-        db = SessionLocal()
+        import time
+
         resumen = {
             "procesadas": 0,
             "aprobadas": 0,
@@ -967,172 +977,129 @@ class FacturasService:
             "detalles": [],
         }
 
+        # 1) Leer facturas pendientes — sesión corta, solo lectura
+        with SessionLocal() as db:
+            rows = [
+                dict(r) for r in db.execute(
+                    text(
+                        """
+                        SELECT id, tipo_comprobante_id, numero, punto_venta
+                        FROM facturas
+                        WHERE estado_id IN (:est_borr, :est_err, :est_rec, :est_pen)
+                        ORDER BY tipo_comprobante_id, punto_venta, numero
+                        """
+                    ),
+                    {
+                        "est_borr": self.ESTADO_BORRADOR,
+                        "est_err": self.ESTADO_ERROR_COMUNICACION,
+                        "est_rec": self.ESTADO_RECHAZADA,
+                        "est_pen": self.ESTADO_PENDIENTE_AFIP,
+                    },
+                ).mappings().all()
+            ]
+
+        if not rows:
+            return resumen
+
+        # 2) Agrupar en memoria (sin sesión abierta)
+        grupos: Dict[Tuple[int, int], List[Dict[str, Any]]] = {}
+        for r in rows:
+            key = (r["tipo_comprobante_id"], int(r["punto_venta"]))
+            grupos.setdefault(key, []).append(r)
+
         try:
-            rows = db.execute(
-                text(
-                    """
-                    SELECT id, tipo_comprobante_id, numero, punto_venta
-                    FROM facturas
-                    WHERE estado_id IN (:est_borr, :est_err, :est_rec, :est_pen)
-                    ORDER BY tipo_comprobante_id, punto_venta, numero
-                    """
-                ),
-                {
-                    "est_borr": self.ESTADO_BORRADOR,
-                    "est_err": self.ESTADO_ERROR_COMUNICACION,
-                    "est_rec": self.ESTADO_RECHAZADA,
-                    "est_pen": self.ESTADO_PENDIENTE_AFIP,
-                },
-            ).mappings().all()
+            auth: ArcaAuthData = self._wsaa.get_auth()
+        except Exception as e:
+            resumen["detalles"].append(f"No se pudo obtener TA de ARCA: {e}")
+            return resumen
 
-            if not rows:
-                return resumen
+        fe_ult = getattr(self._wsfe, "fe_comp_ultimo_autorizado", None)
 
-            # Agrupar por (tipo_comprobante_id, punto_venta)
-            grupos: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
-            for r in rows:
-                key = (r["tipo_comprobante_id"], int(r["punto_venta"]))
-                grupos.setdefault(key, []).append(dict(r))
+        for (tipo_comprobante_id, pto_vta), facturas in grupos.items():
+            proximo_afip = None
 
-            try:
-                auth: ArcaAuthData = self._wsaa.get_auth()
-            except Exception as e:
-                resumen["detalles"].append(f"No se pudo obtener TA de ARCA: {e}")
-                return resumen
-
-            fe_ult = getattr(self._wsfe, "fe_comp_ultimo_autorizado", None)
-
-            for (tipo_comprobante_id, pto_vta), facturas in grupos.items():
-                proximo_afip = None
-
-                # 1) Consultar último autorizado en AFIP
-                if callable(fe_ult):
-                    try:
-                        cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(tipo_comprobante_id)
-                        ult_raw = fe_ult(
-                            auth=auth,
-                            cbte_tipo=cbte_tipo,
-                            pto_vta=pto_vta,
-                        )
-                        ult_nro = 0
-                        if isinstance(ult_raw, dict):
-                            for key in ("cbte_nro", "numero", "CbteNro", "cbtenro"):
-                                if key in ult_raw and ult_raw[key] is not None:
-                                    try:
-                                        ult_nro = int(ult_raw[key])
-                                        break
-                                    except Exception:
-                                        continue
-                        else:
-                            try:
-                                ult_nro = int(ult_raw or 0)
-                            except Exception:
-                                ult_nro = 0
-
-                        proximo_afip = ult_nro + 1
-
-                    except Exception as e:
-                        resumen["detalles"].append(
-                            f"[{tipo_comprobante_id} {pto_vta}] Error al consultar FECompUltimoAutorizado: {e}"
-                        )
-
-                # 2) Fallback local
-                if proximo_afip is None:
-                    max_local = 0
-                    for f in facturas:
+            # 3) Consultar último autorizado en AFIP — sesión corta para lookup de tipo
+            if callable(fe_ult):
+                try:
+                    with SessionLocal() as db:
+                        tipo_info = self._repo(db).get_tipo_comprobante_by_id(tipo_comprobante_id)
+                    codigo_tipo = str(tipo_info["codigo"]) if tipo_info else str(tipo_comprobante_id)
+                    cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(codigo_tipo)
+                    ult_raw = fe_ult(auth=auth, cbte_tipo=cbte_tipo, pto_vta=pto_vta)
+                    ult_nro = 0
+                    if isinstance(ult_raw, dict):
+                        for key in ("cbte_nro", "numero", "CbteNro", "cbtenro"):
+                            if key in ult_raw and ult_raw[key] is not None:
+                                try:
+                                    ult_nro = int(ult_raw[key])
+                                    break
+                                except Exception:
+                                    continue
+                    else:
                         try:
-                            n = int(f.get("numero") or 0)
-                            max_local = max(max_local, n)
+                            ult_nro = int(ult_raw or 0)
                         except Exception:
-                            continue
-                    proximo_afip = max_local + 1
+                            ult_nro = 0
+                    proximo_afip = ult_nro + 1
+                except Exception as e:
+                    resumen["detalles"].append(
+                        f"[{tipo_comprobante_id} {pto_vta}] Error al consultar FECompUltimoAutorizado: {e}"
+                    )
 
-                # 3) Procesar facturas del grupo
-                for f in facturas:
-                    factura_id = f["id"]
-                    num_local = int(f.get("numero") or 0)
+            # 4) Fallback local
+            if proximo_afip is None:
+                proximo_afip = max((int(f.get("numero") or 0) for f in facturas), default=0) + 1
 
-                    # Ajustar numeración si hace falta
-                    if num_local != proximo_afip:
+            # 5) Procesar cada factura del grupo
+            for f in facturas:
+                factura_id = f["id"]
+                num_local = int(f.get("numero") or 0)
+
+                # Ajustar numeración si hace falta — sesión corta, commit inmediato
+                if num_local != proximo_afip:
+                    with SessionLocal() as db:
                         db.execute(
                             text("UPDATE facturas SET numero = :num WHERE id = :id"),
                             {"num": proximo_afip, "id": factura_id},
                         )
-                        f["numero"] = proximo_afip
-                        num_local = proximo_afip
+                        db.commit()
+                    f["numero"] = proximo_afip
+                    num_local = proximo_afip
 
-                    # Autorizar en ARCA
-                    res = self.autorizar_en_arca(factura_id)
-                    resumen["procesadas"] += 1
+                # Pausa entre calls a AFIP para respetar el límite de requests
+                time.sleep(0.2)
 
-                    if res.get("aprobada"):
-                        resumen["aprobadas"] += 1
-                        resumen["detalles"].append(
-                            f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] APROBADA."
-                        )
+                # Autorizar — tiene su propia sesión interna
+                res = self.autorizar_en_arca(factura_id)
+                resumen["procesadas"] += 1
 
-                        # ===================== FIX NC =====================
-                        factura = self._repo(db).get_by_id(factura_id)
-
-                        tipo = self._repo.get_tipo_comprobante_by_id(factura["tipo_comprobante_id"])
-                        if tipo and tipo.get("es_nota_credito"):
-
-                            factura_origen_id = factura.get("factura_origen_id")
-
-                            if factura_origen_id:
-                                # 1) Anular factura original
-                                self._repo(db).actualizar_estado(
-                                    factura_origen_id,
-                                    self.ESTADO_ANULADA_POR_NC
-                                )
-
-                                # 2) Devolver stock de vehículos
-                                db.execute(
-                                    text(
-                                        """
-                                        UPDATE vehiculos
-                                        SET estado_stock_id = :disponible
-                                        WHERE id IN (
-                                            SELECT fd.vehiculo_id
-                                            FROM facturas_detalle fd
-                                            WHERE fd.factura_id = :factura_orig_id
-                                            AND fd.vehiculo_id IS NOT NULL
-                                        )
-                                        """
-                                    ),
-                                    {
-                                        "disponible": 1,  # Disponible
-                                        "factura_orig_id": factura_origen_id,
-                                    },
-                                )
-                        # ==================================================
+                if res.get("aprobada"):
+                    resumen["aprobadas"] += 1
+                    resumen["detalles"].append(
+                        f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] APROBADA."
+                    )
+                    # Efectos NC — sesión corta, commit propio
+                    with SessionLocal() as db:
                         self._procesar_nc_autorizada(db, factura_id)
+                        db.commit()
+                    proximo_afip += 1
 
-                        proximo_afip += 1
+                elif res.get("rechazada"):
+                    resumen["rechazadas"] += 1
+                    resumen["detalles"].append(
+                        f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] "
+                        f"RECHAZADA: {res.get('mensaje')}"
+                    )
+                    proximo_afip += 1
 
-                    elif res.get("rechazada"):
-                        resumen["rechazadas"] += 1
-                        resumen["detalles"].append(
-                            f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] "
-                            f"RECHAZADA: {res.get('mensaje')}"
-                        )
-                        proximo_afip += 1
+                else:
+                    resumen["error_comunicacion"] += 1
+                    resumen["detalles"].append(
+                        f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] "
+                        f"ERROR COMUNICACIÓN: {res.get('mensaje')}"
+                    )
 
-                    else:
-                        resumen["error_comunicacion"] += 1
-                        resumen["detalles"].append(
-                            f"Factura {factura_id} [{tipo_comprobante_id} {str(pto_vta).zfill(4)}-{num_local}] "
-                            f"ERROR COMUNICACIÓN: {res.get('mensaje')}"
-                        )
-
-            db.commit()
-            return resumen
-
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        return resumen
 
     def _procesar_nc_autorizada(self, db: Session, nc_id: int) -> None:
         """
@@ -1195,14 +1162,13 @@ class FacturasService:
         if not venta_id:
             return
 
-        # Estado 33 = Cancelada (según tu tabla estados tipo='ventas')
         db.execute(
             text("""
                 UPDATE ventas
-                SET estado_id = 33
+                SET estado_id = :estado_cancelada
                 WHERE id = :venta_id
             """),
-            {"venta_id": venta_id}
+            {"estado_cancelada": self.ESTADO_VENTA_CANCELADA, "venta_id": venta_id}
         )
 
         # ---------------------------------------------------
@@ -1472,13 +1438,6 @@ class FacturasService:
         fe_cons = getattr(self._wsfe, "fe_comp_consultar", None)
         if not callable(fe_cons):
             raise RuntimeError("WSFE no implementa FECompConsultar")
-
-        raw = fe_cons(
-            auth=auth,
-            cbte_tipo=cbte_tipo,
-            pto_vta=int(pto_vta),
-            cbte_nro=int(numero),
-        )
 
         raw = fe_cons(
             auth=auth,

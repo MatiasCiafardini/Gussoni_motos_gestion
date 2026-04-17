@@ -32,6 +32,33 @@ def fmt_str(txt: str | None, largo: int) -> str:
     return (txt or "")[:largo].ljust(largo)
 
 
+def fmt_doc(valor: str | int | None, largo: int) -> str:
+    solo_digitos = "".join(ch for ch in str(valor or "") if ch.isdigit())
+    return solo_digitos[-largo:].zfill(largo)
+
+
+def fmt_moneda(valor: str | None) -> str:
+    moneda = (valor or "PES").upper()
+    if moneda == "ARS":
+        moneda = "PES"
+    return fmt_str(moneda, 3)
+
+
+def map_tipo_doc(codigo: str | None, nro_doc: str | int | None) -> str:
+    cod = (codigo or "").strip().upper()
+    if cod == "CUIL":
+        return "86"
+    if cod in TIPO_DOC:
+        return TIPO_DOC[cod]
+
+    digitos = "".join(ch for ch in str(nro_doc or "") if ch.isdigit())
+    if len(digitos) == 11:
+        return "80"
+    if 1 <= len(digitos) <= 8:
+        return "96"
+    return "99"
+
+
 # =========================================================
 # Códigos AFIP
 # =========================================================
@@ -46,6 +73,7 @@ TIPO_COMPROBANTE = {
 
 TIPO_DOC = {
     "CUIT": "80",
+    "CDI": "87",
     "DNI": "96",
 }
 
@@ -64,7 +92,7 @@ QUERY_CBTE = """
 SELECT
     f.id,
     f.fecha_emision,
-    f.tipo_comprobante_id AS tipo,
+    tc.codigo AS tipo,
     f.punto_venta,
     f.numero,
     f.total,
@@ -72,11 +100,13 @@ SELECT
     f.moneda,
     f.cotizacion,
     f.vto_cae,
-    c.tipo_doc_id AS tipo_doc,
+    td.codigo AS tipo_doc,
     c.nro_doc,
     CONCAT(TRIM(c.apellido), ' ', TRIM(c.nombre)) AS razon_social
 FROM facturas f
 LEFT JOIN clientes c ON c.id = f.cliente_id
+LEFT JOIN tipos_documento td ON td.id = c.tipo_doc_id
+LEFT JOIN tipos_comprobante tc ON tc.id = f.tipo_comprobante_id
 WHERE
     f.estado_id = 14
     AND MONTH(f.fecha_emision) = :mes
@@ -91,6 +121,11 @@ SELECT
     SUM(fd.importe_neto) AS neto,
     SUM(fd.importe_iva) AS iva
 FROM facturas_detalle fd
+INNER JOIN facturas f ON f.id = fd.factura_id
+WHERE
+    f.estado_id = 14
+    AND MONTH(f.fecha_emision) = :mes
+    AND YEAR(f.fecha_emision) = :anio
 GROUP BY fd.factura_id, fd.alicuota_iva
 """
 
@@ -122,7 +157,8 @@ def generar_txt_iva_ventas(
             raise ValueError("No hay comprobantes autorizados para el período.")
 
         detalles = session.execute(
-            text(QUERY_DETALLE)
+            text(QUERY_DETALLE),
+            {"mes": mes, "anio": anio},
         ).mappings().all()
 
     finally:
@@ -138,20 +174,23 @@ def generar_txt_iva_ventas(
     # =====================================================
     with open(path_cbte, "w", encoding="utf-8") as f:
         for r in cbtes:
+            filas = detalle_por_factura.get(r["id"], [])
+            cant_alic = len(filas) if filas else (1 if abs(float(r["iva"] or 0)) > 0 else 0)
+            total_exporte = abs(float(r["total"] or 0))
             line = (
                 fmt_fecha(r["fecha_emision"])
                 + TIPO_COMPROBANTE.get(r["tipo"], "000")
                 + fmt_int(r["punto_venta"], 5)
                 + fmt_int(r["numero"], 20)
                 + fmt_int(r["numero"], 20)
-                + TIPO_DOC.get(r["tipo_doc"], "99")
-                + fmt_str(r["nro_doc"], 20)
+                + map_tipo_doc(r["tipo_doc"], r["nro_doc"])
+                + fmt_doc(r["nro_doc"], 20)
                 + fmt_str(r["razon_social"], 30)
-                + fmt_num(r["total"], 15)
+                + fmt_num(total_exporte, 15)
                 + fmt_num(0, 15) * 7
-                + fmt_str(r["moneda"] or "ARS", 3)
+                + fmt_moneda(r["moneda"])
                 + fmt_int(int((r["cotizacion"] or 1) * 1_000_000), 10)
-                + "1"
+                + str(cant_alic)
                 + "0"
                 + fmt_num(0, 15)
                 + fmt_fecha(r["vto_cae"])
@@ -170,20 +209,22 @@ def generar_txt_iva_ventas(
                 # 1️⃣ Usar detalle real
                 for d in filas:
                     alic = float(d["alicuota_iva"] or 0)
+                    neto = abs(float(d["neto"] or 0))
+                    iva = abs(float(d["iva"] or 0))
                     line = (
                         TIPO_COMPROBANTE.get(r["tipo"], "000")
                         + fmt_int(r["punto_venta"], 5)
                         + fmt_int(r["numero"], 20)
-                        + fmt_num(d["neto"], 15)
+                        + fmt_num(neto, 15)
                         + ALICUOTA_IVA.get(alic, "0003")
-                        + fmt_num(d["iva"], 15)
+                        + fmt_num(iva, 15)
                     )
                     f.write(line + "\n")
 
-            elif r["iva"] is not None and float(r["iva"]) > 0:
+            elif r["iva"] is not None and abs(float(r["iva"])) > 0:
                 # 2️⃣ Usar IVA cargado en la factura
-                iva = float(r["iva"])
-                total = float(r["total"] or 0)
+                iva = abs(float(r["iva"]))
+                total = abs(float(r["total"] or 0))
                 neto = total - iva
 
                 alic = round((iva / neto) * 100, 1) if neto else 0.0

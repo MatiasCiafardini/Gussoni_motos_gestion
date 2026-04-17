@@ -39,8 +39,8 @@ class VehiculosRepository:
             ).mappings().all()
             if rows:
                 return [dict(r) for r in rows]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("No se pudo consultar tabla estados para vehículos: {}", e)
 
         rows = self.db.execute(
             text(

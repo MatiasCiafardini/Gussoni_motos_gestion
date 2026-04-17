@@ -1290,14 +1290,6 @@ class FacturasAgregarPage(QWidget):
             popUp.toast(self,f"Error al generar la Nota de Crédito: {ex}", kind="error")
             return
 
-        from pprint import pformat
-        popUp.info(
-            self,
-            "Resultado generación NC",
-            pformat(res),
-        )
-
-
         msg = res.get("mensaje") if isinstance(res, dict) else ""
         if res.get("aprobada"):
             self._dirty = False

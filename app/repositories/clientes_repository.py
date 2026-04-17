@@ -24,8 +24,8 @@ class ClientesRepository:
             out = [{"id": r["id"], "nombre": r["nombre"]} for r in rows]
             if out:
                 return out
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("No se pudo consultar estados de clientes, usando defaults: {}", e)
         return [{"id": 10, "nombre": "Activo"}, {"id": 11, "nombre": "Inactivo"}]
 
     # -------------------- Validaciones / existencia --------------------
@@ -83,8 +83,8 @@ class ClientesRepository:
         if not new_id:
             try:
                 new_id = self.db.execute(text("SELECT LAST_INSERT_ID()")).scalar_one()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("No se pudo obtener LAST_INSERT_ID: {}", e)
 
         if not new_id:
             raise RuntimeError("No se pudo obtener el ID del cliente insertado.")
@@ -166,7 +166,7 @@ class ClientesRepository:
 
         if nro_doc:
             where.append("c.nro_doc LIKE :nro_doc")
-            params["nro_doc"] = f"%{nro_doc}%"
+            params["nro_doc"] = f"{nro_doc}%"
         if email:
             where.append("LOWER(c.email) LIKE :email")
             params["email"] = f"%{email.lower()}%"

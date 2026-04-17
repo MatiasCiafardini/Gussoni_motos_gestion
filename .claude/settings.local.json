@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"c:/Users/mat_i/OneDrive/Documentos/trabajos/App_gussoni/app/tools/openssl/openssl.exe\" version *)",
+      "Bash(.venv/Scripts/python.exe -c \"from cryptography.hazmat.primitives.serialization.pkcs7 import PKCS7SignatureBuilder; print\\('ok'\\)\")",
+      "Bash(.venv/Scripts/pip install *)",
+      "Bash(.venv/Scripts/python.exe -c \"import cryptography; print\\(cryptography.__version__\\)\")",
+      "Bash(.venv/Scripts/pip.exe install *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(echo \"EXIT $?\")",
+      "Bash(echo \"---exit $?\")",
+      "Bash(.venv/Scripts/python.exe -m pip install cryptography)",
+      "Bash(pip install *)"
+    ]
+  }
+}

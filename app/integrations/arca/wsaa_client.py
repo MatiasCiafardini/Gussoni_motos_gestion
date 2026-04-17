@@ -5,16 +5,85 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 import base64
-import subprocess
-import tempfile
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
-from app.shared.openssl import get_openssl_path
 
 from app.core.config import settings
 
 ARG = timezone(timedelta(hours=-3))
+
+
+def _der_tlv(tag: bytes, value: bytes) -> bytes:
+    n = len(value)
+    if n < 128:
+        return tag + bytes([n]) + value
+    elif n < 256:
+        return tag + b'\x81' + bytes([n]) + value
+    elif n < 65536:
+        return tag + b'\x82' + bytes([n >> 8, n & 0xFF]) + value
+    raise OverflowError(f"DER value too long: {n}")
+
+
+def _der_oid(s: str) -> bytes:
+    parts = [int(x) for x in s.split('.')]
+    body = bytes([40 * parts[0] + parts[1]])
+    for v in parts[2:]:
+        if v == 0:
+            body += b'\x00'
+        else:
+            chunks: list[int] = []
+            while v:
+                chunks.append(v & 0x7F)
+                v >>= 7
+            chunks.reverse()
+            for i, c in enumerate(chunks):
+                body += bytes([c | 0x80 if i < len(chunks) - 1 else c])
+    return _der_tlv(b'\x06', body)
+
+
+def _build_pkcs7_signed_data(
+    data: bytes,
+    cert_der: bytes,
+    issuer_der: bytes,
+    serial_bytes: bytes,
+    signature: bytes,
+) -> bytes:
+    """
+    Builds a PKCS7 SignedData (DER) with IssuerAndSerialNumber (v1 signerInfo).
+    Pure Python — does not rely on OpenSSL's PKCS7/CMS signer-identifier logic.
+    No signed attributes (equivalent to openssl smime -noattr).
+    """
+    def seq(*p): return _der_tlv(b'\x30', b''.join(p))
+    def set_(*p): return _der_tlv(b'\x31', b''.join(p))
+    def ctx(n, *p): return _der_tlv(bytes([0xA0 | n]), b''.join(p))
+    def octet(b): return _der_tlv(b'\x04', b)
+
+    NULL = b'\x05\x00'
+    sha256_alg = seq(_der_oid('2.16.840.1.101.3.4.2.1'), NULL)
+    rsa_alg    = seq(_der_oid('1.2.840.113549.1.1.1'), NULL)
+
+    encap_content = seq(_der_oid('1.2.840.113549.1.7.1'), ctx(0, octet(data)))
+    issuer_and_serial = seq(issuer_der, _der_tlv(b'\x02', serial_bytes))
+
+    signer_info = seq(
+        b'\x02\x01\x01',     # version 1
+        issuer_and_serial,
+        sha256_alg,           # digestAlgorithm
+        # no signed attributes
+        rsa_alg,              # digestEncryptionAlgorithm
+        octet(signature),     # encryptedDigest
+    )
+
+    signed_data = seq(
+        b'\x02\x01\x01',     # version 1
+        set_(sha256_alg),     # digestAlgorithms
+        encap_content,
+        ctx(0, cert_der),     # certificates [0] IMPLICIT
+        set_(signer_info),    # signerInfos
+    )
+
+    return seq(_der_oid('1.2.840.113549.1.7.2'), ctx(0, signed_data))
 
 
 # ======================================================================
@@ -165,35 +234,38 @@ class ArcaWSAAClient:
         return ET.tostring(root, encoding="utf-8").decode()
 
     def _sign_with_openssl(self, xml: str) -> str:
+        """
+        Builds a PKCS7 SignedData forcing IssuerAndSerialNumber (v1 signerInfo).
+        Pure Python ASN.1 construction — avoids OpenSSL 3.x SubjectKeyIdentifier default.
+        """
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key, Encoding
+        from cryptography.x509 import load_pem_x509_certificate
+
         if not self._config.cert_path.exists():
             raise FileNotFoundError(f"Certificado ARCA no encontrado: {self._config.cert_path}")
         if not self._config.key_path.exists():
             raise FileNotFoundError(f"Clave privada ARCA no encontrada: {self._config.key_path}")
 
-        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".xml", encoding="utf-8") as f:
-            f.write(xml)
-            xml_path = f.name
+        cert = load_pem_x509_certificate(self._config.cert_path.read_bytes())
+        password = self._config.key_password.encode() if self._config.key_password else None
+        private_key = load_pem_private_key(self._config.key_path.read_bytes(), password=password)
 
-        try:
-            cmd = [
-                str(get_openssl_path()), "smime", "-sign",
-                "-signer", str(self._config.cert_path),
-                "-inkey", str(self._config.key_path),
-                "-outform", "DER",
-                "-nodetach",
-                "-noattr",
-                "-in", xml_path,
-            ]
-            if self._config.key_password:
-                cmd.extend(["-passin", f"pass:{self._config.key_password}"])
+        data = xml.encode("utf-8")
+        cert_der = cert.public_bytes(Encoding.DER)
 
-            proc = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            return base64.b64encode(proc.stdout).decode()
-        finally:
-            try:
-                Path(xml_path).unlink()
-            except Exception:
-                pass
+        # Sign raw data — no signed attributes (like smime -noattr)
+        signature = private_key.sign(data, asym_padding.PKCS1v15(), hashes.SHA256())
+
+        issuer_der = cert.issuer.public_bytes()
+        sn = cert.serial_number
+        sn_bytes = sn.to_bytes(max(1, (sn.bit_length() + 7) // 8), 'big')
+        if sn_bytes[0] & 0x80:
+            sn_bytes = b'\x00' + sn_bytes
+
+        pkcs7_der = _build_pkcs7_signed_data(data, cert_der, issuer_der, sn_bytes, signature)
+        return base64.b64encode(pkcs7_der).decode()
 
     def _call_wsaa(self, cms_b64: str) -> str:
         soap = f"""<?xml version="1.0" encoding="UTF-8"?>

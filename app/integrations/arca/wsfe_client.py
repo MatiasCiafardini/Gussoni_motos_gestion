@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from app.core.config import settings
 
 from app.services.catalogos_service import CatalogosService
+from loguru import logger
 
 import ssl
 # -------------------- Resultado WSFE --------------------
@@ -306,6 +307,11 @@ class ArcaWSFEClient:
         if condicion_iva_receptor_id is not None:
             condicion_iva_xml = (
                 f"\n                  <ar:CondicionIVAReceptorId>{int(condicion_iva_receptor_id)}</ar:CondicionIVAReceptorId>"
+            )
+        elif cbte_tipo in (1, 2, 3, 11, 12, 13):
+            logger.warning(
+                "Factura tipo {} enviada a AFIP sin CondicionIVAReceptorId — puede ser rechazada.",
+                cbte_tipo,
             )
 
         alic_iva_id, base_imp, importe_iva = self._build_iva_block(items, imp_neto, imp_iva)

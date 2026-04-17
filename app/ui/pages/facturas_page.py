@@ -561,18 +561,16 @@ class FacturasPage(QWidget):
 
     @with_loading("Sincronizando con ARCA...")
     def on_sync_arca_clicked(self):
-        print(">>> [FacturasPage] on_sync_arca_clicked: inicio sincronización con ARCA")
         try:
             resumen = self.service.sincronizar_borradores_con_arca()
         except Exception as e:
-            print(">>> [FacturasPage] ERROR en sincronizar_borradores_con_arca:", repr(e))
+            from loguru import logger
+            logger.exception("Error en sincronizar_borradores_con_arca")
             popUp.toast(
                 self,
-                f"Ocurrió un error al sincronizar con ARCA:\n{e}",
+                "Ocurrió un error al sincronizar con ARCA. Por favor reintentá.",
             )
             return
-
-        print(">>> [FacturasPage] Resumen sincronización:", resumen)
 
         procesadas = resumen.get("procesadas", 0)
         aprobadas = resumen.get("aprobadas", 0)
