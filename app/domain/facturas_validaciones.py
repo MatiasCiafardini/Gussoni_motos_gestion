@@ -38,7 +38,6 @@ def validar_factura(
 
     if not cabecera.get("condicion_iva_receptor_id"):
         errores.append("Seleccioná la condición frente al IVA del receptor.")
-    print(es_nota_credito)
     # ---------- Nota de Crédito ----------
     if es_nota_credito:
         if comprobante_nc_id in (None, "", 0, "0"):

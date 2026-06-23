@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.data.database import SessionLocal
+from app.core.domain_constants import EstadoStock, TipoMovimientoStock
 from app.repositories.remitos_repository import RemitosRepository
+from app.services.stock_service import StockService
 
 
 class RemitosService:
@@ -17,7 +19,7 @@ class RemitosService:
     ESTADO_ANULADO = "Anulado"
 
     def __init__(self) -> None:
-        pass
+        self._stock = StockService()
 
     # ---------------- Infra ----------------
 
@@ -104,15 +106,16 @@ class RemitosService:
             # ---------------- Insert detalle ----------------
             repo.insert_detalle(remito_id, items)
 
-            # ---------------- Actualizar stock ----------------
-            db.execute(
-                text("""
-                    UPDATE vehiculos
-                    SET estado_stock_id = 3  -- Vendido
-                    WHERE id IN :ids
-                """),
-                {"ids": tuple(vehiculo_ids)},
-            )
+            for row in rows:
+                self._stock.cambiar_estado(
+                    db,
+                    vehiculo_id=int(row["id"]),
+                    estado_nuevo_id=EstadoStock.VENDIDO,
+                    tipo_movimiento=TipoMovimientoStock.REMITO,
+                    origen_tipo="remitos",
+                    origen_id=remito_id,
+                    observaciones="Remito emitido.",
+                )
 
             db.commit()
             return remito_id
@@ -176,14 +179,25 @@ class RemitosService:
 
             # devolver stock
             if vehiculo_ids:
-                db.execute(
+                rows = db.execute(
                     text("""
-                        UPDATE vehiculos
-                        SET estado_stock_id = 1
+                        SELECT id, estado_stock_id
+                        FROM vehiculos
                         WHERE id IN :ids
                     """),
                     {"ids": tuple(vehiculo_ids)},
-                )
+                ).mappings().all()
+
+                for row in rows:
+                    self._stock.cambiar_estado(
+                        db,
+                        vehiculo_id=int(row["id"]),
+                        estado_nuevo_id=EstadoStock.DISPONIBLE,
+                        tipo_movimiento=TipoMovimientoStock.ANULACION,
+                        origen_tipo="remitos",
+                        origen_id=remito_id,
+                        observaciones="Remito anulado.",
+                    )
 
             # marcar remito anulado
             db.execute(

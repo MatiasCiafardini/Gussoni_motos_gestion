@@ -65,7 +65,6 @@ class VehiculosRepository:
             sql = text("""
                 SELECT id, razon_social AS nombre
                 FROM proveedores
-                WHERE activo = 1
                 ORDER BY razon_social ASC
             """)
             rows = self.db.execute(sql).mappings().all()
@@ -117,10 +116,12 @@ class VehiculosRepository:
             data["numero_motor"] = str(data["numero_motor"]).strip().upper()
         if "nro_dnrpa" in data and data["nro_dnrpa"]:
             data["nro_dnrpa"] = str(data["nro_dnrpa"]).strip().upper()
+        if "lca" in data and data["lca"]:
+            data["lca"] = str(data["lca"]).strip().upper()
 
         allowed = [
             "marca", "modelo", "anio",
-            "nro_certificado", "nro_dnrpa",
+            "nro_certificado", "nro_dnrpa", "lca",
             "numero_cuadro", "numero_motor",
             "precio_lista",
             "color_id", "estado_stock_id", "estado_moto_id",
@@ -179,6 +180,7 @@ class VehiculosRepository:
         # --- NUEVOS ---
         nro_certificado: Optional[str] = None,
         nro_dnrpa: Optional[str] = None,
+        lca: Optional[str] = None,
         observaciones: Optional[str] = None,
         q: Optional[str] = None,                    # <-- NUEVO para combos/autocomplete
     ) -> Tuple[List[Dict[str, Any]], int]:
@@ -208,6 +210,7 @@ class VehiculosRepository:
             page_size = filtros.get("page_size", page_size)
             nro_certificado = filtros.get("nro_certificado")
             nro_dnrpa = filtros.get("nro_dnrpa")
+            lca = filtros.get("lca")
             observaciones = filtros.get("observaciones")
             q = filtros.get("q", q)   # <-- NUEVO
             marca = filtros.get("marca")
@@ -228,6 +231,7 @@ class VehiculosRepository:
                     "OR LOWER(COALESCE(v.numero_cuadro, '')) LIKE :q "
                     "OR LOWER(COALESCE(v.nro_certificado, '')) LIKE :q "
                     "OR LOWER(COALESCE(v.nro_dnrpa, '')) LIKE :q "
+                    "OR LOWER(COALESCE(v.lca, '')) LIKE :q "
                     "OR LOWER(COALESCE(v.observaciones, '')) LIKE :q "
                     ")"
                 )
@@ -257,6 +261,9 @@ class VehiculosRepository:
         if nro_dnrpa:
             where.append("v.nro_dnrpa LIKE :nro_dnrpa")
             params["nro_dnrpa"] = f"%{nro_dnrpa}%"
+        if lca:
+            where.append("v.lca LIKE :lca")
+            params["lca"] = f"%{lca}%"
         if observaciones:
             # evitar NULL: COALESCE
             where.append("COALESCE(v.observaciones, '') LIKE :observaciones")
@@ -297,7 +304,7 @@ class VehiculosRepository:
                 f"""
                 SELECT
                     v.id, v.marca, v.modelo, v.anio,
-                    v.nro_certificado, v.nro_dnrpa,
+                    v.nro_certificado, v.nro_dnrpa, v.lca,
                     v.numero_cuadro, v.numero_motor,
                     v.precio_lista,
                     v.observaciones,
@@ -349,7 +356,7 @@ class VehiculosRepository:
         Si proveedor_id está vacío o None, lo setea explícitamente a NULL.
         """
         editable = [
-            "marca", "modelo", "anio", "nro_certificado", "nro_dnrpa",
+            "marca", "modelo", "anio", "nro_certificado", "nro_dnrpa", "lca",
             "numero_cuadro", "numero_motor", "precio_lista",
             "color_id", "estado_stock_id", "estado_moto_id",
             "proveedor_id", "observaciones", "cliente_id"

@@ -555,6 +555,20 @@ class FacturasRepository:
         ).mappings().first()
 
         return dict(row) if row else None
+
+    def list_estados_facturas(self) -> List[Dict[str, Any]]:
+        rows = self.db.execute(
+            text(
+                """
+                SELECT id, nombre, descripcion
+                FROM estados
+                WHERE tipo = 'facturas'
+                ORDER BY id
+                """
+            )
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
     def get_codigo_tipo_comprobante(
         self,
         tipo_id: int

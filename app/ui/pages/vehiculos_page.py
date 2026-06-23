@@ -28,18 +28,19 @@ class VehiculosPage(QWidget):
     COL_ANIO = 3
     COL_CERT = 4
     COL_DNRPA = 5
-    COL_CUADRO = 6
-    COL_MOTOR = 7
-    COL_COLOR = 8
-    COL_ESTADO = 9
-    COL_CONDICION = 10
-    COL_PROVEEDOR = 11
-    COL_PRECIO = 12
-    COL_OBS = 13
-    COL_ACCION = 14
+    COL_LCA = 6
+    COL_CUADRO = 7
+    COL_MOTOR = 8
+    COL_COLOR = 9
+    COL_ESTADO = 10
+    COL_CONDICION = 11
+    COL_PROVEEDOR = 12
+    COL_PRECIO = 13
+    COL_OBS = 14
+    COL_ACCION = 15
 
-    SETTINGS_HEADER_STATE = "VehiculosPage/header_state_v1"
-    SETTINGS_HIDDEN_COLS = "VehiculosPage/hidden_columns_v1"
+    SETTINGS_HEADER_STATE = "VehiculosPage/header_state_v2"
+    SETTINGS_HIDDEN_COLS = "VehiculosPage/hidden_columns_v2"
     SETTINGS_PAGE_SIZE = "VehiculosPage/page_size_v1"
 
     def __init__(self, parent=None, main_window: Optional[QMainWindow] = None):
@@ -63,6 +64,7 @@ class VehiculosPage(QWidget):
 
         self.in_nro_certificado = QLineEdit(); self.in_nro_certificado.setPlaceholderText("N° certificado")
         self.in_nro_dnrpa = QLineEdit(); self.in_nro_dnrpa.setPlaceholderText("N° DNRPA")
+        self.in_lca = QLineEdit(); self.in_lca.setPlaceholderText("LCA")
         self.in_observaciones = QLineEdit(); self.in_observaciones.setPlaceholderText("Buscar en observaciones")
 
         # Combos dinámicos
@@ -91,23 +93,24 @@ class VehiculosPage(QWidget):
         grid.addWidget(QLabel("Color"), 1, 4); grid.addWidget(self.in_color, 1, 5)
         grid.addWidget(QLabel("N° Certificado"), 2, 0); grid.addWidget(self.in_nro_certificado, 2, 1)
         grid.addWidget(QLabel("N° DNRPA"), 2, 2); grid.addWidget(self.in_nro_dnrpa, 2, 3)
-        grid.addWidget(QLabel("Observaciones"), 2, 4); grid.addWidget(self.in_observaciones, 2, 5)
-        grid.addWidget(QLabel("Estado stock"), 3, 0); grid.addWidget(self.in_estado, 3, 1)
-        grid.addWidget(QLabel("Condición"), 3, 2); grid.addWidget(self.in_condicion, 3, 3)
+        grid.addWidget(QLabel("LCA"), 2, 4); grid.addWidget(self.in_lca, 2, 5)
+        grid.addWidget(QLabel("Observaciones"), 3, 0); grid.addWidget(self.in_observaciones, 3, 1)
+        grid.addWidget(QLabel("Estado stock"), 3, 2); grid.addWidget(self.in_estado, 3, 3)
+        grid.addWidget(QLabel("Condición"), 3, 4); grid.addWidget(self.in_condicion, 3, 5)
 
         btns_wrap = QWidget()
         h = QHBoxLayout(btns_wrap); h.setContentsMargins(0, 0, 0, 0); h.setSpacing(8)
         for b in (self.btn_buscar, self.btn_limpiar, self.btn_columnas, self.btn_agregar):
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             h.addWidget(b)
-        grid.addWidget(btns_wrap, 3, 4, 1, 2)
+        grid.addWidget(btns_wrap, 4, 4, 1, 2)
 
         # ---- Tabla ----
-        self.table = QTableWidget(0, 15, self)
+        self.table = QTableWidget(0, 16, self)
         self.table.setObjectName("DataTable")
         self.table.setHorizontalHeaderLabels([
             "ID", "Marca", "Modelo", "Año",
-            "N° Certificado", "N° DNRPA", "N° Cuadro", "N° Motor",
+            "N° Certificado", "N° DNRPA", "LCA", "N° Cuadro", "N° Motor",
             "Color", "Estado", "Condición", "Proveedor", "Precio lista",
             "Observaciones", "Acción"
         ])
@@ -203,7 +206,7 @@ class VehiculosPage(QWidget):
         self._column_menu.clear()
         togglables = [
             (self.COL_MARCA, "Marca"), (self.COL_MODELO, "Modelo"), (self.COL_ANIO, "Año"),
-            (self.COL_CERT, "N° Certificado"), (self.COL_DNRPA, "N° DNRPA"),
+            (self.COL_CERT, "N° Certificado"), (self.COL_DNRPA, "N° DNRPA"), (self.COL_LCA, "LCA"),
             (self.COL_CUADRO, "N° Cuadro"), (self.COL_MOTOR, "N° Motor"), (self.COL_COLOR, "Color"),
             (self.COL_ESTADO, "Estado"), (self.COL_CONDICION, "Condición"), (self.COL_PROVEEDOR, "Proveedor"),
             (self.COL_PRECIO, "Precio lista"), (self.COL_OBS, "Observaciones"),
@@ -254,6 +257,7 @@ class VehiculosPage(QWidget):
             "nro_motor": self.in_nro_motor.text().strip() or None,
             "nro_certificado": self.in_nro_certificado.text().strip() or None,
             "nro_dnrpa": self.in_nro_dnrpa.text().strip() or None,
+            "lca": self.in_lca.text().strip() or None,
             "observaciones": self.in_observaciones.text().strip() or None,
             "color_id": self.in_color.currentData(),
             "estado_stock_id": self.in_estado.currentData(),
@@ -292,6 +296,7 @@ class VehiculosPage(QWidget):
                 )
                 cert = r.get("nro_certificado", "") or r.get("numero_certificado", "")
                 dnrpa = r.get("nro_dnrpa", "") or r.get("numero_dnrpa", "")
+                lca = r.get("lca", "") or ""
                 cuadro = r.get("numero_cuadro", "") or r.get("nro_cuadro", "")
                 motor = r.get("numero_motor", "") or r.get("nro_motor", "")
                 values = {
@@ -299,6 +304,7 @@ class VehiculosPage(QWidget):
                     self.COL_ANIO: str(r.get("anio", "") or ""),
                     self.COL_CERT: tail_ellipsis(cert, 8),
                     self.COL_DNRPA: tail_ellipsis(dnrpa, 8),
+                    self.COL_LCA: tail_ellipsis(lca, 12),
                     self.COL_CUADRO: tail_ellipsis(cuadro, 8),
                     self.COL_MOTOR: tail_ellipsis(motor, 8),
                     self.COL_COLOR: r.get("color", "") or r.get("color_nombre", ""),
@@ -316,6 +322,8 @@ class VehiculosPage(QWidget):
                         item.setToolTip(cert)
                     elif col == self.COL_DNRPA:
                         item.setToolTip(dnrpa)
+                    elif col == self.COL_LCA:
+                        item.setToolTip(lca)
                     elif col == self.COL_CUADRO:
                         item.setToolTip(cuadro)
                     elif col == self.COL_MOTOR:
@@ -347,7 +355,7 @@ class VehiculosPage(QWidget):
     def on_clear_filters_clicked(self):
         for le in (self.in_marca, self.in_modelo, self.in_anio,
                    self.in_nro_cuadro, self.in_nro_motor,
-                   self.in_nro_certificado, self.in_nro_dnrpa, self.in_observaciones): le.clear()
+                   self.in_nro_certificado, self.in_nro_dnrpa, self.in_lca, self.in_observaciones): le.clear()
         self.in_color.setCurrentIndex(0); self.in_estado.setCurrentIndex(0); self.in_condicion.setCurrentIndex(0)
         self.reload(reset_page=True)
 

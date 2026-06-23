@@ -4,6 +4,7 @@ from sqlalchemy import text
 from datetime import date
 
 from app.data.database import SessionLocal
+from app.core.domain_constants import EstadoVenta
 
 
 class DashboardService:
@@ -129,12 +130,16 @@ class DashboardService:
                         DATE_FORMAT(fecha, '%Y-%m') AS mes,
                         COUNT(*) AS unidades
                     FROM ventas
-                    WHERE estado_id IN (31, 32)
+                    WHERE estado_id IN (:estado_activa, :estado_cerrada)
                     GROUP BY YEAR(fecha), MONTH(fecha)
                     ORDER BY YEAR(fecha), MONTH(fecha)
                     LIMIT :lim;
                 """),
-                {"lim": limit}
+                {
+                    "estado_activa": EstadoVenta.ACTIVA,
+                    "estado_cerrada": EstadoVenta.CERRADA,
+                    "lim": limit,
+                }
             ).mappings().all()
 
             return list(reversed([dict(r) for r in rows]))
@@ -158,4 +163,3 @@ class DashboardService:
             db.close()
 
  
-

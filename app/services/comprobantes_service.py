@@ -27,6 +27,8 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
 
 from app.services.facturas_service import FacturasService
+from app.data.database import SessionLocal
+from sqlalchemy import text
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,7 @@ class ComprobantesService:
         if not fac:
             raise ValueError(f"No se encontró la factura ID {factura_id}.")
         items = self._svc.get_detalle(int(factura_id)) or []
+        items = self._enrich_items_with_vehicle_data(items)
 
         out_dir = Path.home() / "Downloads"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -102,6 +105,51 @@ class ComprobantesService:
                 c.showPage()
         c.save()
         return str(pdf_path)
+
+    def _enrich_items_with_vehicle_data(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        vehiculo_ids = sorted({
+            int(it.get("vehiculo_id"))
+            for it in items
+            if it.get("vehiculo_id")
+        })
+        if not vehiculo_ids:
+            return items
+
+        with SessionLocal() as db:
+            rows = db.execute(
+                text(
+                    """
+                    SELECT
+                        id,
+                        marca,
+                        modelo,
+                        anio,
+                        numero_cuadro,
+                        numero_motor,
+                        nro_certificado,
+                        nro_dnrpa,
+                        lca
+                    FROM vehiculos
+                    WHERE id IN :ids
+                    """
+                ),
+                {"ids": tuple(vehiculo_ids)},
+            ).mappings().all()
+
+        by_id = {int(row["id"]): dict(row) for row in rows}
+        enriched: List[Dict[str, Any]] = []
+        for item in items:
+            merged = dict(item)
+            vehicle = by_id.get(int(item.get("vehiculo_id") or 0))
+            if vehicle:
+                for key, value in vehicle.items():
+                    if key == "id":
+                        continue
+                    if value not in (None, ""):
+                        merged.setdefault(key, value)
+            enriched.append(merged)
+        return enriched
+
     def generar_pdf_remito(self, remito_id: int) -> str:
         rem = self._remitos_svc.get(int(remito_id))
         if not rem:
@@ -604,6 +652,8 @@ class ComprobantesService:
             if "cuadro" in low or "chasis" in low:
                 chasis = p.split(":", 1)[-1].strip()
 
+        lca = str(it.get("lca") or "").strip()
+
         lines = []
 
         if marca:
@@ -618,6 +668,8 @@ class ComprobantesService:
             lines.append(f"NÚMERO CHASIS: {chasis}")
         if marca:
             lines.append(f"MARCA MOTOR: {marca.upper()}")
+        if lca:
+            lines.append(f"EXPEDIENTE / IF: {lca}")
         if motor:
             lines.append(f"NÚMERO MOTOR: {motor}")
 

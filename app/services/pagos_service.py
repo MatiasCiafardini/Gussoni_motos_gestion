@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy import text
 from app.data.database import SessionLocal
+from app.core.domain_constants import EstadoFactura, EstadoVenta
 
 
 class PagosService:
@@ -14,11 +15,11 @@ class PagosService:
     Usa SQL directo (sin ORM), consistente con el resto del proyecto.
     """
 
-    ESTADO_VENTA_ACTIVA = 31
-    ESTADO_VENTA_CERRADA = 32
+    ESTADO_VENTA_ACTIVA = EstadoVenta.ACTIVA
+    ESTADO_VENTA_CERRADA = EstadoVenta.CERRADA
 
     ESTADO_FACTURA_PENDIENTE = 21
-    ESTADO_FACTURA_PAGADA = 22
+    ESTADO_FACTURA_PAGADA = EstadoFactura.PAGADA
 
     # -------------------------------------------------
     # SIMULACIÓN (NO escribe en DB)

@@ -7,6 +7,8 @@ from sqlalchemy import text
 from app.data.database import SessionLocal
 from app.repositories.vehiculos_repository import VehiculosRepository
 from app.services.catalogos_service import CatalogosService
+from app.services.stock_service import StockService
+from app.core.domain_constants import TipoMovimientoStock
 
 
 class VehiculosService:
@@ -15,6 +17,7 @@ class VehiculosService:
     def __init__(self) -> None:
         # Servicio de catálogos con caché global (colores, estados, condiciones, proveedores)
         self._catalogos = CatalogosService()
+        self._stock = StockService()
 
     # -------------------- Infra --------------------
     def _repo(self, db: Optional[Session] = None) -> VehiculosRepository:
@@ -75,7 +78,33 @@ class VehiculosService:
     def update(self, vehiculo_id: int, data: Dict[str, Any]) -> int:
         db = SessionLocal()
         try:
-            rc = self._repo(db).update(vehiculo_id, data)
+            repo = self._repo(db)
+            estado_anterior = None
+            estado_nuevo = data.get("estado_stock_id")
+
+            if "estado_stock_id" in data:
+                actual = repo.get_by_id(vehiculo_id)
+                if actual:
+                    estado_anterior = actual.get("estado_stock_id")
+
+            rc = repo.update(vehiculo_id, data)
+
+            if (
+                "estado_stock_id" in data
+                and estado_nuevo is not None
+                and estado_anterior != estado_nuevo
+            ):
+                self._stock.registrar_movimiento(
+                    db,
+                    vehiculo_id=vehiculo_id,
+                    tipo_movimiento=TipoMovimientoStock.CAMBIO_ESTADO,
+                    estado_anterior_id=estado_anterior,
+                    estado_nuevo_id=estado_nuevo,
+                    origen_tipo="vehiculos",
+                    origen_id=vehiculo_id,
+                    observaciones="Cambio manual de estado de stock.",
+                )
+
             db.commit()
             return rc
         except Exception:
@@ -143,6 +172,19 @@ class VehiculosService:
 
             if not new_id:
                 raise RuntimeError("No se pudo determinar el ID del nuevo vehículo insertado.")
+
+            estado_stock_id = payload.get("estado_stock_id")
+            if estado_stock_id is not None:
+                self._stock.registrar_movimiento(
+                    db,
+                    vehiculo_id=int(new_id),
+                    tipo_movimiento=TipoMovimientoStock.INGRESO,
+                    estado_anterior_id=None,
+                    estado_nuevo_id=estado_stock_id,
+                    origen_tipo="vehiculos",
+                    origen_id=int(new_id),
+                    observaciones="Alta de vehiculo.",
+                )
 
             db.commit()
             return int(new_id)

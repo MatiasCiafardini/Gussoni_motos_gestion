@@ -90,6 +90,7 @@ class VehiculosAgregarPage(QWidget):
         self.in_anio = QLineEdit();    self.in_anio.setValidator(QIntValidator(1900, 2100, self)); self.in_anio.setPlaceholderText("Ej: 2024")
         self.in_nro_certificado = QLineEdit(); self.in_nro_certificado.setPlaceholderText("Certificado (opcional)")
         self.in_nro_dnrpa = QLineEdit();       self.in_nro_dnrpa.setPlaceholderText("DNRPA (opcional)")
+        self.in_lca = QLineEdit();             self.in_lca.setPlaceholderText("Ej: 216; IF-2024-...")
         self.in_numero_cuadro = QLineEdit();   self.in_numero_cuadro.setPlaceholderText("N° de cuadro")
         self.in_numero_motor = QLineEdit();    self.in_numero_motor.setPlaceholderText("N° de motor")
         
@@ -137,6 +138,11 @@ class VehiculosAgregarPage(QWidget):
                 normalize_title(self.in_nro_dnrpa.text())
             )
         )
+        self.in_lca.editingFinished.connect(
+            lambda: self.in_lca.setText(
+                self.in_lca.text().strip().upper()
+            )
+        )
 
 
         # === Filas (3 columnas) ===
@@ -152,11 +158,12 @@ class VehiculosAgregarPage(QWidget):
         form.addWidget(QLabel("N° Motor *"), 2, 2);  form.addWidget(self.in_numero_motor, 2, 3)
         form.addWidget(QLabel("Proveedor"), 2, 4);   form.addWidget(self.in_proveedor, 2, 5)
 
-        form.addWidget(QLabel("Color *"), 3, 0);          form.addWidget(self.in_color, 3, 1)
-        form.addWidget(QLabel("Estado stock *"), 3, 2);   form.addWidget(self.in_estado_stock, 3, 3)
-        form.addWidget(QLabel("Condición *"), 3, 4);      form.addWidget(self.in_estado_moto, 3, 5)
+        form.addWidget(QLabel("LCA"), 3, 0);              form.addWidget(self.in_lca, 3, 1)
+        form.addWidget(QLabel("Color *"), 3, 2);          form.addWidget(self.in_color, 3, 3)
+        form.addWidget(QLabel("Estado stock *"), 3, 4);   form.addWidget(self.in_estado_stock, 3, 5)
 
-        form.addWidget(QLabel("Observaciones"), 4, 0); form.addWidget(self.in_observaciones, 4, 1, 1, 5)
+        form.addWidget(QLabel("Condición *"), 4, 0);      form.addWidget(self.in_estado_moto, 4, 1)
+        form.addWidget(QLabel("Observaciones"), 5, 0); form.addWidget(self.in_observaciones, 5, 1, 1, 5)
 
         form_wrap.addLayout(form)
         content_l.addWidget(form_panel)
@@ -199,7 +206,7 @@ class VehiculosAgregarPage(QWidget):
         for w in (
             self.in_marca, self.in_modelo, self.in_anio,
             self.in_numero_cuadro, self.in_numero_motor,
-            self.in_nro_certificado, self.in_nro_dnrpa
+            self.in_nro_certificado, self.in_nro_dnrpa, self.in_lca
         ):
             w.textChanged.connect(self._mark_dirty)
 
@@ -321,7 +328,8 @@ class VehiculosAgregarPage(QWidget):
             self.in_marca.text().strip(), self.in_modelo.text().strip(), self.in_anio.text().strip(),
             self.in_numero_cuadro.text().strip(), self.in_numero_motor.text().strip(),
             self.in_precio_lista.value() > 0, self.in_nro_certificado.text().strip(),
-            self.in_nro_dnrpa.text().strip(), self.in_observaciones.toPlainText().strip()
+            self.in_nro_dnrpa.text().strip(), self.in_lca.text().strip(),
+            self.in_observaciones.toPlainText().strip()
         ]
         if any(campos_texto):
             return True
@@ -343,6 +351,7 @@ class VehiculosAgregarPage(QWidget):
             "proveedor_id": self.in_proveedor.currentData(),
             "nro_certificado": self.in_nro_certificado.text().strip() or None,
             "nro_dnrpa": self.in_nro_dnrpa.text().strip() or None,
+            "lca": self.in_lca.text().strip() or None,
             "precio_lista": self.in_precio_lista.value(),
             "observaciones": self.in_observaciones.toPlainText().strip() or None,
         }
@@ -362,4 +371,5 @@ class VehiculosAgregarPage(QWidget):
         self.in_precio_lista.setValue(0)
         self.in_nro_certificado.clear()
         self.in_nro_dnrpa.clear()
+        self.in_lca.clear()
         self.in_observaciones.clear()

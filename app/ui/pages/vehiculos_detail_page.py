@@ -41,6 +41,7 @@ class VehiculoDetailPage(QWidget):
         # Línea 1
         self.in_nro_cert = QLineEdit();         self.in_nro_cert.setPlaceholderText("N° Certificado")
         self.in_nro_dnrpa = QLineEdit();        self.in_nro_dnrpa.setPlaceholderText("N° DNRPA")
+        self.in_lca = QLineEdit();              self.in_lca.setPlaceholderText("LCA")
 
         self.in_precio = MoneySpinBox()
         self.in_precio.setMinimumHeight(36)
@@ -93,6 +94,11 @@ class VehiculoDetailPage(QWidget):
                 normalize_title(self.in_nro_dnrpa.text())
             )
         )
+        self.in_lca.editingFinished.connect(
+            lambda: self.in_lca.setText(
+                self.in_lca.text().strip().upper()
+            )
+        )
 
 
         # ---------- Botonera del pie (centrada) ----------
@@ -106,7 +112,7 @@ class VehiculoDetailPage(QWidget):
         # ---------- Layout filtros (grid 1-3) ----------
         for w in (
             self.in_marca, self.in_modelo, self.in_anio, self.in_nro_cert, self.in_nro_dnrpa,
-            self.in_precio, self.in_cuadro, self.in_motor, self.in_proveedor
+            self.in_lca, self.in_precio, self.in_cuadro, self.in_motor, self.in_proveedor
         ):
             w.setMinimumHeight(36)
 
@@ -132,9 +138,12 @@ class VehiculoDetailPage(QWidget):
         grid.addWidget(QLabel("Proveedor"), row, 4);     grid.addWidget(self.in_proveedor, row, 5)
 
         row += 1
-        grid.addWidget(QLabel("Color"), row, 0);         grid.addWidget(self.in_color, row, 1)
-        grid.addWidget(QLabel("Estado stock"), row, 2);  grid.addWidget(self.in_estado_stock, row, 3)
-        grid.addWidget(QLabel("Condición"), row, 4);     grid.addWidget(self.in_condicion, row, 5)
+        grid.addWidget(QLabel("LCA"), row, 0);           grid.addWidget(self.in_lca, row, 1)
+        grid.addWidget(QLabel("Color"), row, 2);         grid.addWidget(self.in_color, row, 3)
+        grid.addWidget(QLabel("Estado stock"), row, 4);  grid.addWidget(self.in_estado_stock, row, 5)
+
+        row += 1
+        grid.addWidget(QLabel("Condición"), row, 0);     grid.addWidget(self.in_condicion, row, 1)
 
         row += 1
         grid.addWidget(QLabel("Observaciones"), row, 0, Qt.AlignTop)
@@ -192,7 +201,7 @@ class VehiculoDetailPage(QWidget):
     def _set_editable(self, enabled: bool):
         for w in (
             self.in_marca, self.in_modelo, self.in_anio, self.in_nro_cert, self.in_nro_dnrpa,
-            self.in_precio, self.in_cuadro, self.in_motor, self.in_proveedor,
+            self.in_lca, self.in_precio, self.in_cuadro, self.in_motor, self.in_proveedor,
             self.in_color, self.in_estado_stock, self.in_condicion, self.in_observ
         ):
             w.setEnabled(enabled)
@@ -271,6 +280,7 @@ class VehiculoDetailPage(QWidget):
 
         self.in_nro_cert.setText(str(d.get("nro_certificado", "") or ""))
         self.in_nro_dnrpa.setText(str(d.get("nro_dnrpa", "") or ""))
+        self.in_lca.setText(str(d.get("lca", "") or ""))
 
         self.in_precio.setValue(float(d.get("precio_lista") or 0))
 
@@ -317,6 +327,7 @@ class VehiculoDetailPage(QWidget):
             "anio": int(anio) if anio.isdigit() else None,
             "nro_certificado": self.in_nro_cert.text().strip() or None,
             "nro_dnrpa": self.in_nro_dnrpa.text().strip() or None,
+            "lca": self.in_lca.text().strip() or None,
             "numero_cuadro": self.in_cuadro.text().strip() or None,
             "numero_motor": self.in_motor.text().strip() or None,
             "precio_lista": precio if precio > 0 else None,

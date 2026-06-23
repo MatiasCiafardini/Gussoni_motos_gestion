@@ -15,6 +15,17 @@ class AuthService:
     def _repo(self, db: Optional[Session] = None) -> UsuariosRepository:
         return UsuariosRepository(db or SessionLocal())
 
+    @staticmethod
+    def _is_active_user(user: Dict[str, Any]) -> bool:
+        raw = user.get("activo")
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, int):
+            return raw == 1
+        if isinstance(raw, str):
+            return raw.strip().lower() in {"1", "true", "activo", "active", "si"}
+        return False
+
     def authenticate(self, username: str, password: str) -> Optional[Dict[str, Any]]:
         username = (username or "").strip()
         if not username or not password:
@@ -29,6 +40,9 @@ class AuthService:
 
             stored = user.get("contrasenia_hash") or ""
             if not verify_password(password, stored):
+                return None
+
+            if not self._is_active_user(user):
                 return None
 
             user.pop("contrasenia_hash", None)

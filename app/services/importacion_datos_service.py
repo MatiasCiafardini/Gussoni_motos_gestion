@@ -12,6 +12,8 @@ from app.data.database import SessionLocal
 from app.repositories.clientes_repository import ClientesRepository
 from app.repositories.vehiculos_repository import VehiculosRepository
 from app.services.catalogos_service import CatalogosService
+from app.services.stock_service import StockService
+from app.core.domain_constants import TipoMovimientoStock
 
 
 # =====================================================
@@ -253,7 +255,8 @@ class ImportacionDatosService:
             ("modelo", True),
             ("anio", False),
             ("nro_certificado", True),
-            ("nro_dnrpa", True),
+            ("nro_dnrpa", False),
+            ("lca", False),
             ("numero_cuadro", False),
             ("numero_motor", True),
             ("precio_lista", False),
@@ -276,7 +279,7 @@ class ImportacionDatosService:
 
         ws.append([
             "Honda", "CG Titan 150", 2024,
-            "EJEMPLO-CERT", "EJEMPLO-DNRPA",
+            "EJEMPLO-CERT", "EJEMPLO-DNRPA", "216; IF-2024-117060280-APN-SSAM#JGM",
             "EJEMPLO-CUADRO", "EJEMPLO-MOTOR",
             0, "Negro", "Disponible", "Nueva", "", "Unidad 0 km",
         ])
@@ -290,10 +293,10 @@ class ImportacionDatosService:
             ws.add_data_validation(dv)
             dv.add(f"{col}2:{col}1000")
 
-        dv_list("I", colores, False)
-        dv_list("J", estados, False)
-        dv_list("K", condiciones, False)
-        dv_list("L", proveedores, True)
+        dv_list("J", colores, False)
+        dv_list("K", estados, False)
+        dv_list("L", condiciones, False)
+        dv_list("M", proveedores, True)
 
         bio = BytesIO()
         wb.save(bio)
@@ -303,6 +306,7 @@ class ImportacionDatosService:
         db: Session = SessionLocal()
         repo = VehiculosRepository(db)
         cat = CatalogosService()
+        stock = StockService()
 
         color_map = {c["nombre"].lower(): c["id"] for c in cat.get_colores()}
         estado_map = {e["nombre"].lower(): e["id"] for e in cat.get_estados_stock()}
@@ -333,12 +337,12 @@ class ImportacionDatosService:
                         raise ValueError("Precio inválido")
 
                     nro_motor = req("numero_motor")
-                    nro_dnrpa = req("nro_dnrpa")
+                    nro_dnrpa = str(row.get("nro_dnrpa")).strip() if row.get("nro_dnrpa") else None
                     nro_cuadro = row.get("numero_cuadro")
 
                     if repo.exists_by_numero_motor(nro_motor):
                         raise ValueError("Número de motor duplicado")
-                    if repo.exists_by_nro_dnrpa(nro_dnrpa):
+                    if nro_dnrpa and repo.exists_by_nro_dnrpa(nro_dnrpa):
                         raise ValueError("Número DNRPA duplicado")
                     if nro_cuadro and repo.exists_by_numero_cuadro(str(nro_cuadro)):
                         raise ValueError("Número de cuadro duplicado")
@@ -349,6 +353,7 @@ class ImportacionDatosService:
                         "anio": anio,
                         "nro_certificado": req("nro_certificado"),
                         "nro_dnrpa": nro_dnrpa,
+                        "lca": row.get("lca"),
                         "numero_cuadro": nro_cuadro,
                         "numero_motor": nro_motor,
                         "precio_lista": precio,
@@ -364,7 +369,17 @@ class ImportacionDatosService:
                             raise ValueError("Proveedor inválido")
                         payload["proveedor_id"] = prov_map[str(prov).lower()]
 
-                    repo.create_vehiculo(payload)
+                    new_id = repo.create_vehiculo(payload)
+                    stock.registrar_movimiento(
+                        db,
+                        vehiculo_id=int(new_id),
+                        tipo_movimiento=TipoMovimientoStock.INGRESO,
+                        estado_anterior_id=None,
+                        estado_nuevo_id=payload.get("estado_stock_id"),
+                        origen_tipo="importacion",
+                        origen_id=None,
+                        observaciones=f"Importacion de vehiculo desde fila {fila}.",
+                    )
                     insertados += 1
 
                 except Exception as e:

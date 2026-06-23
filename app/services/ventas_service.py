@@ -1,9 +1,13 @@
 from datetime import datetime
 from sqlalchemy import text
 from app.data.database import SessionLocal
+from app.core.domain_constants import EstadoVenta, FormaPago
+from app.services.financiacion_service import FinanciacionService
 
 
 class VentasService:
+    def __init__(self, financiacion_service: FinanciacionService | None = None):
+        self._financiacion = financiacion_service or FinanciacionService()
 
     # =========================
     # CREAR / COMPLETAR VENTA
@@ -33,13 +37,14 @@ class VentasService:
                 INSERT INTO ventas
                 (fecha, cliente_id, vehiculo_id, precio_total, estado_id)
                 VALUES
-                (:fecha, :cliente, :vehiculo, :precio, 30)
+                (:fecha, :cliente, :vehiculo, :precio, :estado)
             """),
             {
                 "fecha": fecha,
                 "cliente": cliente_id,
                 "vehiculo": vehiculo_id,
                 "precio": precio_total,
+                "estado": EstadoVenta.BORRADOR,
             }
         ).lastrowid
     
@@ -82,58 +87,26 @@ class VentasService:
                 SET precio_total = :precio,
                     forma_pago_id = :forma_pago,
                     anticipo = :anticipo,
-                    estado_id = 31
+                    estado_id = :estado
                 WHERE id = :venta_id
             """),
             {
                 "precio": precio_total,
                 "forma_pago": forma_pago_id,
                 "anticipo": anticipo,
+                "estado": EstadoVenta.ACTIVA,
                 "venta_id": venta_id,
             }
         )
 
-        if forma_pago_id == 3:
-            if not cantidad_cuotas or cantidad_cuotas <= 0:
-                raise ValueError("Cantidad de cuotas inválida")
-
-            if not importe_cuota or importe_cuota <= 0:
-                raise ValueError("Importe de cuota inválido")
-
-            monto_financiado = cantidad_cuotas * importe_cuota
-
-            plan_id = db.execute(
-                text("""
-                    INSERT INTO plan_financiacion
-                    (venta_id, cantidad_cuotas, importe_cuota, fecha_inicio, monto_financiado)
-                    VALUES
-                    (:venta_id, :cuotas, :importe_cuota, :fecha, :monto)
-                """),
-                {
-                    "venta_id": venta_id,
-                    "cuotas": cantidad_cuotas,
-                    "importe_cuota": importe_cuota,
-                    "fecha": fecha_inicio,
-                    "monto": monto_financiado,
-                }
-            ).lastrowid
-
-            for nro in range(1, cantidad_cuotas + 1):
-                db.execute(
-                    text("""
-                        INSERT INTO cuotas
-                        (plan_id, nro_cuota, fecha_vencimiento, monto)
-                        VALUES
-                        (:plan, :nro, DATE_ADD(:fecha, INTERVAL :mes MONTH), :importe)
-                    """),
-                    {
-                        "plan": plan_id,
-                        "nro": nro,
-                        "mes": nro,
-                        "fecha": fecha_inicio,
-                        "importe": importe_cuota,
-                    }
-                )
+        if forma_pago_id == FormaPago.FINANCIACION:
+            self._financiacion.crear_plan_con_cuotas(
+                db=db,
+                venta_id=venta_id,
+                cantidad_cuotas=cantidad_cuotas,
+                importe_cuota=importe_cuota,
+                fecha_inicio=fecha_inicio,
+            )
 
 
 
@@ -264,7 +237,7 @@ class VentasService:
             {"venta": venta_id}
         ).scalar()
 
-        nuevo_estado = 32 if pendientes == 0 else 31
+        nuevo_estado = EstadoVenta.CERRADA if pendientes == 0 else EstadoVenta.ACTIVA
 
         db.execute(
             text("""

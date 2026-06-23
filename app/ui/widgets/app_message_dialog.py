@@ -4,6 +4,7 @@ from typing import Optional
 from PySide6.QtCore import Qt, QPoint, QEvent
 from PySide6.QtGui import QMouseEvent, QColor
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -43,6 +44,7 @@ class AppMessageDialog(QDialog):
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
+        self._message_text = text
 
         self.setModal(True)
         self.setObjectName("NiceDialog")
@@ -89,6 +91,12 @@ class AppMessageDialog(QDialog):
 
         header.addWidget(icon_lbl)
         header.addWidget(title_lbl, 1)
+        if kind == "error":
+            copy_btn = QPushButton("Copiar error", panel)
+            copy_btn.setObjectName("BtnGhost")
+            copy_btn.setCursor(Qt.PointingHandCursor)
+            copy_btn.clicked.connect(lambda _=False, b=copy_btn: self._copy_message(b))
+            header.addWidget(copy_btn, 0, Qt.AlignTop)
         lay.addLayout(header)
 
         # ---- texto ----
@@ -135,8 +143,17 @@ class AppMessageDialog(QDialog):
             QLabel#DialogIcon {
                 font-size: 1.4em;
             }
+            QPushButton#BtnGhost {
+                min-height: 30px;
+                padding: 6px 10px;
+            }
             """
         )
+
+    def _copy_message(self, button: QPushButton) -> None:
+        QApplication.clipboard().setText(self._message_text)
+        button.setText("Copiado")
+        QTimer.singleShot(1400, lambda: button.setText("Copiar error"))
 
     # ---------------- Drag ----------------
     def eventFilter(self, obj, event):

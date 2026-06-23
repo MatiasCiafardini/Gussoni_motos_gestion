@@ -1,4 +1,5 @@
 ---- Archivos temporales de Python ----
+__pycache__/
 pycache/
 *.py[cod]
 *.class
