@@ -669,7 +669,7 @@ class ComprobantesService:
         if motor:
             lines.append(f"NÚMERO MOTOR: {motor}")
         if lca:
-            lines.append(f"EXPEDIENTE / IF: {lca}")
+            lines.append(f"LCA: {lca}")
 
         return "\n".join(lines)
 

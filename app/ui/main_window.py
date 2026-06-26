@@ -1,7 +1,18 @@
 from __future__ import annotations
 from typing import Optional, Callable
 import time
-from appgdetail_page import VehiculoDetailPage as _VehiculoDetailPage
+
+# =================== VEHICULOS ===================
+VehiculosPage = None
+try:
+    from app.ui.pages.vehiculos_page import VehiculosPage as _VehiculosPage
+    VehiculosPage = _VehiculosPage
+except Exception:
+    VehiculosPage = None
+
+VehiculoDetailPage = None
+try:
+    from app.ui.pages.vehiculos_detail_page import VehiculoDetailPage as _VehiculoDetailPage
     VehiculoDetailPage = _VehiculoDetailPage
 except Exception:
     VehiculoDetailPage = None
@@ -44,7 +55,7 @@ except Exception as e:
     print("ERROR importando ReportesPage:", e)
     ReportesPage = None
 
-# =================== FACTURACIÃ“N ===================
+# =================== FACTURACIÓN ===================
 FacturacionPage = None
 try:
     from app.ui.pages.facturas_page import FacturasPage as _FacturacionPage
@@ -59,7 +70,7 @@ try:
 except Exception:
     FacturasAgregarPage = None
 
-# NUEVO: pÃ¡gina de consulta de factura
+# NUEVO: página de consulta de factura
 FacturasConsultarPage = None
 try:
     from app.ui.pages.facturas_consultar import FacturasConsultarPage as _FacturasConsultarPage
@@ -68,7 +79,7 @@ except Exception as e:
     print("❌ ERROR importando FacturasConsultarPage:", e)
     raise
 
-# =================== DOCUMENTACIÃ“N ===================
+# =================== DOCUMENTACIÓN ===================
 DocumentacionPage = None
 try:
     from app.ui.pages.documentacion_page import DocumentacionPage as _DocumentacionPage
@@ -77,7 +88,7 @@ except Exception as e:
     print("ERROR importando DocumentacionPage:", e)
     DocumentacionPage = None
 
-# =================== CONFIGURACIÃ“N ===================
+# =================== CONFIGURACIÓN ===================
 ConfiguracionPage = None
 try:
     from app.ui.pages.configuracion_page import ConfiguracionPage as _ConfiguracionPage
@@ -126,7 +137,7 @@ try:
     UsuariosAgregarPage = _UsuariosAgregarPage
 except Exception:
     UsuariosAgregarPage = None
-# ==== Warmup de catÃ¡logos ====
+# ==== Warmup de catálogos ====
 from app.services.catalogos_service import CatalogosService
 from app.core.catalog_cache import CatalogCache
 from app.core.permissions import (
@@ -168,18 +179,18 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Gestión de Motos")
         self.resize(1100, 720)
-        # IMPORTANTE: fijamos un mÃ­nimo razonable para romper el min gigante de los hijos
+        # IMPORTANTE: fijamos un mínimo razonable para romper el min gigante de los hijos
         self.setMinimumSize(900, 600)
         self.setObjectName("MainWindow")
 
         self.current_user = current_user
         self._on_logout_callback = on_logout
         self.central = QWidget(self)
-        # Permitimos que el central no imponga un mÃ­nimo enorme
+        # Permitimos que el central no imponga un mínimo enorme
         self.central.setMinimumSize(0, 0)
         self.setCentralWidget(self.central)
         # 👇 ACÁ
-        self.loading = LoadingOverlay(self.central, text="Cargandoâ€¦")
+        self.loading = LoadingOverlay(self.central, text="Cargando…")
         self.loading.hide_overlay()
         root_v = QVBoxLayout(self.central)
         root_v.setContentsMargins(0, 0, 0, 0)
@@ -230,7 +241,7 @@ class MainWindow(QMainWindow):
 
         # =============== Stack + historial ===============
         self.stack = QStackedWidget(self)
-        # Que el stack tampoco arrastre mÃ­nimos enormes
+        # Que el stack tampoco arrastre mínimos enormes
         self.stack.setMinimumSize(0, 0)
 
         self._page_history: list[QWidget] = []
@@ -241,7 +252,7 @@ class MainWindow(QMainWindow):
         # Timestamp del warmup fallido
         self._catalog_warmup_fail_ts: Optional[float] = None
 
-        # =============== PÃ¡ginas principales ===============
+        # =============== Páginas principales ===============
         self.page_inicio = DashboardPage() if DashboardPage else PlaceholderPage("Inicio")
         self.page_clientes = self._make_clientes_page()
         self.page_vehiculos = self._make_vehiculos_page()
@@ -303,7 +314,7 @@ class MainWindow(QMainWindow):
 
 
     # ---------------------------------------------------------------------
-    # Warmup de catÃ¡logos
+    # Warmup de catálogos
     # ---------------------------------------------------------------------
     def _preload_catalogos_async(self):
         task = _WarmupTask()
@@ -331,7 +342,7 @@ class MainWindow(QMainWindow):
             self._catalog_warmup_fail_ts = None
         except Exception as e:
             self._catalog_warmup_fail_ts = time.monotonic()
-            print(f"[Warmup Lazy] FallÃ³: {e}")
+            print(f"[Warmup Lazy] Falló: {e}")
 
     def _route_requires_catalogs(self, route: str) -> bool:
         return route.startswith(("vehiculos", "remitos", "facturas"))
@@ -351,7 +362,7 @@ class MainWindow(QMainWindow):
             button.setVisible(allowed)
             button.setEnabled(allowed)
 
-    def show_loading(self, text: str = "Cargandoâ€¦"):
+    def show_loading(self, text: str = "Cargando…"):
         self.loading.lbl_text.setText(text)
         self.loading.show_overlay()
         QApplication.processEvents()
@@ -361,7 +372,7 @@ class MainWindow(QMainWindow):
         self.loading.hide_overlay()
 
     # ---------------------------------------------------------------------
-    # IntegraciÃ³n de pÃ¡ginas
+    # Integración de páginas
     # ---------------------------------------------------------------------
     def _make_vehiculos_page(self) -> QWidget:
         if not VehiculosPage:
@@ -459,7 +470,7 @@ class MainWindow(QMainWindow):
     def open_vehiculo_detail(self, vehiculo_id: int):
         self._ensure_catalogs_ready(force=True)
         if not VehiculoDetailPage:
-            self.notify("La pÃ¡gina de detalle de vehÃ­culo no estÃ¡ disponible.", "error")
+            self.notify("La página de detalle de vehículo no está disponible.", "error")
             return
         detail = VehiculoDetailPage(vehiculo_id)
         if hasattr(detail, "navigate_back"):
@@ -469,7 +480,7 @@ class MainWindow(QMainWindow):
     def open_cliente_detail(self, cliente_id: int):
         self._ensure_catalogs_ready()
         if not ClientesDetailPage:
-            self.notify("La pÃ¡gina de detalle de cliente no estÃ¡ disponible.", "error")
+            self.notify("La página de detalle de cliente no está disponible.", "error")
             return
 
         detail = ClientesDetailPage(cliente_id)
@@ -478,7 +489,7 @@ class MainWindow(QMainWindow):
         if hasattr(detail, "navigate_back"):
             detail.navigate_back.connect(lambda: self.navigate_back())
 
-        # ðŸ‘‰ abrir factura existente (lupa)
+        # abrir factura existente (lupa)
         if hasattr(detail, "navigate_to_factura"):
             detail.navigate_to_factura.connect(
                 lambda fid, cid=cliente_id: self.open_page(
@@ -489,7 +500,7 @@ class MainWindow(QMainWindow):
                 )
             )
 
-        # ðŸ”¥ NUEVO: abrir factura nueva con cliente precargado
+        # NUEVO: abrir factura nueva con cliente precargado
         if hasattr(detail, "navigate_to_factura_nueva"):
             detail.navigate_to_factura_nueva.connect(
                 lambda cid=cliente_id: self.open_page(
@@ -506,7 +517,7 @@ class MainWindow(QMainWindow):
     
     def open_usuario_detail(self, user_id: int):
         if not UsuariosDetailPage:
-            self.notify("La pÃ¡gina de detalle de usuario no estÃ¡ disponible.", "error")
+            self.notify("La página de detalle de usuario no está disponible.", "error")
             return
         detail = UsuariosDetailPage(user_id=user_id, parent=self, main_window=self)
         if hasattr(detail, "navigate_back"):
@@ -527,17 +538,17 @@ class MainWindow(QMainWindow):
                     popUp.info(
                         self,
                         "Actualizaciones",
-                        "La aplicaciÃ³n ya estÃ¡ actualizada.",
+                        "La aplicación ya está actualizada.",
                     )
                     return
             if interactive:
                 if not popUp.confirm(
                     self,
-                    "ActualizaciÃ³n disponible",
-                    f"Hay una nueva versiÃ³n disponible: {update['version']}\n\n"
+                    "Actualización disponible",
+                    f"Hay una nueva versión disponible: {update['version']}\n\n"
                     f"{update.get('changelog', '')}",
                     ok_text="Actualizar ahora",
-                    cancel_text="MÃ¡s tarde",
+                    cancel_text="Más tarde",
                     icon="⬆️",
                 ):
                     return
@@ -551,9 +562,9 @@ class MainWindow(QMainWindow):
 
             popUp.info(
                 self,
-                "ActualizaciÃ³n lista",
-                "La actualizaciÃ³n se descargÃ³ correctamente.\n"
-                "La aplicaciÃ³n se cerrarÃ¡ para instalarla.",
+                "Actualización lista",
+                "La actualización se descargó correctamente.\n"
+                "La aplicación se cerrará para instalarla.",
             )
 
             # -------- lanzar updater --------
@@ -561,7 +572,7 @@ class MainWindow(QMainWindow):
             updater_exe = current_exe.parent / "updater.exe"
 
             if not updater_exe.exists():
-                raise RuntimeError("No se encontrÃ³ updater.exe")
+                raise RuntimeError("No se encontró updater.exe")
 
             params = f'"{current_exe}" "{dest}" "{update["version"]}"'
 
@@ -590,11 +601,11 @@ class MainWindow(QMainWindow):
     # Router
     # ---------------------------------------------------------------------
     def open_page(self, name: str, *args, **kwargs):
-        self.show_loading("Cargandoâ€¦")
+        self.show_loading("Cargando…")
         if self._ensure_catalogs_ready and self._route_requires_catalogs(name):
             self._ensure_catalogs_ready()
 
-        # -------- VehÃ­culos --------
+        # -------- Vehículos --------
         if name == "vehiculos":
             self.show_fixed_page(self.page_vehiculos)
             return
@@ -614,7 +625,7 @@ class MainWindow(QMainWindow):
         if name == "remitos_agregar":
 
             if not RemitosAgregarPage:
-                self.notify("La pÃ¡gina de alta de remito no estÃ¡ disponible.", "error")
+                self.notify("La página de alta de remito no está disponible.", "error")
                 return
 
             page = RemitosAgregarPage(parent=self, main_window=self)
@@ -644,7 +655,7 @@ class MainWindow(QMainWindow):
                 return
 
             if not RemitosDetailPage:
-                self.notify("La pÃ¡gina de detalle de remito no estÃ¡ disponible.", "error")
+                self.notify("La página de detalle de remito no está disponible.", "error")
                 return
 
             page = RemitosDetailPage(
@@ -672,7 +683,7 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self._mount(page))
             return
         
-        # -------- DocumentaciÃ³n --------
+        # -------- Documentación --------
         if name == "documentacion":
             self.show_fixed_page(self.page_documentacion)
             return
@@ -699,9 +710,9 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
 
-                self.navigate_to(page)  # ðŸ‘ˆ CLAVE
+                self.navigate_to(page)  # 👈 CLAVE
             else:
-                self.notify("La pÃ¡gina de usuarios no estÃ¡ disponible.", "error")
+                self.notify("La página de usuarios no está disponible.", "error")
             return
 
 
@@ -723,11 +734,11 @@ class MainWindow(QMainWindow):
                     page.go_to_detalle.connect(lambda uid: self.open_page("usuarios_detalle", usuario_id=uid))
                 self.navigate_to(page)
             else:
-                self.notify("La pÃ¡gina de alta de usuario no estÃ¡ disponible.", "error")
+                self.notify("La página de alta de usuario no está disponible.", "error")
             return
         # -------- Reportes --------
         if name == "reportes":
-            # ðŸ”’ FIX: si ya estoy en Reportes, no mostrar loading
+            # 🔒 FIX: si ya estoy en Reportes, no mostrar loading
             if self.stack.currentWidget() is self.page_reportes:
                 self.loading.hide_overlay()
                 return
@@ -736,7 +747,7 @@ class MainWindow(QMainWindow):
             return
 
 
-        # -------- FacturaciÃ³n --------
+        # -------- Facturación --------
         if name == "facturacion":
             self.show_fixed_page(self.page_facturacion)
             return
@@ -754,7 +765,7 @@ class MainWindow(QMainWindow):
                     cliente_id=cliente_id
                 )
 
-                # ðŸ”¥ CONEXIÃ“N INTELIGENTE DE VOLVER
+                # 🔥 CONEXIÓN INTELIGENTE DE VOLVER
                 if hasattr(page, "go_back"):
                     page.go_back.connect(self.navigate_back)
 
@@ -770,7 +781,7 @@ class MainWindow(QMainWindow):
                 self.navigate_to(page)
 
             else:
-                self.notify("La pÃ¡gina de alta de factura no estÃ¡ disponible.", "error")
+                self.notify("La página de alta de factura no está disponible.", "error")
 
             return
 
@@ -778,7 +789,7 @@ class MainWindow(QMainWindow):
         # NUEVO: consulta de factura
         if name == "facturas_consultar":
 
-            # ðŸ”’ FIX: si ya estoy viendo una factura, no volver a abrirla
+            # 🔒 FIX: si ya estoy viendo una factura, no volver a abrirla
             current = self.stack.currentWidget()
             if isinstance(current, FacturasConsultarPage):
                 return
@@ -789,7 +800,7 @@ class MainWindow(QMainWindow):
                 return
 
             if not FacturasConsultarPage:
-                self.notify("La pÃ¡gina de consulta de factura no estÃ¡ disponible.", "error")
+                self.notify("La página de consulta de factura no está disponible.", "error")
                 return
             try:
                 return_to = kwargs.get("return_to")
@@ -828,7 +839,7 @@ class MainWindow(QMainWindow):
         self.notify(f"Ruta no reconocida: {name}", "error")
 
     # ---------------------------------------------------------------------
-    # NavegaciÃ³n
+    # Navegación
     # ---------------------------------------------------------------------
     def _on_open_page_requested(self, page_widget: QWidget):
         if page_widget is None:
@@ -842,7 +853,7 @@ class MainWindow(QMainWindow):
         if current is not None and current is widget:
             return
 
-        # ðŸ”’ FIX EXTRA: no duplicar por clase (caso facturas_consultar)
+        # FIX EXTRA: no duplicar por clase (caso facturas_consultar)
         if current is not None and type(current) is type(widget):
             return
 
@@ -862,7 +873,7 @@ class MainWindow(QMainWindow):
 
         self.stack.setCurrentWidget(prev)
 
-        # ðŸ”¥ SOLO recargar si volvemos desde FacturasConsultar a Facturacion
+        # SOLO recargar si volvemos desde FacturasConsultar a Facturacion
         if (
             isinstance(current, FacturasConsultarPage)
             and prev is self.page_facturacion
@@ -908,11 +919,11 @@ class MainWindow(QMainWindow):
 
             if popUp.confirm(
                 self,
-                title="ActualizaciÃ³n disponible",
-                text=f"Hay una nueva versiÃ³n disponible: {update['version']}",
+                title="Actualización disponible",
+                text=f"Hay una nueva versión disponible: {update['version']}",
                 informative_text=update.get("changelog"),
                 ok_text="Actualizar ahora",
-                cancel_text="MÃ¡s tarde",
+                cancel_text="Más tarde",
                 icon="⬆️",
             ):
                 self.check_updates_ui(interactive=False)
@@ -975,17 +986,17 @@ class MainWindow(QMainWindow):
         app_font = QApplication.font()
 
         for table in self.findChildren(QTableView):
-            # ðŸ‘‰ forzar font en la tabla
+            # 👉 forzar font en la tabla
             table.setFont(app_font)
 
             header_h = table.horizontalHeader()
             header_v = table.verticalHeader()
 
-            # ðŸ‘‰ forzar font en headers (CLAVE)
+            # 👉 forzar font en headers (CLAVE)
             header_h.setFont(app_font)
             header_v.setFont(app_font)
 
-            # ðŸ‘‰ resetear tamaÃ±os cacheados
+            # 👉 resetear tamaños cacheados
             header_h.setDefaultSectionSize(header_h.defaultSectionSize())
             header_v.setDefaultSectionSize(header_v.defaultSectionSize())
 

@@ -39,7 +39,7 @@ FIELD_LABELS = {
     "anio": "Año modelo",
     "nro_certificado": "N° certificado",
     "nro_dnrpa": "N° DNRPA",
-    "lca": "Expediente / IF",
+    "lca": "LCA",
     "numero_cuadro": "N° cuadro",
     "numero_motor": "N° motor",
     "precio_lista": "Precio lista",

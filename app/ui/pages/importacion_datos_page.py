@@ -474,7 +474,7 @@ class ImportacionCertificadosPreviewDialog(QDialog):
         self.table.setObjectName("DataTable")
         self.table.setHorizontalHeaderLabels([
             "Hoja", "Fila", "Estado", "Coincidencia", "Marca", "Modelo",
-            "Motor", "Cuadro", "DNRPA", "Certificado", "Expediente / IF",
+            "Motor", "Cuadro", "DNRPA", "Certificado", "LCA",
             "Accion", "Diferencias",
         ])
         self.table.verticalHeader().setVisible(False)

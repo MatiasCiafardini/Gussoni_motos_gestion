@@ -15,9 +15,9 @@ def test_descripcion_factura_muestra_lca_si_existe():
 
     assert "MARCA MOTOR: QA" in desc
     assert "NÚMERO MOTOR: M1" in desc
-    assert "EXPEDIENTE / IF: IF-2024-117060280-APN-SSAM#JGM" in desc
+    assert "LCA: IF-2024-117060280-APN-SSAM#JGM" in desc
     assert desc.splitlines().index("NÚMERO MOTOR: M1") < desc.splitlines().index(
-        "EXPEDIENTE / IF: IF-2024-117060280-APN-SSAM#JGM"
+        "LCA: IF-2024-117060280-APN-SSAM#JGM"
     )
 
 
@@ -31,7 +31,7 @@ def test_descripcion_factura_no_muestra_lca_si_esta_vacio():
         }
     )
 
-    assert "EXPEDIENTE / IF" not in desc
+    assert "LCA" not in desc
 
 
 def test_descripcion_factura_usa_numero_motor_enriquecido_si_no_viene_en_descripcion():

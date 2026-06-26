@@ -121,7 +121,7 @@ def generar_nota_no_rodamiento_pdf(cliente: dict, veh: dict) -> str:
     story.append(Paragraph(f"Motor N°: {veh.get('numero_motor','')}", styles["Normal"]))
     lca = str(veh.get("lca") or "").strip()
     if lca:
-        story.append(Paragraph(f"Expediente / IF: {lca}", styles["Normal"]))
+        story.append(Paragraph(f"LCA: {lca}", styles["Normal"]))
     story.append(Paragraph("Dominio: a designar", styles["Normal"]))
     story.append(Paragraph(f"Color: {veh.get('color','')}", styles["Normal"]))
     story.append(Paragraph(f"Año/Modelo: {veh.get('anio','')}", styles["Normal"]))

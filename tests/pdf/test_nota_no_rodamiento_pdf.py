@@ -35,7 +35,7 @@ def test_nota_no_rodamiento_muestra_lca_si_corresponde(monkeypatch):
         for element in captured["story"]
         if hasattr(element, "getPlainText")
     )
-    assert "Expediente / IF: IF-TEST" in text
+    assert "LCA: IF-TEST" in text
 
 
 def test_nota_no_rodamiento_no_muestra_lca_si_esta_vacio(monkeypatch):
@@ -72,7 +72,7 @@ def test_nota_no_rodamiento_no_muestra_lca_si_esta_vacio(monkeypatch):
         for element in captured["story"]
         if hasattr(element, "getPlainText")
     )
-    assert "Expediente / IF" not in text
+    assert "LCA" not in text
 
 
 def test_nota_no_rodamiento_no_imprime_none_en_documento(monkeypatch):
