@@ -1,40 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Callable
 import time
-from app.core.updater import check_for_update
-from app.core.downloader import download_file
-from pathlib import Path
-import sys
-import os
-import subprocess
-from app.ui.widgets.loading_overlay import LoadingOverlay
-from PySide6.QtWidgets import QTableView
-from pathlib import Path
-from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QStackedWidget, QFrame, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QSizePolicy, QApplication
-)
-import app.ui.app_message as popUp
-from PySide6.QtCore import Qt, QTimer, QThreadPool, QRunnable, QObject, Signal
-import ctypes
-# -------- PÃ¡ginas actuales del proyecto (con fallback a placeholders) --------
-try:
-    from app.ui.pages.dashboard_page import DashboardPage  # tu dashboard real
-except Exception:
-    from app.ui.pages.placeholder_page import PlaceholderPage as DashboardPage
-from app.ui.pages.placeholder_page import PlaceholderPage
-from PySide6.QtWidgets import QDialog
-# =================== VEHÍCULOS ===================
-VehiculosPage = None
-try:
-    from app.ui.pages.vehiculos_page import VehiculosPage as _VehiculosPage
-    VehiculosPage = _VehiculosPage
-except Exception:
-    VehiculosPage = None
-
-VehiculoDetailPage = None
-try:
-    from app.ui.pages.vehiculos_detail_page import VehiculoDetailPage as _VehiculoDetailPage
+from appgdetail_page import VehiculoDetailPage as _VehiculoDetailPage
     VehiculoDetailPage = _VehiculoDetailPage
 except Exception:
     VehiculoDetailPage = None

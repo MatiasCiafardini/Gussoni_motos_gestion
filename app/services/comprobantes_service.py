@@ -587,8 +587,8 @@ class ComprobantesService:
                     self._draw_multiline(
                         c, val, tx, ty,
                         max_w=cw - 3 * mm,
-                        line_h=4 * mm,
-                        max_lines=7,
+                        line_h=3.3 * mm,
+                        max_lines=8,
                         font="Helvetica",
                         size=7,
                     )
@@ -625,32 +625,30 @@ class ComprobantesService:
 
     def _desc_like_original(self, it: Dict[str, Any]) -> str:
         raw = str(it.get("descripcion") or "").strip()
-        if not raw:
-            return ""
 
         # Ejemplo:
         # Motomel C110DLX 2026 | Motor: XXXXX | Cuadro: YYYYY
         parts = [p.strip() for p in raw.split("|") if p.strip()]
 
-        marca = ""
-        modelo = ""
-        anio = ""
-        motor = ""
-        chasis = ""
+        marca = str(it.get("marca") or "").strip()
+        modelo = str(it.get("modelo") or "").strip()
+        anio = str(it.get("anio") or "").strip()
+        motor = str(it.get("numero_motor") or it.get("nro_motor") or "").strip()
+        chasis = str(it.get("numero_cuadro") or it.get("nro_cuadro") or "").strip()
 
         if parts:
             tokens = parts[0].split()
             if len(tokens) >= 3:
-                marca = tokens[0]
-                modelo = " ".join(tokens[1:-1])
-                anio = tokens[-1] if tokens[-1].isdigit() else ""
+                marca = marca or tokens[0]
+                modelo = modelo or " ".join(tokens[1:-1])
+                anio = anio or (tokens[-1] if tokens[-1].isdigit() else "")
 
         for p in parts[1:]:
             low = p.lower()
             if "motor" in low:
-                motor = p.split(":", 1)[-1].strip()
+                motor = p.split(":", 1)[-1].strip() or motor
             if "cuadro" in low or "chasis" in low:
-                chasis = p.split(":", 1)[-1].strip()
+                chasis = p.split(":", 1)[-1].strip() or chasis
 
         lca = str(it.get("lca") or "").strip()
 
@@ -668,10 +666,10 @@ class ComprobantesService:
             lines.append(f"NÚMERO CHASIS: {chasis}")
         if marca:
             lines.append(f"MARCA MOTOR: {marca.upper()}")
-        if lca:
-            lines.append(f"EXPEDIENTE / IF: {lca}")
         if motor:
             lines.append(f"NÚMERO MOTOR: {motor}")
+        if lca:
+            lines.append(f"EXPEDIENTE / IF: {lca}")
 
         return "\n".join(lines)
 

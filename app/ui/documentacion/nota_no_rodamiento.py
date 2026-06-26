@@ -11,6 +11,10 @@ from reportlab.lib import colors
 import app.ui.utils.paths as paths
 
 
+def _clean_text(value) -> str:
+    return "" if value is None else str(value).strip()
+
+
 def generar_nota_no_rodamiento_pdf(cliente: dict, veh: dict) -> str:
     downloads_dir = os.path.join(os.path.expanduser("~"), "Downloads")
     filename = f"nota_no_rodamiento_{cliente['id']}_{veh['id']}.pdf"
@@ -126,12 +130,18 @@ def generar_nota_no_rodamiento_pdf(cliente: dict, veh: dict) -> str:
     story.append(Paragraph("<u>DATOS DEL COMPRADOR:</u>", styles["SectionTitle"]))
     story.append(Spacer(1, 6))
 
-    nombre = f"{cliente.get('nombre','')} {cliente.get('apellido','')}".strip()
-    docu = f"{cliente.get('tipo_doc','')} {cliente.get('nro_doc','')}"
+    nombre = f"{_clean_text(cliente.get('nombre'))} {_clean_text(cliente.get('apellido'))}".strip()
+    tipo_doc = _clean_text(
+        cliente.get("tipo_doc")
+        or cliente.get("tipo_doc_label")
+        or cliente.get("cliente_tipo_doc")
+    )
+    nro_doc = _clean_text(cliente.get("nro_doc") or cliente.get("cliente_nro_doc"))
+    docu = f"{tipo_doc} {nro_doc}".strip()
 
     story.append(Paragraph(f"Nombre: {nombre}", styles["Normal"]))
     story.append(Paragraph(f"DNI/CUIT/CUIL: {docu}", styles["Normal"]))
-    story.append(Paragraph(f"Domicilio: {cliente.get('direccion','')}", styles["Normal"]))
+    story.append(Paragraph(f"Domicilio: {_clean_text(cliente.get('direccion'))}", styles["Normal"]))
 
     story.append(Spacer(1, 14))
     story.append(Paragraph(
