@@ -26,6 +26,8 @@ class _Spinner(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        if not painter.isActive():
+            return
         painter.setRenderHint(QPainter.Antialiasing)
         painter.translate(self.width() / 2, self.height() / 2)
         painter.rotate(self._angle)
@@ -92,6 +94,8 @@ class LoadingOverlay(QWidget):
     def paintEvent(self, event):
         # Fondo completamente transparente
         painter = QPainter(self)
+        if not painter.isActive():
+            return
         painter.fillRect(self.rect(), QColor(0, 0, 0, 0))
         painter.end()
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 
-from PySide6.QtCore import Qt, QPoint, QEvent
+from PySide6.QtCore import Qt, QPoint, QEvent, QTimer
 from PySide6.QtGui import QMouseEvent, QColor
 from PySide6.QtWidgets import (
     QApplication,

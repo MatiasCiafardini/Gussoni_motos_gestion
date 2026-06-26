@@ -498,14 +498,10 @@ class FacturasPage(QWidget):
 
     # ---------------- Navegación / eventos ----------------
     def _abrir_consultar(self, factura_id: Optional[int]) -> None:
-        print(">>> Abrir consultar factura_id =", factura_id)
-
         if factura_id is None:
-            print(">>> factura_id es None")
             return
 
         mw = getattr(self, "main_window", None) or self.window()
-        print(">>> main_window =", mw)
 
         try:
             mw.open_page("facturas_consultar", factura_id=factura_id)

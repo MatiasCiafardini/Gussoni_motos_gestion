@@ -44,7 +44,7 @@ def create_updater_window():
     window.show()
 
     return window, status, progress
-def start_fake_progress(progress: QProgressBar, status: QLabel):
+def start_fake_progress(progress: QProgressBar, status: QLabel) -> QTimer:
     steps = [
         (10, "Preparando actualización…"),
         (30, "Cerrando aplicación anterior…"),
@@ -65,20 +65,21 @@ def start_fake_progress(progress: QProgressBar, status: QLabel):
         status.setText(text)
         step_index += 1
 
-    timer = QTimer()
+    timer = QTimer(status)
     timer.timeout.connect(advance)
     timer.start(600)  # cada 600 ms
+    return timer
 
 
-def main():
+def main() -> int:
     app = QApplication(sys.argv)
 
     if len(sys.argv) < 4:
         popUp.critical(None, "Error", "Parámetros inválidos")
-        sys.exit(1)
+        return 1
 
     window, status, progress = create_updater_window()
-    start_fake_progress(progress, status)
+    timer = start_fake_progress(progress, status)
     app.processEvents()
 
     current_exe = Path(sys.argv[1])
@@ -114,15 +115,34 @@ def main():
         progress.setValue(100)
         status.setText("Reiniciando aplicación…")
 
-        subprocess.Popen([str(current_exe)], close_fds=True)
+        creationflags = 0
+        if sys.platform.startswith("win"):
+            creationflags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+
+        subprocess.Popen(
+            [str(current_exe)],
+            close_fds=True,
+            creationflags=creationflags,
+        )
     except Exception as e:
         popUp.critical(None, "Error de actualización", str(e))
-        sys.exit(1)
+        if timer.isActive():
+            timer.stop()
+        window.close()
+        app.processEvents()
+        app.quit()
+        return 1
 
-    sys.exit(0)
+    if timer.isActive():
+        timer.stop()
+    window.close()
+    window.deleteLater()
+    app.processEvents()
+    app.quit()
+    return 0
 
 
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

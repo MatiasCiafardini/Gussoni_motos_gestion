@@ -1,6 +1,6 @@
 #define MyAppName "Gussoni App"
 #define MyAppExeName "GussoniApp.exe"
-#define MyAppVersion "1.0.15"
+#define MyAppVersion "1.0.17"
 #define MyAppPublisher "Gussoni"
 #define MyAppDir "GussoniApp"
 
@@ -36,8 +36,9 @@ Name: "desktopicon"; Description: "Crear icono en el escritorio"; GroupDescripti
 
 [Files]
 ; ===== APP PRINCIPAL =====
-Source: "dist\GussoniApp.exe"; \
+Source: "dist\GussoniApp_{#MyAppVersion}.exe"; \
     DestDir: "{app}"; \
+    DestName: "{#MyAppExeName}"; \
     Flags: ignoreversion
 
 ; ===== UPDATER =====

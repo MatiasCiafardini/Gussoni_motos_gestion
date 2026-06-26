@@ -1,6 +1,33 @@
 from __future__ import annotations
 from typing import Optional, Callable
+import ctypes
+import os
+import sys
 import time
+from pathlib import Path
+
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QSizePolicy,
+    QStackedWidget,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
+
+import app.ui.app_message as popUp
+from app.core.downloader import download_file
+from app.core.updater import check_for_update
+from app.ui.pages.dashboard_page import DashboardPage
+from app.ui.pages.placeholder_page import PlaceholderPage
+from app.ui.widgets.loading_overlay import LoadingOverlay
 
 # =================== VEHICULOS ===================
 VehiculosPage = None
@@ -162,9 +189,15 @@ class _WarmupTask(QRunnable):
     def run(self):
         try:
             data = CatalogosService().warmup_all()
-            self.signals.done.emit(data)
+            try:
+                self.signals.done.emit(data)
+            except RuntimeError:
+                pass
         except Exception as e:
-            self.signals.error.emit(str(e))
+            try:
+                self.signals.error.emit(str(e))
+            except RuntimeError:
+                pass
 
 
 class MainWindow(QMainWindow):
@@ -602,6 +635,12 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------------
     def open_page(self, name: str, *args, **kwargs):
         self.show_loading("Cargando…")
+        try:
+            self._open_page(name, *args, **kwargs)
+        finally:
+            QTimer.singleShot(0, self.loading.hide_overlay)
+
+    def _open_page(self, name: str, *args, **kwargs):
         if self._ensure_catalogs_ready and self._route_requires_catalogs(name):
             self._ensure_catalogs_ready()
 
@@ -788,15 +827,16 @@ class MainWindow(QMainWindow):
 
         # NUEVO: consulta de factura
         if name == "facturas_consultar":
-
-            # 🔒 FIX: si ya estoy viendo una factura, no volver a abrirla
-            current = self.stack.currentWidget()
-            if isinstance(current, FacturasConsultarPage):
-                return
-
             fid = kwargs.get("factura_id") or (args[0] if args else None)
             if not fid:
                 self.notify("Falta factura_id para abrir la consulta.", "error")
+                return
+
+            current = self.stack.currentWidget()
+            if (
+                isinstance(current, FacturasConsultarPage)
+                and getattr(current, "_factura_id", None) == int(fid)
+            ):
                 return
 
             if not FacturasConsultarPage:
@@ -851,10 +891,6 @@ class MainWindow(QMainWindow):
 
         # 🔒 FIX CLAVE: no apilar si ya estamos en la MISMA PÁGINA
         if current is not None and current is widget:
-            return
-
-        # FIX EXTRA: no duplicar por clase (caso facturas_consultar)
-        if current is not None and type(current) is type(widget):
             return
 
         self._page_history.append(current)
