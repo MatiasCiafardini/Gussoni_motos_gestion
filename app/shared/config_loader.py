@@ -28,7 +28,8 @@ def ensure_config_exists() -> Path:
                 "password": "",
                 "name": "",
                 "pool_size": 5,
-                "pool_timeout": 30
+                "pool_timeout": 30,
+                "connect_timeout": 5
             },
             "arca": {
                 "cuit": "33717057479",

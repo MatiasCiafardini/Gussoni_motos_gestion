@@ -1,5 +1,5 @@
 {
-  "version": "1.0.17",
-  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.17/GussoniApp_1.0.17.exe",
-  "changelog": "Corrección de navegación y carga en consulta de facturas"
+  "version": "1.0.18",
+  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.18/GussoniApp_1.0.18.exe",
+  "changelog": "La condición de venta financiada ahora se muestra sin el detalle de las cuotas"
 }

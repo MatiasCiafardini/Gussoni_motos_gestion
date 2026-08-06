@@ -21,6 +21,7 @@ engine = create_engine(
     pool_size=settings.DB_POOL_SIZE,
     pool_pre_ping=True,
     pool_timeout=settings.DB_POOL_TIMEOUT,
+    connect_args={"connect_timeout": max(int(settings.DB_CONNECT_TIMEOUT), 1)},
     isolation_level="READ COMMITTED",
     echo=False,
     future=True,

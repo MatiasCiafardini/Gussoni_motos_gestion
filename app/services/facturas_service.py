@@ -322,17 +322,7 @@ class FacturasService:
             return ""
     
         if nombre.lower() == "financiación":
-            cuotas = row.get("cantidad_cuotas")
-            importe_cuota = row.get("importe_cuota")
-    
-            partes = ["Financiación"]
-            if cuotas:
-                partes.append(f"{int(cuotas)} cuotas")
-            if importe_cuota:
-                partes.append(f"de ${float(importe_cuota):,.2f} c/u")
-
-    
-            return " – ".join(partes)
+            return "Financiación"
     
         return nombre
     

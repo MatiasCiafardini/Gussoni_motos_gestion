@@ -1,6 +1,14 @@
 import pymysql
 from app.core.config import settings
 
+
+def _connect_timeout(db_config: dict) -> int:
+    try:
+        return max(int(db_config.get("connect_timeout", settings.DB_CONNECT_TIMEOUT)), 1)
+    except Exception:
+        return max(int(settings.DB_CONNECT_TIMEOUT), 1)
+
+
 def probar_conexion_db(db_config: dict) -> tuple[bool, str | None]:
     try:
         conn = pymysql.connect(
@@ -9,7 +17,7 @@ def probar_conexion_db(db_config: dict) -> tuple[bool, str | None]:
             user=db_config["user"],
             password=db_config.get("password", ""),
             database=db_config["name"],
-            connect_timeout=5,
+            connect_timeout=_connect_timeout(db_config),
         )
         conn.close()
         return True, None

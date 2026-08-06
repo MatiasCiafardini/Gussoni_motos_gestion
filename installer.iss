@@ -1,6 +1,6 @@
 #define MyAppName "Gussoni App"
 #define MyAppExeName "GussoniApp.exe"
-#define MyAppVersion "1.0.17"
+#define MyAppVersion "1.0.18"
 #define MyAppPublisher "Gussoni"
 #define MyAppDir "GussoniApp"
 

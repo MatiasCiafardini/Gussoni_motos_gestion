@@ -20,6 +20,8 @@ def setup_logging(app_name: str = "MotoAgency Desk") -> None:
             sys.stdout,
             level="INFO",
             format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{message}</cyan>",
+            backtrace=False,
+            diagnose=False,
         )
 
     # 🔹 Archivo (siempre válido)
@@ -29,6 +31,8 @@ def setup_logging(app_name: str = "MotoAgency Desk") -> None:
         retention="4 weeks",
         level="INFO",
         encoding="utf-8",
+        backtrace=False,
+        diagnose=False,
     )
 
     logger.info("Logging inicializado correctamente")

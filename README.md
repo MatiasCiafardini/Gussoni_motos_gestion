@@ -47,6 +47,7 @@ DB_PASSWORD=secret
 DB_NAME=motoagency
 DB_POOL_SIZE=5
 DB_POOL_TIMEOUT=30
+DB_CONNECT_TIMEOUT=5
 ```
 
 ## Ejecutar

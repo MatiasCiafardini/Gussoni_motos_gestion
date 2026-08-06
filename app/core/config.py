@@ -41,6 +41,7 @@ class Settings:
     DB_NAME: str = _str(_db.get("name"))
     DB_POOL_SIZE: int = _int(_db.get("pool_size"), 5)
     DB_POOL_TIMEOUT: int = _int(_db.get("pool_timeout"), 30)
+    DB_CONNECT_TIMEOUT: int = _int(_db.get("connect_timeout"), 5)
     DB_SSL_CA: str = _path(_str(_db.get("ssl_ca")))
 
     # =============== ARCA =================

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import Optional, Dict, Any
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.data.database import SessionLocal
 from app.repositories.usuarios_repository import UsuariosRepository
 from app.core.security import verify_password
+
+
+class AuthServiceDatabaseError(RuntimeError):
+    """Raised when credentials cannot be checked because the database failed."""
 
 
 class AuthService:
@@ -31,8 +36,9 @@ class AuthService:
         if not username or not password:
             return None
 
-        db = SessionLocal()
+        db: Optional[Session] = None
         try:
+            db = SessionLocal()
             repo = self._repo(db)
             user = repo.get_by_username(username)
             if not user:
@@ -47,5 +53,10 @@ class AuthService:
 
             user.pop("contrasenia_hash", None)
             return user
+        except SQLAlchemyError as exc:
+            raise AuthServiceDatabaseError(
+                "No se pudo validar el usuario contra la base de datos."
+            ) from exc
         finally:
-            db.close()
+            if db is not None:
+                db.close()

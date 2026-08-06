@@ -122,7 +122,9 @@ class ConfigDialog(QDialog):
 
     def _on_save(self):
         cfg = load_config()
-        cfg["db"] = self._collect_db_config()
+        db = dict(cfg.get("db", {}))
+        db.update(self._collect_db_config())
+        cfg["db"] = db
         save_config(cfg)
         self.accept()
         self.restart_app()

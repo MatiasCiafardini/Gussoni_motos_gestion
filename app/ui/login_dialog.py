@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 import app.ui.utils.paths as paths
-from app.services.auth_service import AuthService
+from app.services.auth_service import AuthService, AuthServiceDatabaseError
 
 
 class LoginDialog(QDialog):
@@ -191,8 +191,17 @@ class LoginDialog(QDialog):
 
         try:
             user = self._auth_service.authenticate(username, password)
+        except AuthServiceDatabaseError as exc:
+            cause = (
+                exc.__cause__.__class__.__name__
+                if exc.__cause__
+                else exc.__class__.__name__
+            )
+            logger.warning("Login sin conexión a base de datos ({})", cause)
+            self._show_error("No se pudo conectar a la base de datos.")
+            return
         except Exception:
-            logger.exception("Error real durante el login")
+            logger.opt(exception=True).error("Error inesperado durante el login")
             self._show_error("No se pudo iniciar sesión.")
             return
         finally:
