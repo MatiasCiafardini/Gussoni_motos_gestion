@@ -1,5 +1,5 @@
 {
-  "version": "1.0.18",
-  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.18/GussoniApp_1.0.18.exe",
-  "changelog": "La condición de venta financiada ahora se muestra sin el detalle de las cuotas"
+  "version": "1.0.19",
+  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.19/GussoniApp_1.0.19.exe",
+  "changelog": "Corrección al modificar facturas rechazadas: ahora permite guardar cambios de fecha sin solicitar nuevamente el tipo de comprobante"
 }

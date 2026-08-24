@@ -24,7 +24,9 @@ Thumbs.db
 
 ---- Archivos de compilación / distribución ----
 build/
+build_*/
 dist/
+release_*/
 *.egg-info/
 
 ---- Configuración de IDEs ----

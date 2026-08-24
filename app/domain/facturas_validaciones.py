@@ -17,12 +17,17 @@ def validar_factura(
     errores: List[str] = []
 
     # ---------- Cabecera ----------
+    # Al crear una factura la UI envía el ID del catálogo, mientras que la
+    # pantalla de consulta/edición trabaja con el código (FA, FB, NC-B, etc.).
+    # Ambos identifican válidamente el tipo de comprobante.
+    tipo_id = cabecera.get("tipo_comprobante_id")
+    tipo_codigo = str(cabecera.get("tipo") or "").strip()
     try:
-        tipo_id = int(cabecera.get("tipo_comprobante_id"))
+        tipo_id = int(tipo_id)
     except (TypeError, ValueError):
         tipo_id = None
 
-    if not tipo_id:
+    if not tipo_id and not tipo_codigo:
         errores.append("Seleccioná el tipo de comprobante.")
 
 
