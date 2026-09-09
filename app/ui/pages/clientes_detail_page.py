@@ -168,7 +168,7 @@ class ClientesDetailPage(QWidget):
         self.tbl_ventas.setObjectName("DataTable")
 
         self.tbl_ventas.setHorizontalHeaderLabels([
-            "Fecha", "Descripción", "Precio", "Forma de pago", "Estado", "Acciones"
+            "Fecha", "Comprobante", "Moto/s", "Total", "Estado", "Acciones"
         ])
 
         self.tbl_ventas.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -297,17 +297,20 @@ class ClientesDetailPage(QWidget):
     # -----------------------------------------------------
     def _load_ventas(self):
         self.tbl_ventas.setRowCount(0)
-        ventas = self.ventas_service.get_by_cliente(self.cliente_id)
+        ventas = self.ventas_service.get_facturacion_by_cliente(self.cliente_id)
 
         for v in ventas:
             row = self.tbl_ventas.rowCount()
             self.tbl_ventas.insertRow(row)
 
-            self.tbl_ventas.setItem(row, 0, QTableWidgetItem(str(v["fecha"])))
-            self.tbl_ventas.setItem(row, 1, QTableWidgetItem(v["descripcion"]))
-            self.tbl_ventas.setItem(row, 2, QTableWidgetItem(f"$ {v['precio_operacion']:.2f}"))
-            self.tbl_ventas.setItem(row, 3, QTableWidgetItem(v["forma_pago"]))
-            self.tbl_ventas.setItem(row, 4, QTableWidgetItem(v["estado_financiero"]))
+            fecha = v.get("fecha")
+            fecha_texto = fecha.strftime("%d/%m/%Y") if hasattr(fecha, "strftime") else str(fecha or "")
+            estado_factura = v.get("factura_estado") or v.get("estado_financiero") or ""
+            self.tbl_ventas.setItem(row, 0, QTableWidgetItem(fecha_texto))
+            self.tbl_ventas.setItem(row, 1, QTableWidgetItem(v["comprobante"]))
+            self.tbl_ventas.setItem(row, 2, QTableWidgetItem(v["descripcion"]))
+            self.tbl_ventas.setItem(row, 3, QTableWidgetItem(f"$ {v['precio_operacion']:,.2f}"))
+            self.tbl_ventas.setItem(row, 4, QTableWidgetItem(estado_factura))
 
             btns = QWidget()
             lay = QHBoxLayout(btns)

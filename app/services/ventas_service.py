@@ -279,7 +279,7 @@ class VentasService:
                         SUM(
                             CASE
                                 WHEN c.estado != 'PAGADA'
-                                 AND c.fecha_vencimiento < CURDATE()
+                                 AND c.fecha_vencimiento < CURRENT_DATE
                                 THEN 1 ELSE 0
                             END
                         ) AS cuotas_vencidas            
@@ -330,5 +330,83 @@ class VentasService:
 
             return ventas
 
+        finally:
+            db.close()
+
+    def get_facturacion_by_cliente(self, cliente_id: int) -> list[dict]:
+        """Historial de comprobantes del cliente con todas sus motos.
+
+        Se agrupa por factura (no por moto ni por venta), de modo que una factura
+        puede mostrar varias unidades y una misma unidad puede aparecer en ventas
+        distintas a lo largo del tiempo.
+        """
+        estados_financieros = {
+            (v.get("id"), v.get("factura_id")): v
+            for v in self.get_by_cliente(cliente_id)
+        }
+        db = SessionLocal()
+        try:
+            rows = db.execute(
+                text(
+                    """
+                    SELECT
+                        f.id AS factura_id, f.venta_id, f.fecha_emision,
+                        f.punto_venta, f.numero, f.total,
+                        tc.nombre AS comprobante_tipo,
+                        tc.letra AS comprobante_letra,
+                        ef.nombre AS factura_estado,
+                        fd.id AS detalle_id,
+                        vh.id AS vehiculo_id, vh.marca, vh.modelo,
+                        vh.numero_motor, vh.numero_cuadro
+                    FROM facturas f
+                    LEFT JOIN tipos_comprobante tc ON tc.id = f.tipo_comprobante_id
+                    LEFT JOIN estados ef ON ef.id = f.estado_id
+                    LEFT JOIN facturas_detalle fd ON fd.factura_id = f.id
+                    LEFT JOIN vehiculos vh ON vh.id = fd.vehiculo_id
+                    WHERE f.cliente_id = :cliente_id
+                    ORDER BY f.fecha_emision DESC, f.id DESC, fd.id ASC
+                    """
+                ),
+                {"cliente_id": cliente_id},
+            ).mappings().all()
+
+            facturas: dict[int, dict] = {}
+            for row in rows:
+                factura_id = int(row["factura_id"])
+                item = facturas.get(factura_id)
+                if item is None:
+                    numero = f"{int(row['punto_venta']):05d}-{int(row['numero']):08d}"
+                    tipo = row["comprobante_tipo"] or "Comprobante"
+                    financiero = estados_financieros.get((row["venta_id"], factura_id), {})
+                    item = {
+                        "id": row["venta_id"],
+                        "factura_id": factura_id,
+                        "fecha": row["fecha_emision"],
+                        "comprobante": f"{tipo} {numero}",
+                        "precio_operacion": float(row["total"] or 0),
+                        "forma_pago": financiero.get("forma_pago") or "",
+                        "estado_financiero": financiero.get("estado_financiero") or "",
+                        "factura_estado": row["factura_estado"] or "",
+                        "vehiculos": [],
+                    }
+                    facturas[factura_id] = item
+
+                if row["vehiculo_id"] is not None:
+                    nombre = " ".join(
+                        str(value) for value in (row["marca"], row["modelo"]) if value
+                    ).strip() or f"Vehiculo #{row['vehiculo_id']}"
+                    ids = []
+                    if row["numero_motor"]:
+                        ids.append(f"Motor: {row['numero_motor']}")
+                    if row["numero_cuadro"]:
+                        ids.append(f"Cuadro: {row['numero_cuadro']}")
+                    detalle = f"{nombre} | {' | '.join(ids)}" if ids else nombre
+                    if detalle not in item["vehiculos"]:
+                        item["vehiculos"].append(detalle)
+
+            result = list(facturas.values())
+            for item in result:
+                item["descripcion"] = "\n".join(item.pop("vehiculos")) or "Sin motos asociadas"
+            return result
         finally:
             db.close()

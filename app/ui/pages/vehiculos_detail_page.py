@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 from PySide6.QtWidgets import (
     QWidget, QGridLayout, QLineEdit, QTextEdit, QComboBox, QPushButton,
-    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy
+    QVBoxLayout, QHBoxLayout, QLabel, QListView, QSizePolicy,
+    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIntValidator
@@ -11,6 +12,7 @@ from app.ui.widgets.money_spinbox import MoneySpinBox
 import app.ui.app_message as popUp
 from app.domain.vehiculos_validaciones import validate_vehiculo
 from app.ui.utils.text_utils import normalize_title
+from app.ui.utils.table_utils import setup_compact_table
 
 class VehiculoDetailPage(QWidget):
     """
@@ -21,6 +23,7 @@ class VehiculoDetailPage(QWidget):
     - Volver valida si hay edición pendiente y pide confirmación
     """
     navigate_back = Signal()
+    navigate_to_factura = Signal(int)
 
     def __init__(self, vehiculo_id: int, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -156,6 +159,31 @@ class VehiculoDetailPage(QWidget):
         root.addWidget(title)
         root.addLayout(grid)
 
+        self.section_facturacion = QWidget()
+        self.section_facturacion.setObjectName("Card")
+        history_layout = QVBoxLayout(self.section_facturacion)
+        history_layout.setContentsMargins(16, 16, 16, 16)
+        history_title = QLabel("Historial de ventas y comprobantes")
+        history_title.setObjectName("SectionTitle")
+        history_layout.addWidget(history_title)
+        self.tbl_facturacion = QTableWidget(0, 6)
+        self.tbl_facturacion.setObjectName("DataTable")
+        self.tbl_facturacion.setHorizontalHeaderLabels(
+            ["Fecha", "Cliente", "Comprobante", "Importe moto", "Estado", "Acciones"]
+        )
+        self.tbl_facturacion.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tbl_facturacion.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tbl_facturacion.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tbl_facturacion.setAlternatingRowColors(True)
+        self.tbl_facturacion.verticalHeader().setVisible(False)
+        setup_compact_table(self.tbl_facturacion)
+        header = self.tbl_facturacion.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        history_layout.addWidget(self.tbl_facturacion)
+        root.addSpacing(16)
+        root.addWidget(self.section_facturacion)
+
         # llena el alto restante y empuja la botonera al final
         root.addStretch(1)
 
@@ -186,6 +214,7 @@ class VehiculoDetailPage(QWidget):
         # Carga inicial
         self._load_lookups()
         self._load_data()
+        self._load_facturacion_history()
 
     # ---------------------- Helpers UI ----------------------
     def _setup_combo(self, cb: QComboBox):
@@ -205,6 +234,39 @@ class VehiculoDetailPage(QWidget):
             self.in_color, self.in_estado_stock, self.in_condicion, self.in_observ
         ):
             w.setEnabled(enabled)
+        self.section_facturacion.setVisible(not enabled and self.tbl_facturacion.rowCount() > 0)
+
+    def _load_facturacion_history(self):
+        self.tbl_facturacion.setRowCount(0)
+        try:
+            history = self.service.get_facturacion_history(self.vehiculo_id)
+        except Exception as ex:
+            popUp.warning(self, "Vehiculo", f"No se pudo cargar el historial de ventas:\n{ex}")
+            history = []
+        for record in history:
+            row = self.tbl_facturacion.rowCount()
+            self.tbl_facturacion.insertRow(row)
+            fecha = record.get("fecha_emision")
+            fecha_texto = fecha.strftime("%d/%m/%Y") if hasattr(fecha, "strftime") else str(fecha or "")
+            cliente = " ".join(
+                str(value) for value in (record.get("cliente_nombre"), record.get("cliente_apellido")) if value
+            ).strip() or "Sin cliente"
+            if record.get("cliente_documento"):
+                cliente += f" ({record['cliente_documento']})"
+            numero = f"{int(record['punto_venta']):05d}-{int(record['numero']):08d}"
+            tipo = record.get("comprobante_tipo") or "Comprobante"
+            comprobante = f"{tipo} {numero}"
+            importe = float(record.get("importe_item") or 0)
+            values = (fecha_texto, cliente, comprobante, f"$ {importe:,.2f}", record.get("factura_estado") or "")
+            for column, value in enumerate(values):
+                self.tbl_facturacion.setItem(row, column, QTableWidgetItem(value))
+            button = QPushButton("Ver factura")
+            button.setObjectName("BtnGhost")
+            button.clicked.connect(
+                lambda _, factura_id=record["factura_id"]: self.navigate_to_factura.emit(int(factura_id))
+            )
+            self.tbl_facturacion.setCellWidget(row, 5, button)
+        self.section_facturacion.setVisible(bool(history) and not self.edit_mode)
 
     def _update_buttons(self):
         """Maneja visibilidad según modo."""

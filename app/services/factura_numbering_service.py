@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.data.database import SessionLocal
@@ -153,6 +154,7 @@ class FacturaNumberingService:
             tipo_comprobante_id,
             pto_vta,
         )
+        self.validar_sin_pendientes(db, tipo_comprobante_id, pto_vta)
 
         ultimo_afip: Optional[int] = None
         ws_llamado_ok = False
@@ -207,6 +209,40 @@ class FacturaNumberingService:
             proximo_local = 1
 
         return proximo_local
+
+    def validar_sin_pendientes(
+        self,
+        db: Session,
+        tipo_comprobante_id: int,
+        pto_vta: int,
+    ) -> None:
+        """Impide avanzar la secuencia si hay una respuesta de ARCA incierta."""
+        pendiente = db.execute(
+            text(
+                """
+                SELECT f.id, f.numero
+                FROM facturas f
+                LEFT JOIN estados e ON e.id = f.estado_id
+                WHERE f.tipo_comprobante_id = :tipo
+                  AND f.punto_venta = :pto
+                  AND f.cae IS NULL
+                  AND (
+                    LOWER(COALESCE(e.nombre, '')) LIKE '%error%'
+                    OR COALESCE(f.observaciones, '') LIKE '[ARCA] Pendiente de confirmacion%'
+                  )
+                ORDER BY f.numero ASC
+                LIMIT 1
+                """
+            ),
+            {"tipo": int(tipo_comprobante_id), "pto": int(pto_vta)},
+        ).mappings().first()
+        if pendiente:
+            raise RuntimeError(
+                "No se puede emitir un nuevo comprobante: la factura "
+                f"{int(pto_vta):05d}-{int(pendiente['numero']):08d} "
+                "todavia tiene una respuesta pendiente de ARCA. Use "
+                "'Sincronizar con ARCA' antes de continuar."
+            )
 
     @staticmethod
     def _parse_ultimo_afip(value: Any, errores: list[str]) -> Optional[int]:

@@ -375,6 +375,12 @@ class FacturasService:
 
             pto_int = int(pto)
 
+            self._numbering.validar_sin_pendientes(
+                db,
+                tipo_comprobante_id,
+                pto_int,
+            )
+
             # Si no vino número desde la UI → usar lógica real (AFIP primero)
             if not numero:
                 numero = self._obtener_proximo_numero_real(db, repo, tipo_comprobante_id, pto_int)
@@ -540,14 +546,13 @@ class FacturasService:
                         """
                         SELECT id, tipo_comprobante_id, numero, punto_venta
                         FROM facturas
-                        WHERE estado_id IN (:est_borr, :est_err, :est_rec, :est_pen)
+                        WHERE estado_id IN (:est_borr, :est_err, :est_pen)
                         ORDER BY tipo_comprobante_id, punto_venta, numero
                         """
                     ),
                     {
                         "est_borr": self.ESTADO_BORRADOR,
                         "est_err": self.ESTADO_ERROR_COMUNICACION,
-                        "est_rec": self.ESTADO_RECHAZADA,
                         "est_pen": self.ESTADO_PENDIENTE_AFIP,
                     },
                 ).mappings().all()
@@ -610,16 +615,8 @@ class FacturasService:
                 factura_id = f["id"]
                 num_local = int(f.get("numero") or 0)
 
-                # Ajustar numeración si hace falta — sesión corta, commit inmediato
-                if num_local != proximo_afip:
-                    with SessionLocal() as db:
-                        db.execute(
-                            text("UPDATE facturas SET numero = :num WHERE id = :id"),
-                            {"num": proximo_afip, "id": factura_id},
-                        )
-                        db.commit()
-                    f["numero"] = proximo_afip
-                    num_local = proximo_afip
+                # El número fiscal es inmutable. Una diferencia con ARCA se
+                # reconcilia consultando este mismo número, nunca renumerando.
 
                 # Pausa entre calls a AFIP para respetar el límite de requests
                 time.sleep(0.2)

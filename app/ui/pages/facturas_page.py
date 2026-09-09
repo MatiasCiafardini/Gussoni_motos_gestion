@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication
 ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 from app.services.facturas_service import FacturasService
 from app.ui.utils.loading_decorator import with_loading
+from app.ui.widgets.optional_date_edit import OptionalDateEdit
 
 
 class FacturasPage(QWidget):
@@ -71,9 +72,9 @@ class FacturasPage(QWidget):
         self.in_estado.addItem("Todos", None)
 
         # Fechas
-        self.in_fecha_desde = QDateEdit()
+        self.in_fecha_desde = OptionalDateEdit()
         self._setup_date(self.in_fecha_desde)
-        self.in_fecha_hasta = QDateEdit()
+        self.in_fecha_hasta = OptionalDateEdit()
         self._setup_date(self.in_fecha_hasta)
         self._set_default_date_range()
 
@@ -350,8 +351,10 @@ class FacturasPage(QWidget):
 
     # ---------------- Lógica ----------------
     def gather_filters(self) -> Dict[str, Any]:
-        fd = self.in_fecha_desde.date().toString("yyyy-MM-dd")
-        fh = self.in_fecha_hasta.date().toString("yyyy-MM-dd")
+        fecha_desde = self.in_fecha_desde.optional_date()
+        fecha_hasta = self.in_fecha_hasta.optional_date()
+        fd = fecha_desde.toString("yyyy-MM-dd") if fecha_desde else None
+        fh = fecha_hasta.toString("yyyy-MM-dd") if fecha_hasta else None
         return {
             "tipo_comprobante_id": self.in_tipo.currentData(),
             "pto_vta": self.in_pto_vta.currentData(),

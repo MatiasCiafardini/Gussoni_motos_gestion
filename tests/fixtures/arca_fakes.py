@@ -34,6 +34,7 @@ class FakeWSFE:
         self.vto_cae = vto_cae
         self.errores = errores or ["10016 - Rechazo de prueba"]
         self.solicitudes: List[Dict[str, Any]] = []
+        self.comprobantes: Dict[int, Dict[str, Any]] = {}
 
     def fe_comp_ultimo_autorizado(self, *, auth: Any, cbte_tipo: int, pto_vta: int) -> Dict[str, int]:
         return {"cbte_nro": self.ultimo_autorizado}
@@ -43,6 +44,14 @@ class FakeWSFE:
         if self.aprobada:
             numero = int(factura.get("numero") or self.ultimo_autorizado + 1)
             self.ultimo_autorizado = max(self.ultimo_autorizado, numero)
+            self.comprobantes[numero] = {
+                "resultado": "A",
+                "cae": self.cae,
+                "fecha_cae": None,
+                "vto_cae": self.vto_cae,
+                "errores": [],
+                "observaciones": [],
+            }
             return ArcaWSFEResult(
                 aprobada=True,
                 rechazada=False,
@@ -65,12 +74,38 @@ class FakeWSFE:
             mensaje="Resultado: R - Errores: " + "; ".join(self.errores),
         )
 
+    def fe_comp_consultar(self, *, auth: Any, cbte_tipo: int, pto_vta: int, cbte_nro: int):
+        return self.comprobantes.get(
+            int(cbte_nro),
+            {"resultado": None, "cae": None, "errores": ["Comprobante inexistente"]},
+        )
+
 
 class FakeWSFEConError(FakeWSFE):
     def __init__(self, mensaje: str = "Timeout ARCA de prueba") -> None:
         super().__init__(ultimo_autorizado=0, aprobada=False)
         self.mensaje = mensaje
+        self.fallar = True
 
     def solicitar_cae(self, *, auth: Any, factura: Dict[str, Any], items: List[Dict[str, Any]]) -> ArcaWSFEResult:
+        if not self.fallar:
+            self.aprobada = True
+            return super().solicitar_cae(auth=auth, factura=factura, items=items)
         self.solicitudes.append({"factura": dict(factura), "items": list(items)})
         raise TimeoutError(self.mensaje)
+
+
+class FakeWSFETimeoutDespuesDeAutorizar(FakeWSFE):
+    def solicitar_cae(self, *, auth: Any, factura: Dict[str, Any], items: List[Dict[str, Any]]) -> ArcaWSFEResult:
+        numero = int(factura["numero"])
+        self.solicitudes.append({"factura": dict(factura), "items": list(items)})
+        self.ultimo_autorizado = max(self.ultimo_autorizado, numero)
+        self.comprobantes[numero] = {
+            "resultado": "A",
+            "cae": self.cae,
+            "fecha_cae": "20260813",
+            "vto_cae": self.vto_cae,
+            "errores": [],
+            "observaciones": [],
+        }
+        raise TimeoutError("La respuesta se corto despues de autorizar")

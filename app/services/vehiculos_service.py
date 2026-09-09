@@ -75,6 +75,13 @@ class VehiculosService:
         finally:
             db.close()
 
+    def get_facturacion_history(self, vehiculo_id: int) -> List[Dict[str, Any]]:
+        db = SessionLocal()
+        try:
+            return self._repo(db).get_facturacion_history(vehiculo_id)
+        finally:
+            db.close()
+
     def update(self, vehiculo_id: int, data: Dict[str, Any]) -> int:
         db = SessionLocal()
         try:

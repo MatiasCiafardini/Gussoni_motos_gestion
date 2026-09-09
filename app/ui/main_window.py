@@ -508,6 +508,15 @@ class MainWindow(QMainWindow):
         detail = VehiculoDetailPage(vehiculo_id)
         if hasattr(detail, "navigate_back"):
             detail.navigate_back.connect(lambda: self.navigate_back())
+        if hasattr(detail, "navigate_to_factura"):
+            detail.navigate_to_factura.connect(
+                lambda fid, vid=vehiculo_id: self.open_page(
+                    "facturas_consultar",
+                    factura_id=int(fid),
+                    return_to="vehiculo",
+                    vehiculo_id=vid,
+                )
+            )
         self.navigate_to(detail)
 
     def open_cliente_detail(self, cliente_id: int):
@@ -845,6 +854,7 @@ class MainWindow(QMainWindow):
             try:
                 return_to = kwargs.get("return_to")
                 cliente_id = kwargs.get("cliente_id")
+                vehiculo_id = kwargs.get("vehiculo_id")
 
                 page = FacturasConsultarPage(
                     factura_id=int(fid),
@@ -866,6 +876,13 @@ class MainWindow(QMainWindow):
                             lambda: self.open_page(
                                 "clientes_detalle",
                                 cliente_id=cliente_id
+                            )
+                        )
+                    elif return_to == "vehiculo" and vehiculo_id:
+                        page.go_back.connect(
+                            lambda: self.open_page(
+                                "vehiculos_detalle",
+                                vehiculo_id=vehiculo_id,
                             )
                         )
                     else:

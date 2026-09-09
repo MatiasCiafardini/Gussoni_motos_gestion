@@ -1229,11 +1229,28 @@ class FacturasAgregarPage(QWidget):
 
             # 🔥 ACÁ recién autorizás
             autorizar = getattr(self._svc_facturas, "autorizar_en_arca", None)
+            resultado_arca = None
             if callable(autorizar):
-                autorizar(new_id)
+                resultado_arca = autorizar(new_id)
 
             self._dirty = False
-            popUp.toast(self, "Factura procesada correctamente.", kind="success")
+            if resultado_arca and resultado_arca.get("aprobada"):
+                popUp.toast(self, "Factura autorizada correctamente.", kind="success")
+            elif resultado_arca and resultado_arca.get("rechazada"):
+                popUp.toast(
+                    self,
+                    f"Factura rechazada por ARCA: {resultado_arca.get('mensaje') or ''}",
+                    kind="error",
+                )
+            elif resultado_arca:
+                popUp.toast(
+                    self,
+                    resultado_arca.get("mensaje")
+                    or "La factura quedó pendiente de confirmación en ARCA.",
+                    kind="warning",
+                )
+            else:
+                popUp.toast(self, "Factura guardada.", kind="success")
 
             if abrir_detalle:
                 self.go_to_detalle.emit(new_id)

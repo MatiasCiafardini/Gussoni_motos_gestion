@@ -350,6 +350,36 @@ class VehiculosRepository:
         ).mappings().first()
         return dict(row) if row else None
 
+    def get_facturacion_history(self, vehiculo_id: int) -> List[Dict[str, Any]]:
+        """Lista cada comprobante que incluyo el vehiculo, incluso reventas."""
+        rows = self.db.execute(
+            text(
+                """
+                SELECT
+                    f.id AS factura_id, f.venta_id, f.fecha_emision,
+                    f.punto_venta, f.numero, f.total AS factura_total, f.cae,
+                    tc.codigo AS comprobante_codigo,
+                    tc.nombre AS comprobante_tipo,
+                    tc.letra AS comprobante_letra,
+                    ef.nombre AS factura_estado,
+                    c.id AS cliente_id,
+                    c.nombre AS cliente_nombre,
+                    c.apellido AS cliente_apellido,
+                    c.nro_doc AS cliente_documento,
+                    fd.importe_total AS importe_item
+                FROM facturas_detalle fd
+                JOIN facturas f ON f.id = fd.factura_id
+                LEFT JOIN tipos_comprobante tc ON tc.id = f.tipo_comprobante_id
+                LEFT JOIN estados ef ON ef.id = f.estado_id
+                LEFT JOIN clientes c ON c.id = f.cliente_id
+                WHERE fd.vehiculo_id = :vehiculo_id
+                ORDER BY f.fecha_emision DESC, f.id DESC, fd.id DESC
+                """
+            ),
+            {"vehiculo_id": vehiculo_id},
+        ).mappings().all()
+        return [dict(row) for row in rows]
+
     def update(self, vehiculo_id: int, data: Dict[str, Any]) -> int:
         """
         Actualiza columnas permitidas. Devuelve filas afectadas.

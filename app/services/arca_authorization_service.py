@@ -81,64 +81,56 @@ class ArcaAuthorizationService:
                 raise ValueError("La factura no tiene items en el detalle.")
 
             auth: ArcaAuthData = self._wsaa.get_auth()
-
-            try:
-                wsfe_result: ArcaWSFEResult = self._wsfe.solicitar_cae(
+            if factura.get("estado_id") == self._estado_error_getter():
+                wsfe_result = self._consultar_autorizacion_existente(
+                    repo=repo,
                     auth=auth,
                     factura=factura,
-                    items=items,
                 )
-            except Exception as e:
-                logger.exception("Error al invocar WSFE.solicitar_cae para factura {}", factura_id)
-                db.rollback()
-                estado_error = self._estado_error_getter()
-
-                try:
-                    repo = self._repo_factory(db)
-                    repo.actualizar_cae_y_estado(
-                        factura_id=factura_id,
-                        cae=None,
-                        fecha_cae=None,
-                        vto_cae=None,
-                        estado_id=estado_error,
-                    )
-                    self._observaciones_updater(
-                        db,
-                        factura_id,
-                        f"[ARCA] Error de comunicacion: {e}",
-                    )
-                    if self._rejected_effects_processor:
-                        self._rejected_effects_processor(
+                if wsfe_result is None:
+                    if not self._es_seguro_reintentar_mismo_numero(repo, auth, factura):
+                        return self._guardar_estado_incierto(
                             db,
                             factura_id,
-                            motivo="Error de comunicacion ARCA",
+                            factura,
+                            RuntimeError("ARCA todavia no permitio confirmar el comprobante"),
                         )
-                    self._audit.registrar(
-                        db,
-                        entidad="facturas",
-                        entidad_id=factura_id,
-                        accion="ARCA_ERROR_COMUNICACION",
-                        datos_previos={"estado_id": factura.get("estado_id") if factura else None},
-                        datos_nuevos={"estado_id": estado_error, "cae": None},
-                        contexto={"mensaje": str(e), "efectos_revertidos": bool(self._rejected_effects_processor)},
+                    try:
+                        wsfe_result = self._wsfe.solicitar_cae(
+                            auth=auth,
+                            factura=factura,
+                            items=items,
+                        )
+                    except Exception as retry_error:
+                        db.rollback()
+                        repo = self._repo_factory(db)
+                        wsfe_result = self._consultar_autorizacion_existente(
+                            repo=repo,
+                            auth=auth,
+                            factura=factura,
+                        )
+                        if wsfe_result is None:
+                            return self._guardar_estado_incierto(
+                                db, factura_id, factura, retry_error
+                            )
+            else:
+                try:
+                    wsfe_result = self._wsfe.solicitar_cae(
+                        auth=auth,
+                        factura=factura,
+                        items=items,
                     )
-                    db.commit()
-                except Exception:
-                    logger.exception("Error revirtiendo efectos por fallo ARCA para factura {}", factura_id)
+                except Exception as e:
+                    logger.exception("Error al invocar WSFE.solicitar_cae para factura {}", factura_id)
                     db.rollback()
-
-                return {
-                    "factura_id": factura_id,
-                    "aprobada": False,
-                    "rechazada": False,
-                    "cae": None,
-                    "fecha_cae": None,
-                    "vto_cae": None,
-                    "estado_id": estado_error,
-                    "errores": [],
-                    "observaciones": [],
-                    "mensaje": self._error_cleaner(e),
-                }
+                    repo = self._repo_factory(db)
+                    wsfe_result = self._consultar_autorizacion_existente(
+                        repo=repo,
+                        auth=auth,
+                        factura=factura,
+                    )
+                    if wsfe_result is None:
+                        return self._guardar_estado_incierto(db, factura_id, factura, e)
 
             if wsfe_result.aprobada:
                 nuevo_estado = self._estado_autorizada_getter()
@@ -222,6 +214,125 @@ class ArcaAuthorizationService:
             }
         finally:
             db.close()
+
+    def _guardar_estado_incierto(
+        self,
+        db: Session,
+        factura_id: int,
+        factura: Dict[str, Any],
+        error: Exception,
+    ) -> Dict[str, Any]:
+        """No revierte la operacion cuando no sabemos si ARCA la proceso."""
+        estado_error = self._estado_error_getter()
+        try:
+            repo = self._repo_factory(db)
+            repo.actualizar_cae_y_estado(
+                factura_id=factura_id,
+                cae=None,
+                fecha_cae=None,
+                vto_cae=None,
+                estado_id=estado_error,
+            )
+            self._observaciones_updater(
+                db,
+                factura_id,
+                f"[ARCA] Pendiente de confirmacion por error de comunicacion: {error}",
+            )
+            self._audit.registrar(
+                db,
+                entidad="facturas",
+                entidad_id=factura_id,
+                accion="ARCA_ESTADO_INCIERTO",
+                datos_previos={"estado_id": factura.get("estado_id")},
+                datos_nuevos={"estado_id": estado_error, "cae": None},
+                contexto={"mensaje": str(error), "efectos_revertidos": False},
+            )
+            db.commit()
+        except Exception:
+            logger.exception("Error guardando estado incierto para factura {}", factura_id)
+            db.rollback()
+
+        return {
+            "factura_id": factura_id,
+            "aprobada": False,
+            "rechazada": False,
+            "estado_incierto": True,
+            "cae": None,
+            "fecha_cae": None,
+            "vto_cae": None,
+            "estado_id": estado_error,
+            "errores": [],
+            "observaciones": [],
+            "mensaje": (
+                "No se pudo confirmar la respuesta de ARCA. La factura conserva su numero "
+                "y queda pendiente de verificacion; no vuelva a emitirla."
+            ),
+        }
+
+    def _consultar_autorizacion_existente(
+        self,
+        *,
+        repo: FacturasRepository,
+        auth: ArcaAuthData,
+        factura: Dict[str, Any],
+    ) -> Optional[ArcaWSFEResult]:
+        """Recupera el CAE si ARCA autorizo antes de cortarse la respuesta."""
+        consultar = getattr(self._wsfe, "fe_comp_consultar", None)
+        if not callable(consultar):
+            return None
+        try:
+            tipo = repo.get_tipo_comprobante_by_id(factura.get("tipo_comprobante_id"))
+            codigo = tipo["codigo"]
+            cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(codigo)
+            raw = consultar(
+                auth=auth,
+                cbte_tipo=cbte_tipo,
+                pto_vta=int(factura.get("punto_venta") or 0),
+                cbte_nro=int(factura.get("numero") or 0),
+            )
+            resultado = str(raw.get("resultado") or "").strip().upper()
+            cae = raw.get("cae")
+            if resultado != "A" or not cae:
+                return None
+            return ArcaWSFEResult(
+                aprobada=True,
+                rechazada=False,
+                cae=str(cae),
+                fecha_cae=raw.get("fecha_cae"),
+                vto_cae=raw.get("vto_cae"),
+                errores=raw.get("errores") or [],
+                observaciones=raw.get("observaciones") or [],
+                mensaje="Comprobante recuperado desde ARCA despues de una respuesta interrumpida.",
+            )
+        except Exception as consulta_error:
+            logger.warning("No se pudo reconciliar mediante FECompConsultar: {}", consulta_error)
+            return None
+
+    def _es_seguro_reintentar_mismo_numero(
+        self,
+        repo: FacturasRepository,
+        auth: ArcaAuthData,
+        factura: Dict[str, Any],
+    ) -> bool:
+        """Solo reintenta si ARCA espera exactamente el numero ya reservado."""
+        consultar_ultimo = getattr(self._wsfe, "fe_comp_ultimo_autorizado", None)
+        if not callable(consultar_ultimo):
+            return False
+        try:
+            tipo = repo.get_tipo_comprobante_by_id(factura.get("tipo_comprobante_id"))
+            codigo = tipo["codigo"]
+            cbte_tipo = ArcaWSFEClient._map_tipo_comprobante_to_afip_code(codigo)
+            raw = consultar_ultimo(
+                auth=auth,
+                cbte_tipo=cbte_tipo,
+                pto_vta=int(factura.get("punto_venta") or 0),
+            )
+            ultimo = self._parse_ultimo_autorizado(raw)
+            numero = int(factura.get("numero") or 0)
+            return numero > 0 and ultimo + 1 == numero
+        except Exception as error:
+            logger.warning("No se pudo validar un reintento seguro: {}", error)
+            return False
 
     def _log_ultimo_autorizado(
         self,
