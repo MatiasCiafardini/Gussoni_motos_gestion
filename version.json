@@ -1,5 +1,5 @@
 {
-  "version": "1.0.22",
-  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.22/GussoniApp_1.0.22.exe",
-  "changelog": "Nota de no rodamiento con firma y sello desde Facturas y Documentacion, conservando las proporciones de la imagen."
+  "version": "1.0.23",
+  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.23/GussoniApp_1.0.23.exe",
+  "changelog": "Correccion del bucle al volver desde una factura abierta desde vehiculos o clientes. Se recupera la consulta original y luego el listado."
 }

@@ -2380,17 +2380,6 @@ class FacturasConsultarPage(QWidget):
     # ---------------- Navegación ----------------
 
     def _on_volver(self) -> None:
-        # 🔁 Si la factura se abrió desde el perfil del cliente,
-        # volvemos explícitamente a ese cliente
-        if self._return_to == "cliente" and self._cliente_id:
-            mw = self._main_window
-            if mw and hasattr(mw, "open_page"):
-                mw.open_page(
-                    "clientes_detalle",
-                    cliente_id=int(self._cliente_id),
-                )
-            return
-    
-        # 🔙 Caso general: usar navegación normal
+        # Recuperar la pantalla anterior sin crear otra entrada en el historial.
         self.go_back.emit()
     
