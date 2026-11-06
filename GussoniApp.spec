@@ -1,6 +1,6 @@
 from PyInstaller.utils.hooks import collect_submodules, collect_dynamic_libs
 
-APP_NAME = "GussoniApp_1.0.21"
+APP_NAME = "GussoniApp_1.0.22"
 
 reportlab_hidden = collect_submodules("reportlab")
 mysql_hidden = collect_submodules("mysql")

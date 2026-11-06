@@ -152,9 +152,10 @@ def generar_nota_no_rodamiento_pdf(cliente: dict, veh: dict) -> str:
         # --- Firma ---
     story.append(Spacer(1, 25))
 
-    firma = Image(paths.FIRMA_ADMIN)
-    firma.drawHeight = 25 * mm
-    firma.drawWidth = 40 * mm
+    firma = Image(paths.FIRMA_CON_SELLO, mask="auto")
+    proporcion_firma = firma.imageHeight / firma.imageWidth
+    firma.drawWidth = 45 * mm
+    firma.drawHeight = firma.drawWidth * proporcion_firma
 
     firma_table = Table(
         [[firma]],

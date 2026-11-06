@@ -1,5 +1,5 @@
 {
-  "version": "1.0.21",
-  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.21/GussoniApp_1.0.21.exe",
-  "changelog": "Consulta de vehiculos: aviso de descarte solo ante cambios reales y visualizacion del comprador, comprobante e historial de facturacion."
+  "version": "1.0.22",
+  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.22/GussoniApp_1.0.22.exe",
+  "changelog": "Nota de no rodamiento con firma y sello desde Facturas y Documentacion, conservando las proporciones de la imagen."
 }
