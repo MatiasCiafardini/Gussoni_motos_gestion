@@ -48,7 +48,6 @@ class VehiculoDetailPage(QWidget):
 
         self.in_precio = MoneySpinBox()
         self.in_precio.setMinimumHeight(36)
-        self.in_precio.valueChanged.connect(self._mark_edited)
 
 
         # Línea 2
@@ -358,6 +357,7 @@ class VehiculoDetailPage(QWidget):
         self._set_combo_by_value(self.in_condicion, d.get("estado_moto_id"))
 
         self.in_observ.setPlainText(str(d.get("observaciones", "") or ""))
+        self._original_payload = self._collect_payload()
 
     def _set_combo_by_value(self, cb: QComboBox, value: Optional[int]):
         if value is None:
@@ -372,7 +372,7 @@ class VehiculoDetailPage(QWidget):
     # ---------------------- Back con confirmación ----------------------
     def _on_back_clicked(self):
         if self.edit_mode:
-            if not popUp.ask_discard(self):
+            if self._collect_payload() != self._original_payload and not popUp.ask_discard(self):
                 return
             self._cancel_edit()
         self.navigate_back.emit()
@@ -400,9 +400,6 @@ class VehiculoDetailPage(QWidget):
             "observaciones": self.in_observ.toPlainText().strip() or None,
         }
         return payload
-
-    def _mark_edited(self, *_):
-        self.edit_mode = True
 
     def _save(self):
         payload = self._collect_payload()

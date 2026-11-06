@@ -1,5 +1,5 @@
 {
-  "version": "1.0.20",
-  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.20/GussoniApp_1.0.20.exe",
-  "changelog": "Recuperación segura de facturas ante cortes de ARCA, prevención de comprobantes duplicados, historial de facturación en clientes y vehículos, y filtros de fecha opcionales."
+  "version": "1.0.21",
+  "url": "https://github.com/MatiasCiafardini/Gussoni_motos_gestion/releases/download/v1.0.21/GussoniApp_1.0.21.exe",
+  "changelog": "Consulta de vehiculos: aviso de descarte solo ante cambios reales y visualizacion del comprador, comprobante e historial de facturacion."
 }
